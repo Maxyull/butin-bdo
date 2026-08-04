@@ -58,7 +58,7 @@ class LecteurFactice:
         self.fenetres = fenetres
         self.appels = 0
 
-    def read_lines(self, image: np.ndarray) -> list[str]:
+    def read_text(self, image: np.ndarray) -> list[str]:
         fenetre = self.fenetres[min(self.appels, len(self.fenetres) - 1)]
         self.appels += 1
         return list(fenetre)
@@ -79,6 +79,24 @@ def construire(fenetres: list[list[str]], matcher: ItemMatcher, **reglages: obje
     lecteur = LecteurFactice(fenetres)
     config = LoopConfig(min_sightings=2, **reglages)  # type: ignore[arg-type]
     return source, lecteur, CaptureLoop(source, lecteur, matcher, REGION, config=config)
+
+
+def test_le_lecteur_reel_satisfait_le_contrat_de_la_boucle() -> None:
+    """Régression : ils ne se branchaient PAS, et rien ne le disait.
+
+    Le protocole de la boucle déclarait `read_lines`, le vrai lecteur expose
+    `read_text`. Tous les tests passaient, parce qu'ils utilisaient un lecteur
+    simulé qui suivait le protocole au lieu de suivre le vrai lecteur. Le
+    défaut ne serait apparu qu'au premier lancement réel.
+
+    L'annotation ci-dessous est le garde-fou : mypy vérifie l'accord entre les
+    deux à chaque analyse, ce qu'aucun test simulé ne peut faire.
+    """
+    from butin.capture.loop import LineSource
+    from butin.capture.ocr import TextReader
+
+    lecteur: LineSource = TextReader()
+    assert hasattr(lecteur, "read_text")
 
 
 class TestCadence:
