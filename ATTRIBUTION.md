@@ -19,12 +19,28 @@ Les idées et le code repris, adaptés puis réécrits ici :
 | Concept repris | Où il vit dans Butin | État |
 | --- | --- | --- |
 | Confusions de chiffres propres à la police du jeu | `src/butin/catalog/normalize.py` | fait |
-| Alignement de deux captures successives par recouvrement | `src/butin/tracking/alignment.py` | à faire |
-| Détection du défilement du journal d'acquisition | `src/butin/tracking/scroll.py` | à faire |
-| Validation d'un drop après accord de plusieurs images | `src/butin/tracking/staging.py` | à faire |
+| Comparaison tolérante de deux lignes lues | `src/butin/tracking/similarity.py` | fait |
+| Alignement de deux captures par suffixe et préfixe | `src/butin/tracking/alignment.py` | fait |
+| Garde-fous image aberrante et saut invraisemblable | `src/butin/tracking/alignment.py` | fait |
+| Détection du défilement par comparaison de pixels | `src/butin/tracking/scroll.py` | fait |
+| Attente de stabilité avant lecture | `src/butin/tracking/stability.py` | fait |
+| Validation d'un drop après accord de plusieurs images | `src/butin/tracking/staging.py` | fait |
 
 La colonne « état » est tenue à jour au fur et à mesure du portage. Elle dit ce
 qui dérive réellement du travail d'origine à cet instant, pas ce qui est prévu.
+
+### Ce qui a changé en cours de portage
+
+Le portage n'est pas une copie. Les différences de fond :
+
+- **Comparaison par identifiant d'objet et non par nom.** Deux lectures
+  abîmées du même objet donnent deux chaînes différentes mais le même
+  identifiant. Comparer les chaînes coûte plus cher et se trompe davantage.
+- **Le doute sur une quantité est enregistré au moment de la lecture**
+  (`quantity_uncertain`) et pèse moins au vote, au lieu d'être oublié.
+- **Typage strict** vérifié par mypy sur l'ensemble du paquet.
+- **Départage reproductible** à égalité de voix, pour que deux exécutions sur
+  la même capture donnent le même résultat.
 
 La licence MIT d'origine est reproduite dans [LICENSE](LICENSE), aux côtés de la
 nôtre, conformément à sa clause de conservation de la mention de copyright.

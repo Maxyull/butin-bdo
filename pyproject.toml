@@ -103,9 +103,14 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Les assertions sont le mécanisme normal de pytest, et les valeurs codées en
-# dur dans les tests sont des données de test, pas des secrets.
-"tests/**" = ["S101", "S105", "S106"]
+# S101 : les assertions sont le mécanisme normal de pytest.
+# S105/S106 : les valeurs codées en dur dans les tests sont des données de test,
+#   pas des secrets.
+# S311 : `random` sert à SIMULER du bruit d'OCR reproductible dans les tests de
+#   suivi, jamais à produire quoi que ce soit de sensible. Un générateur
+#   cryptographique y serait au contraire nuisible, puisque la reproductibilité
+#   à graine fixe est ce qui rend ces tests utilisables.
+"tests/**" = ["S101", "S105", "S106", "S311"]
 
 [tool.mypy]
 # Pas de python_version figée, volontairement.
