@@ -199,6 +199,19 @@ class SessionStore:
             )
         return len(valeurs)
 
+    def set_spot(self, session_id: int, spot: str) -> None:
+        """Nomme le spot d'une session, si elle n'en a pas déjà un.
+
+        « Si elle n'en a pas déjà un » est la partie qui compte : une détection
+        automatique ne doit jamais écraser un nom saisi à la main. L'utilisateur
+        qui a pris la peine de nommer sa session en sait plus que nous.
+        """
+        with self._transaction() as connection:
+            connection.execute(
+                "UPDATE sessions SET spot = ? WHERE id = ? AND spot = ''",
+                (spot, session_id),
+            )
+
     def add_silver(self, session_id: int, amount: int) -> None:
         """Ajoute du silver ramassé directement.
 
