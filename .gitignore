@@ -1,0 +1,40 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Outils
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Guide agent, strictement local. Ce dépôt est public : rien de personnel ni de
+# propre à la machine de développement ne doit y entrer.
+CLAUDE.md
+.claude/
+
+# Données locales de l'utilisateur. Le catalogue est un cache de 6 Mo
+# retéléchargeable, la base de sessions contient l'historique de farm.
+*.sqlite3
+cache/
+items.json
+
+# Captures d'écran de calibrage. Une capture du jeu peut contenir le pseudo, la
+# guilde ou le contenu du chat de la personne qui l'a prise.
+captures/
+*.png
+!docs/images/*.png
+# Les images de test sont générées par le code (voir tests/fixtures/README.md),
+# jamais des captures réelles du jeu, donc elles ne portent aucune donnée
+# personnelle et sont suivies par git.
+!tests/fixtures/*.png
+
+# Système
+Thumbs.db
+desktop.ini
+.DS_Store

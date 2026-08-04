@@ -1,0 +1,50 @@
+name: gitleaks
+
+# Recherche de secrets dans le code ET dans l'historique.
+# Un secret retiré par un commit ultérieur reste lisible dans l'historique d'un
+# dépôt public, donc scanner seulement l'état courant ne servirait à rien.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 5 * * 2'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # historique complet, voir le commentaire en tête
+
+      # Le binaire est lancé directement plutôt que via gitleaks/gitleaks-action.
+      # Cette action interroge l'API GitHub pour reconstituer la liste des
+      # commits d'une PR, et tombe en échec quand l'API répond 503, sans avoir
+      # rien scanné. Un contrôle rouge sur un dépôt sain finit par être ignoré,
+      # ce qui est pire que pas de contrôle du tout. Le binaire scanne
+      # l'historique local déjà récupéré : même comportement dans les trois
+      # déclencheurs.
+      - name: Installation de gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          # Empreinte publiée dans gitleaks_<version>_checksums.txt de la
+          # release. La vérifier évite qu'une release retaguée ou un miroir
+          # compromis n'injecte un binaire modifié dans notre CI.
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+
+      # --redact : ne jamais imprimer la valeur d'un secret dans des journaux de
+      # CI publics. Sortie non nulle si quelque chose est trouvé.
+      - name: Analyse
+        run: ./gitleaks git . --config .gitleaks.toml --redact --no-banner

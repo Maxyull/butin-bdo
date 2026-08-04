@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "_lisez_moi": [
+    "Noms français recoupés à la main, prioritaires sur le catalogue amont.",
+    "",
+    "Le catalogue amont (veliainn-market-resources) est une source unique. Une",
+    "faute de frappe ou un décalage avec le client français en jeu y passerait",
+    "inaperçue, et rendrait l'objet concerné définitivement non reconnu par",
+    "l'OCR, sans aucun message d'erreur. Ce fichier est la contre-vérification.",
+    "",
+    "Règle : bdocodex et garmoth font référence, les autres sites confirment.",
+    "Une entrée doit citer au moins deux sources distinctes dont au moins une",
+    "référence. La suite de tests échoue tant qu'une entrée ne respecte pas",
+    "cette règle, pour qu'un recoupement commencé ne soit pas pris pour acquis.",
+    "",
+    "Format d'une entrée, la clé étant l'identifiant numérique de l'objet :",
+    "  \"4998\": {",
+    "    \"nom\": \"Éclat de cristal noir tranchant\",",
+    "    \"sources\": [\"bdocodex\", \"garmoth\"],",
+    "    \"verifie_le\": \"2026-08-04\"",
+    "  }",
+    "",
+    "Vide pour l'instant : aucun recoupement n'a encore été fait. Le catalogue",
+    "amont sert donc de source unique en attendant, ce qui est un risque connu",
+    "et assumé, pas un oubli."
+  ],
+  "sources": {
+    "bdocodex": "https://bdocodex.com/fr/",
+    "garmoth": "https://garmoth.com/",
+    "bdolytics": "https://bdolytics.com/fr",
+    "grumpygreen": "https://grumpygreen.cricket/"
+  },
+  "items": {}
+}

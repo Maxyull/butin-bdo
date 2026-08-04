@@ -1,0 +1,13 @@
+# Fins de ligne normalisées en LF dans le dépôt.
+#
+# Le développement se fait sous Windows mais l'intégration continue tourne sous
+# Linux. Sans cette normalisation, un fichier écrit en CRLF fait échouer les
+# scripts shell des workflows avec une erreur illisible, et chaque
+# aller-retour entre les deux systèmes produit un diff entier sur des fichiers
+# dont pas une ligne n'a changé.
+* text=auto eol=lf
+
+# Fichiers binaires, jamais convertis.
+*.png binary
+*.onnx binary
+*.sqlite3 binary

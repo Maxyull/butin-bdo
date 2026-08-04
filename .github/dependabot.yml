@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # Les actions GitHub sont épinglées par empreinte de commit dans les
+  # workflows, ce qui protège d'une étiquette de version déplacée sous nos
+  # pieds mais fige aussi les correctifs de sécurité. Dependabot lève ces
+  # empreintes, sinon elles ne bougeraient plus jamais.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"

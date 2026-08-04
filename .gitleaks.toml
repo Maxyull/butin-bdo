@@ -1,0 +1,21 @@
+# Configuration gitleaks.
+#
+# Butin n'a aucun secret par conception : pas de compte, pas de serveur, pas de
+# clé d'API. Les deux sources externes qu'il consulte sont publiques et
+# anonymes. Il n'y a donc rien à mettre en liste blanche aujourd'hui, et c'est
+# volontairement noté ici : le jour où quelqu'un ajoutera une exception, elle
+# devra être justifiée à côté, comme celles qui suivraient.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Chemins sans valeur secrète possible"
+paths = [
+  # Sa propre configuration : les motifs d'exemple qu'elle contiendrait un jour
+  # ne sont pas des secrets.
+  '''\.gitleaks\.toml''',
+  # Empreintes SHA256 de binaires publics, épinglées exprès dans les workflows.
+  # Ce sont des empreintes publiées, pas des jetons.
+  '''\.github/workflows/.*\.yml''',
+]

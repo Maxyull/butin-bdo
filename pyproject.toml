@@ -1,0 +1,118 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "butin"
+version = "0.1.0"
+description = "Suivi de butin pour Black Desert Online, pensé pour le client français"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Maxime Lacoste" }]
+keywords = ["black-desert-online", "bdo", "loot-tracker", "ocr", "francais"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Win32 (MS Windows)",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: French",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Games/Entertainment",
+]
+
+dependencies = [
+  "mss>=9.0.1",
+  "Pillow>=10.0.0",
+  "numpy>=1.26",
+  "requests>=2.31.0",
+  "rapidfuzz>=3.6",
+  # Moteur OCR. Choisi contre Tesseract parce qu'il s'installe entièrement par
+  # pip : aucun binaire système à télécharger séparément, aucune variable PATH à
+  # régler à la main. Voir docs/ocr.md pour le raisonnement complet.
+  "rapidocr-onnxruntime>=1.3.24",
+  "platformdirs>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "types-requests",
+  "pip-audit>=2.7",
+]
+
+[project.urls]
+Source = "https://github.com/Maxyull/butin-bdo"
+Bogues = "https://github.com/Maxyull/butin-bdo/issues"
+
+[project.scripts]
+butin = "butin.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+butin = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+  "reseau: test nécessitant un accès réseau réel (désactivé par défaut en CI)",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["src/butin"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: pas de couverture", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",    # pycodestyle
+  "F",         # pyflakes
+  "I",         # tri des imports
+  "UP",        # pyupgrade
+  "B",         # bugbear
+  "A",         # ombrage des noms natifs
+  "C4",        # comprehensions
+  "SIM",       # simplifications
+  "PTH",       # préférer pathlib
+  "RUF",       # règles ruff
+  "S",         # bandit : contrôles de sécurité
+]
+ignore = [
+  # Les chaînes du domaine (noms d'objets, messages) sont en français et
+  # contiennent des caractères que RUF001/RUF002/RUF003 signalent comme
+  # « ambigus » par rapport à leur équivalent ASCII. C'est un faux positif
+  # systématique sur ce projet, qui est francophone par conception.
+  "RUF001", "RUF002", "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Les assertions sont le mécanisme normal de pytest, et les valeurs codées en
+# dur dans les tests sont des données de test, pas des secrets.
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+strict = true
+warn_unreachable = true
+# Ces paquets n'expédient pas d'annotations de types.
+[[tool.mypy.overrides]]
+module = ["mss.*", "rapidocr_onnxruntime.*", "cv2.*"]
+ignore_missing_imports = true

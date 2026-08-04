@@ -1,0 +1,41 @@
+name: CodeQL
+
+# Analyse statique de sécurité, gratuite sur dépôt public.
+# Résultats dans l'onglet Security > Code scanning.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Hebdomadaire : rattrape les nouvelles règles CodeQL sur du code qui n'a
+    # pas bougé. Une règle publiée après le dernier commit ne serait jamais
+    # appliquée sans ce passage périodique.
+    - cron: '27 4 * * 2'
+
+jobs:
+  analyze:
+    name: Analyse (python)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Initialisation
+        uses: github/codeql-action/init@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3
+        with:
+          languages: python
+          # security-extended plutôt que security-and-quality : le pack
+          # « quality » est du linting déjà couvert par ruff, et il enterre les
+          # vraies alertes de sécurité sous du bruit qui finit par ne plus être
+          # trié du tout.
+          queries: security-extended
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3
+        with:
+          category: '/language:python'

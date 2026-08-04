@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Aucun droit d'écriture : ce workflow lit le code et rapporte, il ne modifie
+# jamais le dépôt. Un jeton en lecture seule ne peut pas être détourné pour
+# pousser un commit, même si une dépendance de la chaîne était compromise.
+permissions:
+  contents: read
+
+jobs:
+  qualite:
+    name: Qualité et tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 est le plancher déclaré dans pyproject.toml. Le tester vraiment
+        # évite d'y écrire par mégarde de la syntaxe plus récente : la version
+        # de développement locale seule ne le dirait jamais.
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Installation
+        run: pip install -e ".[dev]"
+
+      # Le style passe en premier : il échoue en quelques secondes, là où la
+      # suite de tests prend plus longtemps. Sur un échec de style, inutile
+      # d'attendre le reste.
+      - name: Style (ruff)
+        run: ruff check src tests
+
+      - name: Format (ruff)
+        run: ruff format --check src tests
+
+      - name: Types (mypy)
+        run: mypy
+
+      - name: Tests
+        run: pytest --cov --cov-report=term-missing
+
+  securite:
+    name: Vulnérabilités des dépendances
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Installation
+        run: pip install -e ".[dev]"
+
+      # Job séparé de la matrice : une alerte de vulnérabilité ne dépend pas de
+      # la version de Python, la répéter trois fois n'apprendrait rien et
+      # tripleerait le bruit sur un même avis.
+      - name: Audit (pip-audit)
+        run: pip-audit --strict --desc
