@@ -44,6 +44,10 @@ dans [docs/versionnage.md](docs/versionnage.md).
   tournent toutes les 100 ms, la reconnaissance de texte seulement quand il y a
   quelque chose à lire. Le défilement accumulé entre deux lectures alimente la
   prédiction de l'alignement, qui devient plus fine qu'avec une boucle unique.
+- **Prix du marché central** par région (EU, NA et les autres), avec une chaîne
+  de repli qui donne toujours une valeur et dit toujours d'où elle vient : prix
+  frais, prix périmé daté, valeur au marchand, ou inconnu. Un échec réseau
+  n'interrompt jamais une session.
 - **Interface en ligne de commande** minimale : état du catalogue et test de
   reconnaissance d'un nom.
 
