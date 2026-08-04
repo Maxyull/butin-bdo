@@ -105,11 +105,23 @@ request ce qui garantit qu'elle ne devient pas plus fausse.
 Pas de commit direct sur `main`, même pour une ligne. Une branche, une pull
 request, fusion quand la CI est verte.
 
-Messages de commit en français, à l'impératif :
+Messages de commit en français, à l'impératif, et qui expliquent **pourquoi** le
+changement existe plutôt que ce qu'il fait :
 
 ```
 Déplie la ligature « œ » avant la décomposition NFKD
 ```
+
+**Pas de préfixe `feat:` ni `fix:`.** La convention Conventional Commits a été
+examinée et écartée : son bénéfice est l'automatisation de la publication, que
+ce projet ne fait pas. Le raisonnement complet, et la condition sous laquelle
+elle serait adoptée, sont dans [docs/versionnage.md](docs/versionnage.md).
+
+Toute modification visible par un utilisateur s'ajoute à la section
+`Non publié` de [CHANGELOG.md](CHANGELOG.md), dans la catégorie qui convient.
+Le journal est écrit à la main et pour des humains : il dit ce que le
+changement change pour la personne qui utilise le logiciel, pas ce qui a été
+touché dans le code.
 
 ## Vie privée dans les rapports de bogue
 
