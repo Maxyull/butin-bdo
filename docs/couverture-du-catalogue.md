@@ -84,6 +84,54 @@ Trois besoins distincts, aujourd'hui un seul est couvert :
 2. déclarer un objet hors marché, sans prix → à faire
 3. lever une ambiguïté en désignant l'identifiant retenu → à faire
 
+## Résolution, mesurée le 04/08/2026
+
+**bdocodex répond au problème.** Il publie la base complète, 68 714 objets
+contre 8 344, dans les deux langues, par une requête publique.
+
+Confrontation de la liste de butin curée à la main (417 entrées, voir
+ATTRIBUTION.md) aux deux sources :
+
+| Source des noms | Lignes jointes |
+| --- | --- |
+| veliainn, catalogue de marché | 22 sur 417, **5 %** |
+| bdocodex, base complète | 407 sur 417, **98 %** |
+
+Les trois noms qui bloquaient sont résolus :
+
+| Nom lu à l'écran | veliainn | bdocodex |
+| --- | --- | --- |
+| `Anneau de Tuvala` | absent | 695111 |
+| `Humus noir` | absent | 44118 |
+| `Boucle d'oreille de Tuvala` | absent | 695110 |
+
+Les 10 entrées restantes ne sont pas des trous de bdocodex mais des défauts de
+la liste amont : deux fautes de frappe (`Debreka` pour Deboreka, `Warder'd` pour
+Warden's) et un doublon.
+
+### Ce que le recoupement a fait apparaître
+
+Pour l'objet **16001**, veliainn dit `Pierre noire (arme)` et bdocodex dit
+`Pierre noire`. **C'est bdocodex qui correspond à ce que le jeu affiche**, comme
+le montrent les captures.
+
+`Pierre noire` reste ambigu même dans la base complète : deux objets portent ce
+nom exact (39105 et 16001). Cette ambiguïté-là est réelle et non un défaut de
+source, donc elle se tranche dans `data/noms-verifies.json` et nulle part
+ailleurs.
+
+C'est précisément la raison d'être du recoupement sur plusieurs sources : une
+source unique n'aurait rien signalé, ni l'écart de nom ni l'homonymie.
+
+### Un point de modélisation découvert au passage
+
+Le niveau d'amélioration **n'est pas une identité d'objet**. Un collier de
+Deboreka et son PRI portent le même identifiant, l'amélioration est une
+propriété. La liste amont l'encode dans le nom (`I PRI: Deboreka Necklace`), ce
+qui fait pointer 75 lignes sur des identifiants déjà pris. Les écraser aurait
+perdu ces 75 entrées en silence. `data/butin-connu.json` range donc les valeurs
+par niveau.
+
 ## Ce qui reste à décider
 
 Le recoupement des noms sur bdocodex et garmoth, déjà prévu, devient le chemin

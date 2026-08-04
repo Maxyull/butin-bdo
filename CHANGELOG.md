@@ -43,6 +43,13 @@ dans [docs/versionnage.md](docs/versionnage.md).
 - **Interface en ligne de commande** minimale : état du catalogue et test de
   reconnaissance d'un nom.
 
+- **Base de butin français** (`data/butin-connu.json`) : 362 objets avec leur
+  nom anglais, leur nom français, leur valeur en silver par niveau
+  d'amélioration, et pour 102 d'entre eux la **zone de farm** où ils tombent.
+  Ces zones donnent enfin des données au mécanisme de restriction par spot.
+- **Script de jointure reproductible** (`scripts/joindre_butin.py`) entre la
+  liste de butin curée à la main et la base complète de bdocodex.
+
 ### Sécurité
 
 - Téléchargement du catalogue durci : HTTPS imposé, hôte en liste blanche
@@ -69,10 +76,13 @@ dans [docs/versionnage.md](docs/versionnage.md).
 
 ### Connu et non résolu
 
-- **Le catalogue du marché ne reconnaît qu'un objet sur huit du butin réel.**
-  C'est une base de prix et non une base d'objets : tout ce qui est lié au
-  personnage en est absent. Voir
+- Le catalogue du marché ne reconnaît qu'un objet sur huit du butin réel.
+  **Résolu par bdocodex** (98 % de jointure contre 5 %), mais la bascule du
+  moteur de reconnaissance vers cette source n'est pas encore faite : pour
+  l'instant `data/butin-connu.json` existe sans être branché. Voir
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
+- `Pierre noire` reste ambigu même dans la base complète : deux objets portent
+  ce nom exact. À trancher dans `data/noms-verifies.json`.
 - La reconnaissance de texte coûte 336 ms par image, contre 100 ms envisagés.
   Le calcul de marge tient encore, l'arbitrage de cadence n'est pas tranché.
 - Aucune boucle de capture ni interface : les briques existent, l'assemblage
