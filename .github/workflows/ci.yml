@@ -66,5 +66,10 @@ jobs:
       # Job séparé de la matrice : une alerte de vulnérabilité ne dépend pas de
       # la version de Python, la répéter trois fois n'apprendrait rien et
       # tripleerait le bruit sur un même avis.
+      # --skip-editable exclut « butin » lui-même. Le paquet est installé en
+      # mode éditable pour les besoins de la CI, et pip-audit tente alors de le
+      # chercher sur PyPI où il n'existe pas, ce qui fait échouer le job sur
+      # notre propre code au lieu d'une vraie vulnérabilité. Les dépendances,
+      # elles, restent toutes auditées.
       - name: Audit (pip-audit)
-        run: pip-audit --strict --desc
+        run: pip-audit --strict --desc --skip-editable

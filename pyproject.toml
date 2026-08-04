@@ -108,7 +108,17 @@ ignore = [
 "tests/**" = ["S101", "S105", "S106"]
 
 [tool.mypy]
-python_version = "3.10"
+# Pas de python_version figée, volontairement.
+#
+# La fixer à 3.10 alors que l'intégration continue lance mypy sur trois
+# interpréteurs crée une contradiction : sur le job 3.12, numpy installe des
+# stubs écrits en syntaxe 3.12 (« type X = ... », PEP 695) que mypy refuse de
+# lire quand on lui demande de viser 3.10, et l'analyse s'arrête sur une erreur
+# de syntaxe dans une dépendance plutôt que sur notre code.
+#
+# Sans la clé, mypy vise la version de l'interpréteur qui l'exécute. Chaque job
+# de la matrice vérifie donc le code avec la sémantique de SA version, ce qui
+# couvre mieux le plancher 3.10 que ne le faisait la valeur figée.
 files = ["src"]
 strict = true
 warn_unreachable = true
