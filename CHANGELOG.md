@@ -40,6 +40,10 @@ dans [docs/versionnage.md](docs/versionnage.md).
 - **Découpage des lignes du journal d'acquisition français**, avec le format du
   client isolé en données pour qu'une autre langue s'ajoute sans toucher à la
   logique.
+- **Boucle de capture à deux vitesses.** La capture et la mesure de défilement
+  tournent toutes les 100 ms, la reconnaissance de texte seulement quand il y a
+  quelque chose à lire. Le défilement accumulé entre deux lectures alimente la
+  prédiction de l'alignement, qui devient plus fine qu'avec une boucle unique.
 - **Interface en ligne de commande** minimale : état du catalogue et test de
   reconnaissance d'un nom.
 
@@ -89,7 +93,13 @@ dans [docs/versionnage.md](docs/versionnage.md).
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- La reconnaissance de texte coûte 336 ms par image, contre 100 ms envisagés.
-  Le calcul de marge tient encore, l'arbitrage de cadence n'est pas tranché.
-- Aucune boucle de capture ni interface : les briques existent, l'assemblage
-  non.
+- La reconnaissance de texte coûte 336 ms par image. **Tranché par le
+  découplage** : la boucle rapide tourne quand même à 100 ms.
+- Le garde-fou de stabilité est **inutilisable en l'état**. Il suppose un fond
+  fixe, alors que le journal est transparent sur un monde qui bouge en
+  permanence. La défense contre une lecture prise en pleine animation repose
+  donc entièrement sur le vote multi-images.
+- La colonne de pastilles servant de règle de mesure est validée sur deux
+  captures de scènes différentes, pas encore sur deux images consécutives d'un
+  journal qui défile vraiment.
+- Aucune interface, et aucun calibrage automatique de la zone.
