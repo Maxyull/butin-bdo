@@ -60,6 +60,20 @@ français sans une refonte de sa couche de données. Butin apporte :
 - un **contrôle d'ambiguïté** qui refuse de trancher entre deux objets voisins
   plutôt que d'attribuer un drop au hasard.
 
+### La liste de butin curée à la main
+
+`items/items.csv` du même dépôt, 417 entrées curées **à la main** : nom de
+l'objet, valeur en silver, et pour une centaine d'entre elles la **zone de farm**
+où elles tombent.
+
+Cette donnée n'existe nulle part ailleurs. Aucune base publique ne dit quel
+objet tombe à quel spot, parce que c'est le fruit d'heures de farm et non d'un
+export. C'est elle qui alimente `data/butin-connu.json` et qui donne enfin des
+données au mécanisme de restriction par spot de `catalog/matcher.py`.
+
+Reprise telle quelle pour les valeurs et les zones, jointe aux noms français par
+`scripts/joindre_butin.py`.
+
 ## Sources de données
 
 **[andreivreja/veliainn-market-resources](https://github.com/andreivreja/veliainn-market-resources)**
@@ -67,8 +81,14 @@ publie chaque jour la base d'objets du jeu, identifiants et noms en quatorze
 langues dont le français. C'est ce jeu de données qui rend un tracker français
 possible sans traduire plusieurs milliers de noms à la main.
 
-Les noms sont ensuite recoupés à la main contre **[bdocodex](https://bdocodex.com/fr/)**
-et **[garmoth](https://garmoth.com/)** comme références, d'autres bases publiques
+**[bdocodex](https://bdocodex.com/fr/)** publie la base **complète** des objets
+du jeu, 68 000 contre 8 300 chez veliainn, dans les deux langues. C'est la seule
+source capable de nommer un objet lié au personnage, donc la seule utilisable
+pour du butin de farm. Une requête par langue, mise en cache localement, jamais
+rejouée sans nécessité : c'est un service communautaire gratuit.
+
+Les noms sont ensuite recoupés à la main contre bdocodex et
+**[garmoth](https://garmoth.com/)** comme références, d'autres bases publiques
 servant à confirmer en cas de divergence. Voir
 [data/noms-verifies.json](data/noms-verifies.json).
 

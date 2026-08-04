@@ -1,0 +1,3311 @@
+{
+ "version": 1,
+ "_lisez_moi": [
+  "Butin connu : nom anglais, nom français, valeur silver et zone.",
+  "Généré par scripts/joindre_butin.py, ne pas éditer à la main.",
+  "Valeur et zone viennent de janhnguyen/BDO-Loot-Tracker (MIT),",
+  "les noms de bdocodex. Voir ATTRIBUTION.md.",
+  "Les zones sont en anglais : leur traduction reste à faire."
+ ],
+ "items": {
+  "1": {
+   "en": "Silver",
+   "fr": "Pièces",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1
+   },
+   "ambigu": true
+  },
+  "28": {
+   "en": "Prognyl Silver Bar",
+   "fr": "Lingot d'argent de Prognyl",
+   "zone_en": "",
+   "valeurs": {
+    "base": 20000
+   },
+   "ambigu": false
+  },
+  "6393": {
+   "en": "Elkarr",
+   "fr": "Elkarr",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "6399": {
+   "en": "Ah'krad",
+   "fr": "Ah'krad",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "6400": {
+   "en": "Olucas",
+   "fr": "Olucas",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "8124": {
+   "en": "Valtarra's Flame",
+   "fr": "Flamme de Valtarra",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000000
+   },
+   "ambigu": false
+  },
+  "8126": {
+   "en": "Okiara's Tide",
+   "fr": "Vague d'Okiara",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000000
+   },
+   "ambigu": false
+  },
+  "8129": {
+   "en": "Narc's Lightning",
+   "fr": "Foudre de Narc",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000000
+   },
+   "ambigu": false
+  },
+  "8133": {
+   "en": "Seed of Void",
+   "fr": "Graine du néant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 10000000
+   },
+   "ambigu": false
+  },
+  "9749": {
+   "en": "Black Energy Residue",
+   "fr": "Résidu d'énergie noire",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000
+   },
+   "ambigu": false
+  },
+  "9776": {
+   "en": "Intricately Patterned Mystical Shard",
+   "fr": "Éclat mystique au motif complexe",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "10989": {
+   "en": "Mediah Merchants Union Helm",
+   "fr": "Casque de la guilde marchande de Mediah",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150000
+   },
+   "ambigu": false
+  },
+  "10991": {
+   "en": "Beia's Black Magic Gloves",
+   "fr": "Gants noirs magiques de Beia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 120000
+   },
+   "ambigu": false
+  },
+  "10992": {
+   "en": "Derek's Light Leather Shoes",
+   "fr": "Chaussures de cuir légères de Derek",
+   "zone_en": "",
+   "valeurs": {
+    "base": 120000
+   },
+   "ambigu": false
+  },
+  "11607": {
+   "en": "Ogre Ring",
+   "fr": "Anneau d'ogre",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 144000000,
+    "DUO": 474000000
+   },
+   "ambigu": true
+  },
+  "11625": {
+   "en": "Sicil's Necklace",
+   "fr": "Collier de Sicil",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 43400000,
+    "DUO": 189000000
+   },
+   "ambigu": true
+  },
+  "11628": {
+   "en": "Serap's Necklace",
+   "fr": "Collier de Serap",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 75000000,
+    "DUO": 190000000
+   },
+   "ambigu": false
+  },
+  "11629": {
+   "en": "Tungrad Necklace",
+   "fr": "Collier de Tungrad",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 151000000,
+    "DUO": 530000000
+   },
+   "ambigu": false
+  },
+  "11630": {
+   "en": "Laytenn's Power Stone",
+   "fr": "Pierre de puissance de Laytenn",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 146000000,
+    "DUO": 463000000
+   },
+   "ambigu": true
+  },
+  "11631": {
+   "en": "Necklace of Shultz the Gladiator",
+   "fr": "Collier de Shultz le Gladiateur",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 23400000,
+    "DUO": 60500000
+   },
+   "ambigu": false
+  },
+  "11640": {
+   "en": "Asula's Crimson Eye Necklace",
+   "fr": "Collier de l'œil pourpre d'Asula",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150000
+   },
+   "ambigu": false
+  },
+  "11653": {
+   "en": "Deboreka Necklace",
+   "fr": "Collier de Deboreka",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 920000000,
+    "DUO": 2090000000,
+    "TRI": 7550000000,
+    "TET": 24300000000
+   },
+   "ambigu": false
+  },
+  "11662": {
+   "en": "Revived River Necklace",
+   "fr": "Collier de fleuve ravivé",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 810000000,
+    "DUO": 2080000000
+   },
+   "ambigu": false
+  },
+  "11663": {
+   "en": "Revived Lunar Necklace",
+   "fr": "Collier de lune ravivée",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 167000000,
+    "DUO": 1760000000
+   },
+   "ambigu": true
+  },
+  "11808": {
+   "en": "Witch's Earring",
+   "fr": "Boucle d'oreille de magicienne",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 5850000,
+    "DUO": 19700000
+   },
+   "ambigu": false
+  },
+  "11810": {
+   "en": "Mesto Earring",
+   "fr": "Boucle d'oreille de Mesto",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 11600000,
+    "DUO": 80500000
+   },
+   "ambigu": false
+  },
+  "11828": {
+   "en": "Tungrad Earring",
+   "fr": "Boucle d'oreille de Tungrad",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 149000000,
+    "DUO": 525000000
+   },
+   "ambigu": true
+  },
+  "11834": {
+   "en": "Narc Ear Accessory",
+   "fr": "Accessoire d'oreille de Narc",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 44700000,
+    "DUO": 316000000
+   },
+   "ambigu": true
+  },
+  "11838": {
+   "en": "Asula's Crimson Eye Earring",
+   "fr": "Boucle d'oreille de l'œil pourpre d'Asula",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150000
+   },
+   "ambigu": false
+  },
+  "11844": {
+   "en": "Treant Spirit's Whisper Earring",
+   "fr": "Boucle d'oreille de murmure d'esprit tréant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 46000
+   },
+   "ambigu": false
+  },
+  "11853": {
+   "en": "Black Distortion Earring",
+   "fr": "Boucle d'oreille de sombre altération",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 265000000,
+    "DUO": 820000000
+   },
+   "ambigu": false
+  },
+  "11855": {
+   "en": "Dawn Earring",
+   "fr": "Boucle d'oreille de l'aube",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 197000000,
+    "DUO": 1350000000
+   },
+   "ambigu": true
+  },
+  "11882": {
+   "en": "Deboreka Earring",
+   "fr": "Boucle d'oreille de Deboreka",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 1380000000,
+    "DUO": 4220000000,
+    "TRI": 10800000000
+   },
+   "ambigu": false
+  },
+  "12031": {
+   "en": "Ring of Crescent Guardian",
+   "fr": "Anneau de gardien du croissant",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 35800000,
+    "DUO": 209000000
+   },
+   "ambigu": true
+  },
+  "12032": {
+   "en": "Ring of Cadry Guardian",
+   "fr": "Anneau de gardien de Cadry",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 259000000,
+    "DUO": 730000000
+   },
+   "ambigu": true
+  },
+  "12042": {
+   "en": "Forest Ronaros Ring",
+   "fr": "Anneau des Ronaros forestiers",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 39800000,
+    "DUO": 168000000
+   },
+   "ambigu": true
+  },
+  "12045": {
+   "en": "Rainbow Coral Ring",
+   "fr": "Anneau de corail arc-en-ciel",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 15800000,
+    "DUO": 100000000
+   },
+   "ambigu": false
+  },
+  "12050": {
+   "en": "Treant Spirit's Echo Ring",
+   "fr": "Anneau de résonance d'esprit tréant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 46000
+   },
+   "ambigu": false
+  },
+  "12060": {
+   "en": "Eye of the Ruins Ring",
+   "fr": "Anneau de l'œil des ruines",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 24700000,
+    "DUO": 193000000
+   },
+   "ambigu": false
+  },
+  "12061": {
+   "en": "Tungrad Ring",
+   "fr": "Anneau de Tungrad",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 248000000,
+    "DUO": 1030000000
+   },
+   "ambigu": false
+  },
+  "12068": {
+   "en": "Ominous Ring",
+   "fr": "Anneau sinistre",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 408000000,
+    "DUO": 1200000000
+   },
+   "ambigu": true
+  },
+  "12091": {
+   "en": "Ocean Haze Ring",
+   "fr": "Anneau de brume marine",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 520000000,
+    "DUO": 1400000000
+   },
+   "ambigu": false
+  },
+  "12094": {
+   "en": "Deboreka Ring",
+   "fr": "Anneau de Deboreka",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 1040000000,
+    "DUO": 3160000000,
+    "TRI": 8700000000,
+    "TET": 28300000000
+   },
+   "ambigu": false
+  },
+  "12208": {
+   "en": "Rhutum Elite Belt",
+   "fr": "Ceinture d'élite rhutum",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 6850000,
+    "DUO": 25200000
+   },
+   "ambigu": false
+  },
+  "12211": {
+   "en": "Belt of Shultz the Gladiator",
+   "fr": "Ceinture de Shultz le gladiateur",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 8800000,
+    "DUO": 42400000
+   },
+   "ambigu": false
+  },
+  "12229": {
+   "en": "Centaurus Belt",
+   "fr": "Ceinture de centaure",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 183000000,
+    "DUO": 570000000
+   },
+   "ambigu": true
+  },
+  "12230": {
+   "en": "Basilisk's Belt",
+   "fr": "Ceinture de basilic",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 22100000,
+    "DUO": 122000000
+   },
+   "ambigu": true
+  },
+  "12236": {
+   "en": "Valtarra Eclipsed Belt",
+   "fr": "Ceinture éclipsée de Valtarra",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 28000000,
+    "DUO": 125000000
+   },
+   "ambigu": false
+  },
+  "12237": {
+   "en": "Tungrad Belt",
+   "fr": "Ceinture de Tungrad",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 127000000,
+    "DUO": 496000000
+   },
+   "ambigu": false
+  },
+  "12238": {
+   "en": "Asula's Crimson Eye Belt",
+   "fr": "Ceinture de l'œil pourpre d'Asula",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150000
+   },
+   "ambigu": false
+  },
+  "12243": {
+   "en": "Treant Spirit's Hope Belt",
+   "fr": "Ceinture d'espoir d'esprit tréant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 48750
+   },
+   "ambigu": false
+  },
+  "12251": {
+   "en": "Orkinrad's Belt",
+   "fr": "Ceinture d'Orkinrad",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 28000000,
+    "DUO": 179000000
+   },
+   "ambigu": true
+  },
+  "12257": {
+   "en": "Turo's Belt",
+   "fr": "Ceinture de Turo",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 150000000,
+    "DUO": 600000000
+   },
+   "ambigu": true
+  },
+  "12276": {
+   "en": "Deboreka Belt",
+   "fr": "Ceinture de Deboreka",
+   "zone_en": "",
+   "valeurs": {
+    "PRI": 950000000,
+    "DUO": 3440000000,
+    "TRI": 8750000000,
+    "TET": 29400000000
+   },
+   "ambigu": false
+  },
+  "15136": {
+   "en": "Magic Crystal of Infinity - Max HP",
+   "fr": "Cristal magique d'infinité - PV max.",
+   "zone_en": "",
+   "valeurs": {
+    "base": 68500
+   },
+   "ambigu": true
+  },
+  "15257": {
+   "en": "Crystal of Precise Destruction",
+   "fr": "Cristal de destruction précis",
+   "zone_en": "",
+   "valeurs": {
+    "base": 108000000
+   },
+   "ambigu": false
+  },
+  "15258": {
+   "en": "Crystal of Stalwart Fortitude",
+   "fr": "Cristal de courage robuste",
+   "zone_en": "",
+   "valeurs": {
+    "base": 471000000
+   },
+   "ambigu": false
+  },
+  "15259": {
+   "en": "Crystal of Dogged Patience",
+   "fr": "Cristal de patience tenace",
+   "zone_en": "",
+   "valeurs": {
+    "base": 108000000
+   },
+   "ambigu": false
+  },
+  "15260": {
+   "en": "Crystal of Unyielding Spirit",
+   "fr": "Cristal d'esprit combatif loyal",
+   "zone_en": "",
+   "valeurs": {
+    "base": 108000000
+   },
+   "ambigu": false
+  },
+  "15262": {
+   "en": "BON Dawn Crystal - All AP",
+   "fr": "Cristal de l'aube BON - Tous les PA",
+   "zone_en": "",
+   "valeurs": {
+    "base": 935000000
+   },
+   "ambigu": false
+  },
+  "15263": {
+   "en": "WON Dawn Crystal - All AP",
+   "fr": "Cristal de l'aube WON - Tous les PA",
+   "zone_en": "",
+   "valeurs": {
+    "base": 71500000
+   },
+   "ambigu": false
+  },
+  "15265": {
+   "en": "BON Dawn Crystal - Black Spirit's Rage",
+   "fr": "Cristal de l'aube BON - Rage occulte",
+   "zone_en": "",
+   "valeurs": {
+    "base": 76000000
+   },
+   "ambigu": false
+  },
+  "15266": {
+   "en": "WON Dawn Crystal - Black Spirit's Rage",
+   "fr": "Cristal de l'aube WON - Rage occulte",
+   "zone_en": "",
+   "valeurs": {
+    "base": 935000000
+   },
+   "ambigu": false
+  },
+  "15268": {
+   "en": "BON Dawn Crystal - Accuracy",
+   "fr": "Cristal de l'aube BON - Précision",
+   "zone_en": "",
+   "valeurs": {
+    "base": 93500000
+   },
+   "ambigu": false
+  },
+  "15269": {
+   "en": "WON Dawn Crystal - Accuracy",
+   "fr": "Cristal de l'aube WON - Précision",
+   "zone_en": "",
+   "valeurs": {
+    "base": 935000000
+   },
+   "ambigu": false
+  },
+  "15271": {
+   "en": "BON Dawn Crystal - Damage Reduction",
+   "fr": "Cristal de l'aube BON - Réduction des dégâts",
+   "zone_en": "",
+   "valeurs": {
+    "base": 935000000
+   },
+   "ambigu": false
+  },
+  "15272": {
+   "en": "WON Dawn Crystal - Damage Reduction",
+   "fr": "Cristal de l'aube WON - Réduction des dégâts",
+   "zone_en": "",
+   "valeurs": {
+    "base": 93500000
+   },
+   "ambigu": false
+  },
+  "15274": {
+   "en": "BON Dawn Crystal - Evasion",
+   "fr": "Cristal de l'aube BON - Esquive",
+   "zone_en": "",
+   "valeurs": {
+    "base": 93500000
+   },
+   "ambigu": false
+  },
+  "15275": {
+   "en": "WON Dawn Crystal - Evasion",
+   "fr": "Cristal de l'aube WON - Esquive",
+   "zone_en": "",
+   "valeurs": {
+    "base": 935000000
+   },
+   "ambigu": false
+  },
+  "15286": {
+   "en": "WON Crystal of Dusky Ruin",
+   "fr": "Cristal de perdition sombre WON",
+   "zone_en": "",
+   "valeurs": {
+    "base": 500000000
+   },
+   "ambigu": false
+  },
+  "15287": {
+   "en": "BON Crystal of Dusky Ruin",
+   "fr": "Cristal de perdition sombre BON",
+   "zone_en": "",
+   "valeurs": {
+    "base": 700000000
+   },
+   "ambigu": false
+  },
+  "15290": {
+   "en": "JIN Crystal of Dusky Ruin",
+   "fr": "Cristal de perdition sombre JIN",
+   "zone_en": "",
+   "valeurs": {
+    "base": 800000000
+   },
+   "ambigu": false
+  },
+  "15291": {
+   "en": "HAN Crystal of Dusky Ruin",
+   "fr": "Cristal de perdition sombre KANG",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1000000000
+   },
+   "ambigu": false
+  },
+  "15601": {
+   "en": "Ancient Magic Crystal - Harphia",
+   "fr": "Cristal magique ancien - Harphia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 189000
+   },
+   "ambigu": true
+  },
+  "15602": {
+   "en": "Ancient Magic Crystal - Cobelinus",
+   "fr": "Cristal magique ancien - Cobelinus",
+   "zone_en": "",
+   "valeurs": {
+    "base": 2830000
+   },
+   "ambigu": true
+  },
+  "15603": {
+   "en": "Ancient Magic Crystal - Viper",
+   "fr": "Cristal magique ancien - Vipère",
+   "zone_en": "",
+   "valeurs": {
+    "base": 190000
+   },
+   "ambigu": true
+  },
+  "15605": {
+   "en": "Ancient Magic Crystal - Carmae",
+   "fr": "Cristal magique ancien - Carmae",
+   "zone_en": "",
+   "valeurs": {
+    "base": 268000
+   },
+   "ambigu": true
+  },
+  "15610": {
+   "en": "Ancient Magic Crystal of Abundance - Armor",
+   "fr": "Cristal magique ancien d'abondance - Armure",
+   "zone_en": "",
+   "valeurs": {
+    "base": 242000
+   },
+   "ambigu": true
+  },
+  "15616": {
+   "en": "Ancient Magic Crystal of Nature - Adamantine",
+   "fr": "Cristal magique ancien de la nature - Adamantine",
+   "zone_en": "",
+   "valeurs": {
+    "base": 405000
+   },
+   "ambigu": true
+  },
+  "15649": {
+   "en": "Ancient Magic Crystal - Addis",
+   "fr": "Cristal magique ancien - Addis",
+   "zone_en": "",
+   "valeurs": {
+    "base": 260000
+   },
+   "ambigu": true
+  },
+  "15662": {
+   "en": "Combined Magic Crystal - Gervish",
+   "fr": "Cristal magique combiné - Gervish",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5900000
+   },
+   "ambigu": true
+  },
+  "15663": {
+   "en": "Combined Magic Crystal - Macalod",
+   "fr": "Cristal magique combiné - Macalod",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5900000
+   },
+   "ambigu": true
+  },
+  "15664": {
+   "en": "Combined Magic Crystal - Hoom",
+   "fr": "Cristal magique combiné - Hoom",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5900000
+   },
+   "ambigu": true
+  },
+  "15668": {
+   "en": "Kagtunak",
+   "fr": "Kagtunak",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1000000
+   },
+   "ambigu": false
+  },
+  "15712": {
+   "en": "Ancient Magic Crystal of Nature - Fighting Spirit",
+   "fr": "Cristal magique ancien de la nature - Esprit combatif",
+   "zone_en": "",
+   "valeurs": {
+    "base": 68500000
+   },
+   "ambigu": true
+  },
+  "15714": {
+   "en": "Ancient Magic Crystal of Nature - Giant",
+   "fr": "Cristal magique ancien de la nature - Géant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1870000
+   },
+   "ambigu": true
+  },
+  "15741": {
+   "en": "Corrupted Gluttony Crystal",
+   "fr": "Cristal de voracité corrompu",
+   "zone_en": "",
+   "valeurs": {
+    "base": 2800000000
+   },
+   "ambigu": false
+  },
+  "16017": {
+   "en": "Traveler's Map",
+   "fr": "Carte de voyageur",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1830000
+   },
+   "ambigu": false
+  },
+  "16080": {
+   "en": "Cron Stone",
+   "fr": "Pierre de Cron",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000000
+   },
+   "ambigu": false
+  },
+  "36875": {
+   "en": "Mark of a Secret Organization",
+   "fr": "Marque d'une organisation secrète",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "36876": {
+   "en": "Bluish Sulfur",
+   "fr": "Soufre bleuâtre",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "36877": {
+   "en": "Power Engine of Ancient Weapons",
+   "fr": "Moteur d'armes ancestrales",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "36878": {
+   "en": "Lost Piece of a Forbidden Book",
+   "fr": "Fragment perdu d'un livre interdit",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "40218": {
+   "en": "Ancient Relic Crystal Shard",
+   "fr": "Éclat de cristal de relique ancienne",
+   "zone_en": "",
+   "valeurs": {
+    "base": 162000
+   },
+   "ambigu": false
+  },
+  "40220": {
+   "en": "Forbidden Book",
+   "fr": "Livre interdit",
+   "zone_en": "",
+   "valeurs": {
+    "base": 376000
+   },
+   "ambigu": false
+  },
+  "40228": {
+   "en": "Scroll Written in Ancient Language",
+   "fr": "Parchemin rédigé dans une langue ancienne",
+   "zone_en": "",
+   "valeurs": {
+    "base": 401000
+   },
+   "ambigu": false
+  },
+  "40258": {
+   "en": "Black Spirit's Claw Piece",
+   "fr": "Morceau de griffe de l'Esprit occulte",
+   "zone_en": "",
+   "valeurs": {
+    "base": 22400000
+   },
+   "ambigu": false
+  },
+  "40383": {
+   "en": "Manshaum Voodoo Doll",
+   "fr": "Poupée vaudou de Manshaum",
+   "zone_en": "",
+   "valeurs": {
+    "base": 700000
+   },
+   "ambigu": false
+  },
+  "40448": {
+   "en": "Asula's Weakened Magic Ring",
+   "fr": "Anneau d'Asula de magie atténuée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "40449": {
+   "en": "Asula's Weakened Magic Earring",
+   "fr": "Boucle d'oreille d'Asula de magie atténuée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "40450": {
+   "en": "Asula's Weakened Magic Necklace",
+   "fr": "Collier d'Asula de magie atténuée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "40451": {
+   "en": "Asula's Weakened Magic Belt",
+   "fr": "Ceinture d'Asula de magie atténuée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "40543": {
+   "en": "Fragment of the Deep Sea",
+   "fr": "Fragment de la Mer abyssale",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1370000
+   },
+   "ambigu": false
+  },
+  "40603": {
+   "en": "Marni's Research Box",
+   "fr": "Boîte de recherche de Marni",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "40706": {
+   "en": "Ancient Sherekhan's Panacea",
+   "fr": "Remède des Sherekhans ancestral",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40707": {
+   "en": "Ancient Valtarra's Clairvoyance",
+   "fr": "Clairvoyance de Valtarra ancestrale",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40708": {
+   "en": "Ancient Narc's Crimson Tear",
+   "fr": "Larme écarlate de Narc ancestrale",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40709": {
+   "en": "Ancient Ron's Tintinnabulum",
+   "fr": "Clochettes de Ron ancestrales",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40710": {
+   "en": "Ancient Ash Halfmoon Kagtunak",
+   "fr": "Œil demi-lune cendrée de Kagtunak ancestral",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40711": {
+   "en": "Ancient Markthanan's Gland",
+   "fr": "Glande de Markthanan ancestrale",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40752": {
+   "en": "Katzvariak's Venom",
+   "fr": "Venin de Katzvariak",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40754": {
+   "en": "Valtarra's Memory",
+   "fr": "Mémoire de Valtarra",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40756": {
+   "en": "Narc's Solace",
+   "fr": "Consolation de Narc",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40758": {
+   "en": "Tranquil Tinniolum",
+   "fr": "Clochette inaltérée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40760": {
+   "en": "Blood Wolf's Oath",
+   "fr": "Serment des Loups sanglants",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40762": {
+   "en": "Dragon's Fang",
+   "fr": "Dent de dragon",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "40968": {
+   "en": "Dew of Tranquil Forest",
+   "fr": "Rosée de forêt sereine",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "42379": {
+   "en": "Witch's Magic Amulet",
+   "fr": "Amulette magique de magicienne",
+   "zone_en": "",
+   "valeurs": {
+    "base": 20
+   },
+   "ambigu": false
+  },
+  "43775": {
+   "en": "Mutant Loah Flower",
+   "fr": "Fleur loah mutante",
+   "zone_en": "",
+   "valeurs": {
+    "base": 120000
+   },
+   "ambigu": false
+  },
+  "43984": {
+   "en": "Broken Shackles",
+   "fr": "Chaînes brisées",
+   "zone_en": "Abandoned Iron Mine",
+   "valeurs": {
+    "base": 500
+   },
+   "ambigu": true
+  },
+  "44032": {
+   "en": "Cursed Fang",
+   "fr": "Croc maudit",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150
+   },
+   "ambigu": true
+  },
+  "44069": {
+   "en": "Sharp Bone Fragment",
+   "fr": "Fragment d'os pointu",
+   "zone_en": "Hexe Sanctuary",
+   "valeurs": {
+    "base": 6200
+   },
+   "ambigu": true
+  },
+  "44085": {
+   "en": "Broken Rhutum Fang",
+   "fr": "Croc de rhutum cassé",
+   "zone_en": "Rhutum Outstation",
+   "valeurs": {
+    "base": 6000
+   },
+   "ambigu": true
+  },
+  "44126": {
+   "en": "Viscous Liquid",
+   "fr": "Liquide visqueux",
+   "zone_en": "",
+   "valeurs": {
+    "base": 35
+   },
+   "ambigu": false
+  },
+  "44138": {
+   "en": "Ancient Artifact",
+   "fr": "Ancien artefact",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150
+   },
+   "ambigu": false
+  },
+  "44143": {
+   "en": "Cursed Crystal",
+   "fr": "Cristal maudit",
+   "zone_en": "",
+   "valeurs": {
+    "base": 7200
+   },
+   "ambigu": true
+  },
+  "44145": {
+   "en": "Huge Spear",
+   "fr": "Grande lance",
+   "zone_en": "Cyclops Land",
+   "valeurs": {
+    "base": 7700
+   },
+   "ambigu": true
+  },
+  "44169": {
+   "en": "Hard Timber Fragment",
+   "fr": "Fragment de bois dur",
+   "zone_en": "",
+   "valeurs": {
+    "base": 175
+   },
+   "ambigu": false
+  },
+  "44170": {
+   "en": "Corrupt Crystal",
+   "fr": "Cristal corrompu",
+   "zone_en": "Mansha Forest",
+   "valeurs": {
+    "base": 7500
+   },
+   "ambigu": true
+  },
+  "44173": {
+   "en": "Rock Fragment",
+   "fr": "Fragment de roche durcie",
+   "zone_en": "",
+   "valeurs": {
+    "base": 80
+   },
+   "ambigu": true
+  },
+  "44174": {
+   "en": "Useful Coin Pouch",
+   "fr": "Bourse à pièces miteuse",
+   "zone_en": "Wandering Rogue Den",
+   "valeurs": {
+    "base": 780
+   },
+   "ambigu": false
+  },
+  "44175": {
+   "en": "Bunch of Loose Mane Hair",
+   "fr": "Touffe de crinière détachée",
+   "zone_en": "Manes Hideout",
+   "valeurs": {
+    "base": 550
+   },
+   "ambigu": false
+  },
+  "44179": {
+   "en": "Helmet Ornament",
+   "fr": "Décoration de casque brisé",
+   "zone_en": "Helms Post",
+   "valeurs": {
+    "base": 840
+   },
+   "ambigu": false
+  },
+  "44180": {
+   "en": "Armor Fragment",
+   "fr": "Fragment d'armure",
+   "zone_en": "Sausan Garrison",
+   "valeurs": {
+    "base": 11050
+   },
+   "ambigu": true
+  },
+  "44181": {
+   "en": "Robe Piece",
+   "fr": "Morceau de robe déchirée",
+   "zone_en": "Sausan Garrison",
+   "valeurs": {
+    "base": 504
+   },
+   "ambigu": false
+  },
+  "44182": {
+   "en": "Cultist's Token",
+   "fr": "Jeton de cultiste",
+   "zone_en": "Elric Shrine",
+   "valeurs": {
+    "base": 720
+   },
+   "ambigu": false
+  },
+  "44183": {
+   "en": "Mark of Frenzy",
+   "fr": "Marque de frénésie",
+   "zone_en": "Soldier's Cemetery",
+   "valeurs": {
+    "base": 900
+   },
+   "ambigu": false
+  },
+  "44184": {
+   "en": "Spell Necklace Ornament",
+   "fr": "Décoration de collier de sortilège",
+   "zone_en": "Soldier's Cemetery",
+   "valeurs": {
+    "base": 635
+   },
+   "ambigu": false
+  },
+  "44193": {
+   "en": "Old Identification Tag",
+   "fr": "Vieille plaque d'identification",
+   "zone_en": "Soldier's Cemetery",
+   "valeurs": {
+    "base": 700
+   },
+   "ambigu": false
+  },
+  "44197": {
+   "en": "Catfishman Scale",
+   "fr": "Écaille d'homme poisson-chat",
+   "zone_en": "Catfishman Camp",
+   "valeurs": {
+    "base": 4600
+   },
+   "ambigu": true
+  },
+  "44207": {
+   "en": "Mysterious Rock Fragment",
+   "fr": "Fragment de roche mystérieux",
+   "zone_en": "Hasrah Cliff",
+   "valeurs": {
+    "base": 1700
+   },
+   "ambigu": false
+  },
+  "44221": {
+   "en": "Sturdy Rock Fragment",
+   "fr": "Fragment de roche solide",
+   "zone_en": "",
+   "valeurs": {
+    "base": 160
+   },
+   "ambigu": false
+  },
+  "44222": {
+   "en": "Rusty Iron Piece",
+   "fr": "Morceau de fer rouillé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 200
+   },
+   "ambigu": false
+  },
+  "44223": {
+   "en": "Sturdy Timber Fragment",
+   "fr": "Fragment de bois solide",
+   "zone_en": "",
+   "valeurs": {
+    "base": 184
+   },
+   "ambigu": false
+  },
+  "44224": {
+   "en": "Broken Desert Fogan Egg",
+   "fr": "Œuf de Fogan du désert cassé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 80
+   },
+   "ambigu": false
+  },
+  "44243": {
+   "en": "Soiled Ring of Crescent Guardian",
+   "fr": "Anneau de gardien du croissant souillé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000
+   },
+   "ambigu": false
+  },
+  "44245": {
+   "en": "Soiled Centaurus Belt",
+   "fr": "Ceinture de centaure souillée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000
+   },
+   "ambigu": false
+  },
+  "44246": {
+   "en": "Soiled Ogre Ring",
+   "fr": "Anneau d'ogre souillé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000
+   },
+   "ambigu": false
+  },
+  "44267": {
+   "en": "Hystria Ruins Fragment",
+   "fr": "Fragment des ruines d'Hystria",
+   "zone_en": "Hystria Ruins",
+   "valeurs": {
+    "base": 20370
+   },
+   "ambigu": true
+  },
+  "44277": {
+   "en": "Lafi Bedmountain's Upgraded Compass Parts",
+   "fr": "Morceau de boussole améliorée de Lafi Limontagne",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "44284": {
+   "en": "Soiled Sicil's Necklace",
+   "fr": "Collier de Sicil souillé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000
+   },
+   "ambigu": false
+  },
+  "44286": {
+   "en": "Part for Explorer's Compass",
+   "fr": "Fragment de boussole d'explorateur",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3730000
+   },
+   "ambigu": false
+  },
+  "44296": {
+   "en": "Griffon Beak",
+   "fr": "Bec de griffon",
+   "zone_en": "Navarn Steppe",
+   "valeurs": {
+    "base": 21150
+   },
+   "ambigu": true
+  },
+  "44297": {
+   "en": "Ferri Beak",
+   "fr": "Bec de ferri",
+   "zone_en": "Navarn Steppe",
+   "valeurs": {
+    "base": 3750
+   },
+   "ambigu": true
+  },
+  "44298": {
+   "en": "Belladonna Elephant Ivory Piece",
+   "fr": "Défense d'éléphant belladone",
+   "zone_en": "Navarn Steppe",
+   "valeurs": {
+    "base": 5580
+   },
+   "ambigu": true
+  },
+  "44299": {
+   "en": "Black Leopard Fang",
+   "fr": "Croc de panthère noire",
+   "zone_en": "Navarn Steppe",
+   "valeurs": {
+    "base": 19520
+   },
+   "ambigu": true
+  },
+  "44300": {
+   "en": "Feather Wolf Tail",
+   "fr": "Queue de loup à plumes",
+   "zone_en": "Navarn Steppe",
+   "valeurs": {
+    "base": 3020
+   },
+   "ambigu": true
+  },
+  "44303": {
+   "en": "Degraded Wood Fragment",
+   "fr": "Fragment de bois abîmé",
+   "zone_en": "Mirumok Ruins",
+   "valeurs": {
+    "base": 18200
+   },
+   "ambigu": true
+  },
+  "44304": {
+   "en": "Wind Spirit Stone Fragment",
+   "fr": "Fragment de pierre d'esprit du vent",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "44305": {
+   "en": "Earth Spirit Stone Fragment",
+   "fr": "Fragment de pierre d'esprit de la terre",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "44306": {
+   "en": "Water Spirit Stone Fragment",
+   "fr": "Fragment de pierre d'esprit de l'eau",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "44310": {
+   "en": "Gazelle Fur",
+   "fr": "Fourrure de gazelle",
+   "zone_en": "Navarn Steppe",
+   "valeurs": {
+    "base": 220
+   },
+   "ambigu": false
+  },
+  "44311": {
+   "en": "Tree Spirit Stone Fragment",
+   "fr": "Fragment de pierre d'esprit des arbres",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "44322": {
+   "en": "Mushroom Hypha",
+   "fr": "Hyphe de champignon",
+   "zone_en": "Polly's Forest",
+   "valeurs": {
+    "base": 9720
+   },
+   "ambigu": true
+  },
+  "44324": {
+   "en": "Fragment of Bronze Artifact",
+   "fr": "Fragment d'artefact en bronze",
+   "zone_en": "Gyfin Rhasia Temple (Upper)",
+   "valeurs": {
+    "base": 16400
+   },
+   "ambigu": true
+  },
+  "44350": {
+   "en": "Yona's Fragment",
+   "fr": "Fragment de Yona",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "44357": {
+   "en": "Magic Stone Fragment",
+   "fr": "Fragment de pierre magique",
+   "zone_en": "",
+   "valeurs": {
+    "base": 760
+   },
+   "ambigu": false
+  },
+  "44358": {
+   "en": "Mud Stained Branch",
+   "fr": "Branche couverte de boue",
+   "zone_en": "",
+   "valeurs": {
+    "base": 4902
+   },
+   "ambigu": true
+  },
+  "44361": {
+   "en": "Blood Wolf Tooth",
+   "fr": "Dent de Loup sanglant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5960
+   },
+   "ambigu": true
+  },
+  "44365": {
+   "en": "Faded Ball of Fur",
+   "fr": "Boule de poils ternis",
+   "zone_en": "",
+   "valeurs": {
+    "base": 580
+   },
+   "ambigu": false
+  },
+  "44378": {
+   "en": "Protty Fin",
+   "fr": "Nageoire de protty",
+   "zone_en": "Protty Cave",
+   "valeurs": {
+    "base": 10500
+   },
+   "ambigu": true
+  },
+  "44380": {
+   "en": "Underwater Ancient Weapon Power Stone",
+   "fr": "Pierre de puissance sous-marine d'arme ancestrale",
+   "zone_en": "Sycraia Ruins (Lower)",
+   "valeurs": {
+    "base": 107900
+   },
+   "ambigu": true
+  },
+  "44382": {
+   "en": "Destroyed Ancient Weapon Power Stone",
+   "fr": "Pierre de puissance d'arme ancestrale endommagée",
+   "zone_en": "Sycraia Ruins (Upper)",
+   "valeurs": {
+    "base": 33800
+   },
+   "ambigu": true
+  },
+  "44383": {
+   "en": "Sycrid's Song",
+   "fr": "Chant de Sycrid",
+   "zone_en": "",
+   "valeurs": {
+    "base": 1000000
+   },
+   "ambigu": false
+  },
+  "44400": {
+   "en": "Sanguine Crystal of Despair",
+   "fr": "Cristal du désespoir étincelant",
+   "zone_en": "Vessel of Inquisition",
+   "valeurs": {
+    "base": 15500
+   },
+   "ambigu": true
+  },
+  "44401": {
+   "en": "Destroyed Star Fragment",
+   "fr": "Fragment d'étoile détruite",
+   "zone_en": "",
+   "valeurs": {
+    "base": 750
+   },
+   "ambigu": false
+  },
+  "44405": {
+   "en": "Clear Blackstar Crystal",
+   "fr": "Cristal de Sombrétoile limpide",
+   "zone_en": "",
+   "valeurs": {
+    "base": 100000
+   },
+   "ambigu": false
+  },
+  "44407": {
+   "en": "Destructive Illusion",
+   "fr": "Illusion destructrice",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "44411": {
+   "en": "Specter's Cloth",
+   "fr": "Tissu de spectre",
+   "zone_en": "Ash Forest",
+   "valeurs": {
+    "base": 35000
+   },
+   "ambigu": false
+  },
+  "44423": {
+   "en": "Iridescent Rock Piece",
+   "fr": "Morceau de roche irisée",
+   "zone_en": "Kratuga Ancient Ruins",
+   "valeurs": {
+    "base": 8000
+   },
+   "ambigu": false
+  },
+  "44425": {
+   "en": "Desert Naga's Webfoot",
+   "fr": "Pied palmé de Naga du désert",
+   "zone_en": "Desert Naga Temple",
+   "valeurs": {
+    "base": 12700
+   },
+   "ambigu": true
+  },
+  "44426": {
+   "en": "Bashim Mane",
+   "fr": "Crinière de Bashim",
+   "zone_en": "Bashim Base",
+   "valeurs": {
+    "base": 14800
+   },
+   "ambigu": true
+  },
+  "44427": {
+   "en": "Desert Fogan's Helmet Shard",
+   "fr": "Éclat de casque de Fogan du désert",
+   "zone_en": "Titium Valley",
+   "valeurs": {
+    "base": 14500
+   },
+   "ambigu": true
+  },
+  "44428": {
+   "en": "Token of Crescent",
+   "fr": "Jeton de croissant",
+   "zone_en": "Crescent Shrine",
+   "valeurs": {
+    "base": 10600
+   },
+   "ambigu": true
+  },
+  "44429": {
+   "en": "Swamp Leaves",
+   "fr": "Feuilles de marais",
+   "zone_en": "Tshira Ruins",
+   "valeurs": {
+    "base": 8820
+   },
+   "ambigu": true
+  },
+  "44430": {
+   "en": "Gahaz Seal",
+   "fr": "Sceau de Gahaz",
+   "zone_en": "Gahaz Bandit's Lair",
+   "valeurs": {
+    "base": 20930
+   },
+   "ambigu": true
+  },
+  "44431": {
+   "en": "Cadry's Token",
+   "fr": "Jeton de Cadry",
+   "zone_en": "Cadry Ruins",
+   "valeurs": {
+    "base": 15700
+   },
+   "ambigu": true
+  },
+  "44432": {
+   "en": "Fadus Armor Fragment",
+   "fr": "Fragment d'armure de fadus",
+   "zone_en": "Fadus Habitat",
+   "valeurs": {
+    "base": 9671
+   },
+   "ambigu": true
+  },
+  "44434": {
+   "en": "Stone Waragon Hide",
+   "fr": "Peau de waragon de pierre",
+   "zone_en": "Waragon Nest",
+   "valeurs": {
+    "base": 10000
+   },
+   "ambigu": true
+  },
+  "44435": {
+   "en": "Blood Wolf Mane",
+   "fr": "Crinière de Loup sanglant",
+   "zone_en": "Blood Wolf Settlement",
+   "valeurs": {
+    "base": 7764
+   },
+   "ambigu": true
+  },
+  "44436": {
+   "en": "Basilisk Scale",
+   "fr": "Écaille de basilic",
+   "zone_en": "Basilisk Den",
+   "valeurs": {
+    "base": 8300
+   },
+   "ambigu": true
+  },
+  "44437": {
+   "en": "Centaurus Mane",
+   "fr": "Crinière de centaure",
+   "zone_en": "Centaurus Herd",
+   "valeurs": {
+    "base": 21900
+   },
+   "ambigu": true
+  },
+  "44439": {
+   "en": "Sulfur Fragment",
+   "fr": "Fragment de soufre",
+   "zone_en": "Roud Sulfur Mine",
+   "valeurs": {
+    "base": 18600
+   },
+   "ambigu": true
+  },
+  "44440": {
+   "en": "Token of Bravery",
+   "fr": "Preuve de bravoure",
+   "zone_en": "Sherekhan Necropolis (Day)",
+   "valeurs": {
+    "base": 12750
+   },
+   "ambigu": true
+  },
+  "44441": {
+   "en": "Medal of Bravery",
+   "fr": "Médaille de la bravoure",
+   "zone_en": "Sherekhan Necropolis (Night)",
+   "valeurs": {
+    "base": 57777
+   },
+   "ambigu": true
+  },
+  "44442": {
+   "en": "Hoof of Forest Ronaros",
+   "fr": "Sabot de Ronaros forestier",
+   "zone_en": "Forest Ronaros Area",
+   "valeurs": {
+    "base": 13490
+   },
+   "ambigu": true
+  },
+  "44443": {
+   "en": "Narc Magic Mark",
+   "fr": "Marque magique de Narc",
+   "zone_en": "Manshaum Forest",
+   "valeurs": {
+    "base": 12770
+   },
+   "ambigu": true
+  },
+  "44446": {
+   "en": "Shadow Knight's Armor Ornament",
+   "fr": "Décoration d'armure de chevalier des ombres",
+   "zone_en": "Abandoned Monastery",
+   "valeurs": {
+    "base": 15000
+   },
+   "ambigu": false
+  },
+  "44448": {
+   "en": "Outlaw's Mark",
+   "fr": "Marque de hors-la-loi",
+   "zone_en": "Padix Island",
+   "valeurs": {
+    "base": 15000
+   },
+   "ambigu": false
+  },
+  "44450": {
+   "en": "Abyssal Ash",
+   "fr": "Cendre abyssale",
+   "zone_en": "Crypt of Resting Thoughts",
+   "valeurs": {
+    "base": 38000
+   },
+   "ambigu": false
+  },
+  "44451": {
+   "en": "Moonlight Spirit Powder",
+   "fr": "Poudre spirituelle du clair de lune",
+   "zone_en": "Thornwood Forest",
+   "valeurs": {
+    "base": 15000
+   },
+   "ambigu": false
+  },
+  "44454": {
+   "en": "Broken Horn Fragment",
+   "fr": "Fragment de corne brisée",
+   "zone_en": "Tunkuta",
+   "valeurs": {
+    "base": 18000
+   },
+   "ambigu": false
+  },
+  "44455": {
+   "en": "Old Warrior's Horn Decoration",
+   "fr": "Corne décorative de vieux guerrier",
+   "zone_en": "",
+   "valeurs": {
+    "base": 12000
+   },
+   "ambigu": false
+  },
+  "44456": {
+   "en": "Golem's Heart Fragment",
+   "fr": "Fragment de cœur de golem",
+   "zone_en": "Olun's Valley",
+   "valeurs": {
+    "base": 107000
+   },
+   "ambigu": false
+  },
+  "44477": {
+   "en": "Shard of the Vengeful Undead",
+   "fr": "Éclat de la mort vengeresse",
+   "zone_en": "Traitor's Graveyard",
+   "valeurs": {
+    "base": 1820
+   },
+   "ambigu": false
+  },
+  "44482": {
+   "en": "Oily Orange Mushroom",
+   "fr": "Champignon rouge-orangé huileux",
+   "zone_en": "[Elvia] Orc Camp",
+   "valeurs": {
+    "base": 18500
+   },
+   "ambigu": false
+  },
+  "44484": {
+   "en": "Proof of Reckless Courage",
+   "fr": "Preuve de grande bravoure",
+   "zone_en": "[Elvia] Biraghi Den",
+   "valeurs": {
+    "base": 16000
+   },
+   "ambigu": false
+  },
+  "44485": {
+   "en": "Hardened Casque",
+   "fr": "Bosse asséchée",
+   "zone_en": "[Elvia] Swamp Fogans",
+   "valeurs": {
+    "base": 17000
+   },
+   "ambigu": false
+  },
+  "44486": {
+   "en": "Bruised Naga Fin",
+   "fr": "Aileron de Nagas ecchymosé",
+   "zone_en": "[Elvia] Swamp Nagas",
+   "valeurs": {
+    "base": 18000
+   },
+   "ambigu": false
+  },
+  "44487": {
+   "en": "Mark of Desperate Rebels",
+   "fr": "Marque du soldat résistant désespéré",
+   "zone_en": "[Elvia] Castle Ruins",
+   "valeurs": {
+    "base": 17500
+   },
+   "ambigu": false
+  },
+  "44488": {
+   "en": "Covetous Eye",
+   "fr": "Pupille assoiffée",
+   "zone_en": "[Elvia] Altar Imps",
+   "valeurs": {
+    "base": 16000
+   },
+   "ambigu": false
+  },
+  "44489": {
+   "en": "Proof of Blind Faith",
+   "fr": "Sceau de la foi aveuglante",
+   "zone_en": "[Elvia] Bloody Monastery",
+   "valeurs": {
+    "base": 19000
+   },
+   "ambigu": false
+  },
+  "44494": {
+   "en": "Decomposed Exocrine Gland",
+   "fr": "Glande exocrine décomposée",
+   "zone_en": "Murrowak's Labyrinth",
+   "valeurs": {
+    "base": 11980
+   },
+   "ambigu": true
+  },
+  "44495": {
+   "en": "Evergrowing Scale",
+   "fr": "Écaille grandissant sans fin",
+   "zone_en": "Erethea's Limbo",
+   "valeurs": {
+    "base": 24350
+   },
+   "ambigu": false
+  },
+  "44496": {
+   "en": "Winter Tree Snow Crystal",
+   "fr": "Flocon d'arbre d'hiver",
+   "zone_en": "Winter Tree Fossil",
+   "valeurs": {
+    "base": 5620
+   },
+   "ambigu": false
+  },
+  "44501": {
+   "en": "Murrowak Crystal Carapace",
+   "fr": "Cristal de Murrowak",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "44516": {
+   "en": "Bronze Fragment of Delusion",
+   "fr": "Morceau de bronze de la délusion",
+   "zone_en": "Gyfin Rhasia Temple (Under)",
+   "valeurs": {
+    "base": 25120
+   },
+   "ambigu": false
+  },
+  "44518": {
+   "en": "Tainted Specter's Cloth",
+   "fr": "Tissu de spectre possédé",
+   "zone_en": "[Dehkia] Ash Forest",
+   "valeurs": {
+    "base": 52500
+   },
+   "ambigu": true
+  },
+  "44519": {
+   "en": "Tainted Golem's Heart Fragment",
+   "fr": "Fragment de cœur de golem possédé",
+   "zone_en": "[Dehkia] Olun's Valley",
+   "valeurs": {
+    "base": 111700
+   },
+   "ambigu": true
+  },
+  "44520": {
+   "en": "Tainted Moonlight Spirit Powder",
+   "fr": "Poudre spirituelle du clair de lune possédée",
+   "zone_en": "[Dehkia] Thornwood Forest",
+   "valeurs": {
+    "base": 39000
+   },
+   "ambigu": false
+  },
+  "44521": {
+   "en": "Tainted Broken Horn Fragment",
+   "fr": "Fragment de corne brisée possédée",
+   "zone_en": "[Dehkia] Tunkuta",
+   "valeurs": {
+    "base": 40000
+   },
+   "ambigu": false
+  },
+  "44522": {
+   "en": "Tainted Huge Spear",
+   "fr": "Grande lance possédée",
+   "zone_en": "[Dehkia] Cyclops Land",
+   "valeurs": {
+    "base": 32950
+   },
+   "ambigu": false
+  },
+  "44523": {
+   "en": "Corrupted Gargoyle Claw",
+   "fr": "Griffe de gargouille possédée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 16990
+   },
+   "ambigu": false
+  },
+  "44524": {
+   "en": "Tainted Token of Crescent",
+   "fr": "Jeton de croissant possédé",
+   "zone_en": "[Dehkia] Crescent Shrine",
+   "valeurs": {
+    "base": 38800
+   },
+   "ambigu": false
+  },
+  "44525": {
+   "en": "Tainted Cadry's Token",
+   "fr": "Jeton de Cadry possédé",
+   "zone_en": "[Dehkia] Cadry Ruins",
+   "valeurs": {
+    "base": 35880
+   },
+   "ambigu": false
+  },
+  "44526": {
+   "en": "Tainted Bronze Fragment",
+   "fr": "Fragment de bronze possédé",
+   "zone_en": "[Dehkia] Gyfin Rhasia Temple (Upper)",
+   "valeurs": {
+    "base": 125900
+   },
+   "ambigu": false
+  },
+  "44527": {
+   "en": "Tainted Wood Fragment",
+   "fr": "Fragment de bois possédé",
+   "zone_en": "[Dehkia] Mirumok Ruins",
+   "valeurs": {
+    "base": 101500
+   },
+   "ambigu": false
+  },
+  "44795": {
+   "en": "Crimson Bell",
+   "fr": "Cloche rouge",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000
+   },
+   "ambigu": true
+  },
+  "44799": {
+   "en": "Forgotten Witch's Token",
+   "fr": "Sceau de la sorcière oubliée",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "44931": {
+   "en": "Offensive Sub-weapon Box",
+   "fr": "Coffre d'arme secondaire offensive",
+   "zone_en": "",
+   "valeurs": {
+    "base": 11200
+   },
+   "ambigu": true
+  },
+  "44932": {
+   "en": "Accuracy Sub-weapon Box",
+   "fr": "Coffre d'arme secondaire de précision",
+   "zone_en": "",
+   "valeurs": {
+    "base": 9600
+   },
+   "ambigu": true
+  },
+  "44933": {
+   "en": "Defensive Sub-weapon Box",
+   "fr": "Coffre d'arme secondaire de défense",
+   "zone_en": "",
+   "valeurs": {
+    "base": 12800
+   },
+   "ambigu": true
+  },
+  "45013": {
+   "en": "Quturan's Left Lung",
+   "fr": "Poumon gauche de Quturan",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "45014": {
+   "en": "Quturan's Right Lung",
+   "fr": "Poumon droit de Quturan",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "45017": {
+   "en": "Quturan's Black Leaf",
+   "fr": "Feuille noire de Quturan",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "45018": {
+   "en": "Quturan's Ashen Leaf",
+   "fr": "Feuille cendreuse de Quturan",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "45297": {
+   "en": "Destruction Spirit Stone",
+   "fr": "Pierre d'esprit de destruction",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3900000
+   },
+   "ambigu": true
+  },
+  "45299": {
+   "en": "Guardian Spirit Stone",
+   "fr": "Pierre d'esprit gardien",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3140000
+   },
+   "ambigu": true
+  },
+  "45301": {
+   "en": "Life Spirit Stone",
+   "fr": "Pierre d'esprit de profession",
+   "zone_en": "",
+   "valeurs": {
+    "base": 4490000
+   },
+   "ambigu": true
+  },
+  "50801": {
+   "en": "Krogdalo's Origin Stone",
+   "fr": "Pierre originelle de Krogdalo",
+   "zone_en": "",
+   "valeurs": {
+    "base": 14400000
+   },
+   "ambigu": false
+  },
+  "50802": {
+   "en": "Swaying Wind Shard",
+   "fr": "Éclat de vent balayant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 130000
+   },
+   "ambigu": false
+  },
+  "50803": {
+   "en": "Rumbling Earth Shard",
+   "fr": "Éclat de terre grondante",
+   "zone_en": "",
+   "valeurs": {
+    "base": 188000
+   },
+   "ambigu": false
+  },
+  "50807": {
+   "en": "Pure Forest Breath",
+   "fr": "Souffle de la forêt",
+   "zone_en": "",
+   "valeurs": {
+    "base": 2330000
+   },
+   "ambigu": false
+  },
+  "54031": {
+   "en": "Laila's Petal",
+   "fr": "Pétale de Laila",
+   "zone_en": "",
+   "valeurs": {
+    "base": 500000
+   },
+   "ambigu": false
+  },
+  "56284": {
+   "en": "Forgotten Limbo Box",
+   "fr": "Coffre de l'oubli effacé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "56327": {
+   "en": "Discarded Kkebicap",
+   "fr": "Chapeau de Dokkebi abandonné",
+   "zone_en": "Dokkebi Forest",
+   "valeurs": {
+    "base": 52571
+   },
+   "ambigu": false
+  },
+  "56328": {
+   "en": "Faded Bandit Mask",
+   "fr": "Masque de bandit terni",
+   "zone_en": "Honglim Base",
+   "valeurs": {
+    "base": 20520
+   },
+   "ambigu": false
+  },
+  "56329": {
+   "en": "Shattered Treasures",
+   "fr": "Trésors brisés",
+   "zone_en": "Golden Pig Cave",
+   "valeurs": {
+    "base": 59415
+   },
+   "ambigu": false
+  },
+  "56334": {
+   "en": "Thorn-Entwined Weapon Fragment",
+   "fr": "Fragment d'arme enlacé d'épines",
+   "zone_en": "Orzekea",
+   "valeurs": {
+    "base": 96040
+   },
+   "ambigu": false
+  },
+  "56335": {
+   "en": "Golden Pigs Subjugation Token",
+   "fr": "Sceau d'extermination des Cochons dorés",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "56338": {
+   "en": "Shiny Treasure",
+   "fr": "Trésors brillants",
+   "zone_en": "Fortunate Golden Pig Cave",
+   "valeurs": {
+    "base": 59415
+   },
+   "ambigu": false
+  },
+  "56339": {
+   "en": "Corrupted Sanguine Crystal",
+   "fr": "Cristal sanglant corrompu",
+   "zone_en": "Star's End",
+   "valeurs": {
+    "base": 155000
+   },
+   "ambigu": false
+  },
+  "56340": {
+   "en": "Origin of Corruption",
+   "fr": "Source de corruption",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000000000
+   },
+   "ambigu": false
+  },
+  "56345": {
+   "en": "Faint Sycraia's Memory",
+   "fr": "Mémoire floue de Sycraia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 150000000
+   },
+   "ambigu": false
+  },
+  "56346": {
+   "en": "Gentle Sycraia's Memory",
+   "fr": "Mémoire faible de Sycraia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 300000000
+   },
+   "ambigu": false
+  },
+  "56347": {
+   "en": "Intense Sycraia's Memory",
+   "fr": "Mémoire puissante de Sycraia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 900000000
+   },
+   "ambigu": false
+  },
+  "56348": {
+   "en": "Radiant Sycraia's Memory",
+   "fr": "Mémoire rayonnante de Sycraia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000000000
+   },
+   "ambigu": false
+  },
+  "56505": {
+   "en": "Ancient Spirit Light",
+   "fr": "Lumière d'esprit ancien",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "59797": {
+   "en": "Gnawing Rhutum Fang",
+   "fr": "Canine de Rhutum mordante",
+   "zone_en": "[Elvia] Rhutum Outstation",
+   "valeurs": {
+    "base": 18575
+   },
+   "ambigu": false
+  },
+  "59798": {
+   "en": "Fiery Troll Hide",
+   "fr": "Cuir de troll ardent",
+   "zone_en": "[Elvia] Quint Hill",
+   "valeurs": {
+    "base": 96750
+   },
+   "ambigu": false
+  },
+  "59799": {
+   "en": "Scornful Spear",
+   "fr": "Lance de la rancoeur",
+   "zone_en": "[Elvia] Primal Giant Post",
+   "valeurs": {
+    "base": 20000
+   },
+   "ambigu": false
+  },
+  "59800": {
+   "en": "Howling Bone Fragment",
+   "fr": "Fragment d'os hurlant",
+   "zone_en": "[Elvia] Hexe Sanctuary",
+   "valeurs": {
+    "base": 26190
+   },
+   "ambigu": false
+  },
+  "59801": {
+   "en": "Icy Armor Fragment",
+   "fr": "Fragment d'armure glacé",
+   "zone_en": "[Elvia] Saunil Camp",
+   "valeurs": {
+    "base": 17520
+   },
+   "ambigu": false
+  },
+  "59802": {
+   "en": "Tattered Shadow",
+   "fr": "Ombre en lambeaux",
+   "zone_en": "",
+   "valeurs": {
+    "base": 25207
+   },
+   "ambigu": false
+  },
+  "59880": {
+   "en": "Corrupt Power Source",
+   "fr": "Puissance corrompue",
+   "zone_en": "Yzrahid Highlands",
+   "valeurs": {
+    "base": 25190
+   },
+   "ambigu": false
+  },
+  "59886": {
+   "en": "Krea Sub-weapon Box",
+   "fr": "Coffre d'arme secondaire de Krea",
+   "zone_en": "",
+   "valeurs": {
+    "base": 14400
+   },
+   "ambigu": true
+  },
+  "59887": {
+   "en": "Rosar Sub-weapon Box",
+   "fr": "Coffre d'arme secondaire de Rosar",
+   "zone_en": "",
+   "valeurs": {
+    "base": 16000
+   },
+   "ambigu": true
+  },
+  "65327": {
+   "en": "Lafi Bedmountain's Upgraded Telescope Parts",
+   "fr": "Pièce de télescope amélioré de Lafi Limontagne",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "65328": {
+   "en": "Tungrad Ruins Fragment",
+   "fr": "Fragment des Ruines de Tungrad",
+   "zone_en": "Tungrad Ruins",
+   "valeurs": {
+    "base": 35100
+   },
+   "ambigu": false
+  },
+  "65329": {
+   "en": "Mark of the Black Sands",
+   "fr": "Marque du Sable Noir",
+   "zone_en": "City of the Dead",
+   "valeurs": {
+    "base": 32900
+   },
+   "ambigu": false
+  },
+  "65330": {
+   "en": "Decayed Cloth",
+   "fr": "Morceau de tissu corrompu",
+   "zone_en": "Darkseekers' Retreat",
+   "valeurs": {
+    "base": 45570
+   },
+   "ambigu": false
+  },
+  "65397": {
+   "en": "Tainted Ruins Fragment",
+   "fr": "Fragment de ruines possédé",
+   "zone_en": "[Dehkia] Hystria Ruins",
+   "valeurs": {
+    "base": 34270
+   },
+   "ambigu": true
+  },
+  "65398": {
+   "en": "Tainted Sulfur Fragment",
+   "fr": "Fragment de soufre possédé",
+   "zone_en": "[Elvia] Roud Sulfur Mine",
+   "valeurs": {
+    "base": 31500
+   },
+   "ambigu": false
+  },
+  "65399": {
+   "en": "Tainted Token Piece",
+   "fr": "Fragment de jeton possédé",
+   "zone_en": "[Dehkia] Pila Ku Jail",
+   "valeurs": {
+    "base": 30900
+   },
+   "ambigu": false
+  },
+  "65400": {
+   "en": "Tainted Aakman's Token",
+   "fr": "Jeton d'Aakman possédé",
+   "zone_en": "[Dekhia] Aakman",
+   "valeurs": {
+    "base": 32900
+   },
+   "ambigu": false
+  },
+  "65770": {
+   "en": "Venomous Night Fang",
+   "fr": "Croc nocturne venimeux",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000
+   },
+   "ambigu": false
+  },
+  "65778": {
+   "en": "Al Rhundi's Secret Orders",
+   "fr": "Ordre secret d'Al Rhundi",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "66106": {
+   "en": "Glimmering Treasure Key",
+   "fr": "Clé du trésor brillant sereinement",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "66107": {
+   "en": "Sparkling Treasure Key",
+   "fr": "Clé du trésor brillant faiblement",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "66108": {
+   "en": "Dazzling Treasure Key",
+   "fr": "Clé du trésor brillant de mille feux",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "66945": {
+   "en": "Fortunate Golden Pig King Summon Scroll",
+   "fr": "Parchemin d'invocation du Roi des cochons dorés imprégné de chance",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "721002": {
+   "en": "Ancient Spirit Dust",
+   "fr": "Poussière d'esprit ancien",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3000
+   },
+   "ambigu": false
+  },
+  "721044": {
+   "en": "Specter's Energy",
+   "fr": "Énergie spectrale",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000000
+   },
+   "ambigu": false
+  },
+  "735201": {
+   "en": "Marsh's Artifact - Melee AP",
+   "fr": "Artefact de Marsh - PA (CàC)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735202": {
+   "en": "Marsh's Artifact - Ranged AP",
+   "fr": "Artefact de Marsh - PA (distance)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735203": {
+   "en": "Marsh's Artifact - Magic AP",
+   "fr": "Artefact de Marsh - PA (magiques)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735204": {
+   "en": "Marsh's Artifact - Melee Accuracy",
+   "fr": "Artefact de Marsh - Précision (CàC)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735205": {
+   "en": "Marsh's Artifact - Ranged Accuracy",
+   "fr": "Artefact de Marsh - Précision (distance)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735206": {
+   "en": "Marsh's Artifact - Magic Accuracy",
+   "fr": "Artefact de Marsh - Précision (magique)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735207": {
+   "en": "Marsh's Artifact - Extra AP Against Monsters",
+   "fr": "Artefact de Marsh - PA supplémentaires (monstres)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735251": {
+   "en": "Lesha's Artifact - Melee Damage Reduction",
+   "fr": "Artefact de Lesha - Réduction des dégâts (CàC)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735252": {
+   "en": "Lesha's Artifact - Melee Evasion",
+   "fr": "Artefact de Lesha - Esquive (CàC)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735253": {
+   "en": "Lesha's Artifact - Ranged Damage Reduction",
+   "fr": "Artefact de Lesha - Réduction des dégâts (distance)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735254": {
+   "en": "Lesha's Artifact - Ranged Evasion",
+   "fr": "Artefact de Lesha - Esquive (distance)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735255": {
+   "en": "Lesha's Artifact - Magic Damage Reduction",
+   "fr": "Artefact de Lesha - Réduction des dégâts (magiques)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735256": {
+   "en": "Lesha's Artifact - Magic Evasion",
+   "fr": "Artefact de Lesha - Esquive (magique)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735257": {
+   "en": "Lesha's Artifact - All Damage Reduction",
+   "fr": "Artefact de Lesha - Réduction de tous les dégâts",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735258": {
+   "en": "Lesha's Artifact - All Evasion",
+   "fr": "Artefact de Lesha - Tous types d'esquive",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735259": {
+   "en": "Lesha's Artifact - Monster Damage Reduction",
+   "fr": "Artefact de Lesha - Réduction des dégâts (monstres)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735301": {
+   "en": "Kehelle's Artifact - Max HP",
+   "fr": "Artefact de Kehelle - PV max.",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735302": {
+   "en": "Kehelle's Artifact - Max Stamina",
+   "fr": "Artefact de Kehelle - Endurance max.",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "735303": {
+   "en": "Kehelle's Artifact - Black Spirit's Rage Max Increase",
+   "fr": "Artefact de Kehelle - Augmentation de la rage occulte max.",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "742269": {
+   "en": "Kabua's Artifact",
+   "fr": "Artefact de Kabua",
+   "zone_en": "",
+   "valeurs": {
+    "base": 9350000000
+   },
+   "ambigu": false
+  },
+  "748021": {
+   "en": "Dehkia's Artifact - All Damage Reduction",
+   "fr": "Artefact de Dehkia - Réduction de tous les dégâts",
+   "zone_en": "",
+   "valeurs": {
+    "base": 9350000000
+   },
+   "ambigu": false
+  },
+  "748022": {
+   "en": "Dehkia's Artifact - All Evasion",
+   "fr": "Artefact de Dehkia - Tous types d'esquive",
+   "zone_en": "",
+   "valeurs": {
+    "base": 9350000000
+   },
+   "ambigu": false
+  },
+  "752023": {
+   "en": "Mass of Pure Magic",
+   "fr": "Amas de magie pure",
+   "zone_en": "",
+   "valeurs": {
+    "base": 51000
+   },
+   "ambigu": false
+  },
+  "752530": {
+   "en": "Atanis Element",
+   "fr": "Élément d'Atanis",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "757451": {
+   "en": "Bares Main Weapon Box",
+   "fr": "Coffre d'arme principale de Bares",
+   "zone_en": "",
+   "valeurs": {
+    "base": 16400
+   },
+   "ambigu": false
+  },
+  "757452": {
+   "en": "Yuria Main Weapon Box",
+   "fr": "Coffre d'arme principale de Yuria",
+   "zone_en": "",
+   "valeurs": {
+    "base": 18000
+   },
+   "ambigu": false
+  },
+  "757453": {
+   "en": "Krea Main Weapon Box",
+   "fr": "Coffre d'arme principale de Krea",
+   "zone_en": "",
+   "valeurs": {
+    "base": 19600
+   },
+   "ambigu": false
+  },
+  "757454": {
+   "en": "Seleth Main Weapon Box",
+   "fr": "Coffre d'arme principale de Seleth",
+   "zone_en": "",
+   "valeurs": {
+    "base": 13200
+   },
+   "ambigu": false
+  },
+  "757455": {
+   "en": "Kalis Main Weapon Box",
+   "fr": "Coffre d'arme principale de Kalis",
+   "zone_en": "",
+   "valeurs": {
+    "base": 14800
+   },
+   "ambigu": false
+  },
+  "757460": {
+   "en": "Rosar Main Weapon Box",
+   "fr": "Coffre d'arme principale de Rosar",
+   "zone_en": "",
+   "valeurs": {
+    "base": 16000
+   },
+   "ambigu": false
+  },
+  "757462": {
+   "en": "Magic Crystal of Infinity Box",
+   "fr": "Boîte de Cristal magique d'infinité",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5800
+   },
+   "ambigu": false
+  },
+  "757463": {
+   "en": "Hercules' Defense Gear Box",
+   "fr": "Coffre d'équipement défensif herculéen",
+   "zone_en": "",
+   "valeurs": {
+    "base": 12200
+   },
+   "ambigu": false
+  },
+  "757464": {
+   "en": "Heve's Defense Gear Box",
+   "fr": "Coffre d'équipement défensif d'Heve",
+   "zone_en": "",
+   "valeurs": {
+    "base": 15400
+   },
+   "ambigu": false
+  },
+  "757465": {
+   "en": "Fortuna's Luck Defense Gear Box",
+   "fr": "Coffre d'équipement défensif de Fortuna",
+   "zone_en": "",
+   "valeurs": {
+    "base": 13800
+   },
+   "ambigu": false
+  },
+  "757466": {
+   "en": "Agerian Defense Gear Box",
+   "fr": "Coffre d'équipement défensif d'Agerian",
+   "zone_en": "",
+   "valeurs": {
+    "base": 9000
+   },
+   "ambigu": false
+  },
+  "757468": {
+   "en": "Zereth Defense Gear Box",
+   "fr": "Coffre d'équipement défensif de Zereth",
+   "zone_en": "",
+   "valeurs": {
+    "base": 16200
+   },
+   "ambigu": false
+  },
+  "757470": {
+   "en": "Grunil Defense Gear Box",
+   "fr": "Coffre d'équipement défensif de Grunil",
+   "zone_en": "",
+   "valeurs": {
+    "base": 17800
+   },
+   "ambigu": false
+  },
+  "757471": {
+   "en": "Rocaba Defense Gear Box",
+   "fr": "Coffre d'équipement défensif de Rocaba",
+   "zone_en": "",
+   "valeurs": {
+    "base": 19400
+   },
+   "ambigu": false
+  },
+  "757477": {
+   "en": "Black Stone Bundle",
+   "fr": "Lot de pierres noires",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": true
+  },
+  "757480": {
+   "en": "Reliable Adventurer's Earring Box",
+   "fr": "Boîte de boucle d'oreille d'aventurier robuste",
+   "zone_en": "",
+   "valeurs": {
+    "base": 12800
+   },
+   "ambigu": false
+  },
+  "761714": {
+   "en": "Roud Sulfur Mine Paint",
+   "fr": "Peinture de la Mine de soufre de Roud",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761715": {
+   "en": "Pila Ku Jail Paint",
+   "fr": "Peinture de la Prison de Pila Ku",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761716": {
+   "en": "Aakman Temple Paint",
+   "fr": "Peinture du Temple d'Aakman",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761717": {
+   "en": "Hystria Ruins Paint",
+   "fr": "Peinture des Ruines d'Hystria",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761718": {
+   "en": "Sycraia Underwater Ruins Paint",
+   "fr": "Peinture des Ruines sous-marines de Sycraia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761719": {
+   "en": "Padix Island Paint",
+   "fr": "Peinture de l'Île de Padix",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761720": {
+   "en": "Ash Forest Paint",
+   "fr": "Peinture de la Forêt de cendres",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761721": {
+   "en": "Crypt of Resting Thoughts Paint",
+   "fr": "Peinture de la Crypte des pensées endormies",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761722": {
+   "en": "Olun's Valley Paint",
+   "fr": "Peinture de la Vallée d'Olun",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761723": {
+   "en": "City of the Dead Paint",
+   "fr": "Peinture de la Cité des morts",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761724": {
+   "en": "Tungrad Ruins Paint",
+   "fr": "Peinture des Ruines de Tungrad",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "761725": {
+   "en": "Darkseekers' Retreat Paint",
+   "fr": "Peinture du Refuge des disciples des ténèbres",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "766101": {
+   "en": "Iridescent Lightstone",
+   "fr": "Pierre de lumière multicolore",
+   "zone_en": "",
+   "valeurs": {
+    "base": 3210000000
+   },
+   "ambigu": false
+  },
+  "766104": {
+   "en": "Imperfect Lightstone of Fire",
+   "fr": "Pierre de lumière imparfaite (feu)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 8550000
+   },
+   "ambigu": false
+  },
+  "766105": {
+   "en": "Imperfect Lightstone of Earth",
+   "fr": "Pierre de lumière imparfaite (terre)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 7600000
+   },
+   "ambigu": false
+  },
+  "766106": {
+   "en": "Imperfect Lightstone of Wind",
+   "fr": "Pierre de lumière imparfaite (vent)",
+   "zone_en": "",
+   "valeurs": {
+    "base": 7400000
+   },
+   "ambigu": false
+  },
+  "767091": {
+   "en": "Dehkia's Fragment",
+   "fr": "Fragment de Dehkia",
+   "zone_en": "",
+   "valeurs": {
+    "base": 93500000
+   },
+   "ambigu": false
+  },
+  "767244": {
+   "en": "Chilled Soul Piece",
+   "fr": "Fragment d'âme gelée",
+   "zone_en": "Aetherion Castle",
+   "valeurs": {
+    "base": 105640
+   },
+   "ambigu": false
+  },
+  "767245": {
+   "en": "Contaminated Coral Piece",
+   "fr": "Morceau de corail contaminé",
+   "zone_en": "Nymphamaré Castle",
+   "valeurs": {
+    "base": 115200
+   },
+   "ambigu": false
+  },
+  "767246": {
+   "en": "Ancient Soldier Fragment",
+   "fr": "Fragment d'ancien soldat",
+   "zone_en": "Tenebraum Castle",
+   "valeurs": {
+    "base": 147630
+   },
+   "ambigu": false
+  },
+  "767247": {
+   "en": "Lightlost Core",
+   "fr": "Noyau sans lumière",
+   "zone_en": "Orbita Castle",
+   "valeurs": {
+    "base": 140600
+   },
+   "ambigu": false
+  },
+  "767248": {
+   "en": "Hardened Lava Chunk",
+   "fr": "Morceau de lave solidifiée",
+   "zone_en": "Zephyros Castle",
+   "valeurs": {
+    "base": 126980
+   },
+   "ambigu": false
+  },
+  "767249": {
+   "en": "Empty Picture Frame",
+   "fr": "Cadre sans dessin",
+   "zone_en": "",
+   "valeurs": {
+    "base": 15348
+   },
+   "ambigu": false
+  },
+  "767293": {
+   "en": "Crimson Primordial Pigment - Sovereign",
+   "fr": "Pigment primordial rouge - Souverain",
+   "zone_en": "",
+   "valeurs": {
+    "base": 10900000000
+   },
+   "ambigu": false
+  },
+  "767294": {
+   "en": "Violet Primordial Pigment - Sovereign",
+   "fr": "Pigment primordial violet - Souverain",
+   "zone_en": "",
+   "valeurs": {
+    "base": 35000000000
+   },
+   "ambigu": false
+  },
+  "767296": {
+   "en": "Violet Primordial Pigment - Edana",
+   "fr": "Pigment primordial violet - Edana",
+   "zone_en": "",
+   "valeurs": {
+    "base": 10800000000
+   },
+   "ambigu": false
+  },
+  "767339": {
+   "en": "Sycrid's Scale Piece",
+   "fr": "Éclat d'écaille de Sycrid",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "767348": {
+   "en": "Tainted Armor Fragment",
+   "fr": "Fragment d'armure possédé",
+   "zone_en": "Dark Energy Floodlands",
+   "valeurs": {
+    "base": 100507
+   },
+   "ambigu": false
+  },
+  "767349": {
+   "en": "Faded Dark Energy",
+   "fr": "Énergie noire ternie",
+   "zone_en": "",
+   "valeurs": {
+    "base": 597680
+   },
+   "ambigu": false
+  },
+  "768160": {
+   "en": "Sealed Black Magic Crystal",
+   "fr": "Cristal de magie noire scellé",
+   "zone_en": "",
+   "valeurs": {
+    "base": 6000000
+   },
+   "ambigu": false
+  },
+  "790694": {
+   "en": "Void Tainted Whispers",
+   "fr": "Murmure influencé par le néant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 0
+   },
+   "ambigu": false
+  },
+  "790699": {
+   "en": "Resplendently-lit Gemstone",
+   "fr": "Joyau d'éclat resplendissant",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5000000
+   },
+   "ambigu": false
+  },
+  "790700": {
+   "en": "Torn Buccaneer Lapel",
+   "fr": "Col déchiré de pirate",
+   "zone_en": "Bumblin' Buccaneers",
+   "valeurs": {
+    "base": 13470
+   },
+   "ambigu": false
+  },
+  "820040": {
+   "en": "Kuadir Fragment",
+   "fr": "Fragment de Kuadir",
+   "zone_en": "",
+   "valeurs": {
+    "base": 50000
+   },
+   "ambigu": false
+  },
+  "821246": {
+   "en": "Primordial Fragment",
+   "fr": "Fragment originel",
+   "zone_en": "",
+   "valeurs": {
+    "base": 30000000
+   },
+   "ambigu": false
+  },
+  "821253": {
+   "en": "WON Crystal of Ruin",
+   "fr": "Cristal de perdition WON",
+   "zone_en": "",
+   "valeurs": {
+    "base": 5000000
+   },
+   "ambigu": false
+  },
+  "821254": {
+   "en": "BON Crystal of Ruin",
+   "fr": "Cristal de perdition BON",
+   "zone_en": "",
+   "valeurs": {
+    "base": 7000000
+   },
+   "ambigu": false
+  },
+  "821319": {
+   "en": "JIN Crystal of Ruin",
+   "fr": "Cristal de perdition JIN",
+   "zone_en": "",
+   "valeurs": {
+    "base": 8000000
+   },
+   "ambigu": false
+  },
+  "821320": {
+   "en": "HAN Crystal of Ruin",
+   "fr": "Cristal de perdition KANG",
+   "zone_en": "",
+   "valeurs": {
+    "base": 10000000
+   },
+   "ambigu": false
+  }
+ }
+}
