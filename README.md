@@ -109,13 +109,30 @@ pip install -e ".[dev]"
 | Catalogue d'objets par identifiant | ✅ fait | 8344 objets, noms FR, mise en cache sécurisée |
 | Reconnaissance floue + contrôle d'ambiguïté | ✅ fait | seuil, marge, restriction par spot |
 | Noms vérifiés à la main | ⚙️ mécanisme prêt | recoupement bdocodex/garmoth à faire, objet par objet |
+| Anti-double-comptage entre images | ✅ fait | alignement, défilement, validation multi-images |
 | Capture d'écran et OCR | ⛔ à faire | |
-| Anti-double-comptage entre images | ⛔ à faire | |
 | Prix du marché central | ⛔ à faire | |
 | Sessions et silver/heure | ⛔ à faire | |
 | Interface | ⛔ à faire | |
 
-103 tests automatisés couvrent les briques marquées comme faites.
+194 tests automatisés couvrent les briques marquées comme faites.
+
+### Ce que mesure la simulation de bout en bout
+
+L'anti-double-comptage est vérifié sur un journal simulé complet, pas seulement
+pièce par pièce. Sur 3000 captures et plus de 500 drops, le total compté est
+**exactement** le total tombé. Avec 15% des lectures volontairement abîmées,
+609 drops sur 609 sont encore comptés et 99% des quantités restent exactes.
+
+Deux résultats de cette simulation méritent d'être connus :
+
+- **Quand le tracker n'y arrive pas, il sous-compte, il ne sur-compte jamais.**
+  C'est le bon sens de l'erreur.
+- **Attendre plus d'images avant de valider un drop dégrade le résultat.** Le
+  réglage qu'on serait tenté d'augmenter par prudence fait perdre du butin : la
+  ligne sort de l'écran avant d'atteindre le seuil. Mesuré, en passant de 3 à 7
+  observations exigées, les pertes passent de 0 à 24 drops sur la même session.
+  Un test empêche que ce réglage soit relevé sans le voir.
 
 ## Développement
 

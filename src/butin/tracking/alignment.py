@@ -1,0 +1,233 @@
+"""Alignement de deux captures successives du journal d'acquisition.
+
+C'est le cœur de l'anti-double-comptage, et la partie la plus difficile d'un
+tracker de butin. Elle n'a rien à voir avec la langue : c'est pour elle que
+partir du travail de janhnguyen/BDO-Loot-Tracker (MIT) valait mieux que
+repartir de zéro.
+
+**L'invariant.** Le journal est une file : les nouvelles lignes arrivent en bas
+et tout remonte d'un cran. Donc les lignes communes à deux captures successives
+forment un **suffixe** de l'ancienne image et un **préfixe** de la nouvelle.
+Les lignes réellement nouvelles sont exactement `current[recouvrement:]`.
+
+    ancienne          nouvelle
+    ┌──────────┐
+    │ ligne A  │      (a défilé hors écran)
+    │ ligne B  │  ─┐  ┌──────────┐
+    │ ligne C  │  ─┼─▶│ ligne B  │  ┐
+    │ ligne D  │  ─┘  │ ligne C  │  ├─ recouvrement = 3
+    └──────────┘      │ ligne D  │  ┘
+                      │ ligne E  │  ◀── seule ligne réellement nouvelle
+                      └──────────┘
+
+**Pourquoi c'est délicat.** Le recouvrement n'est pas donné, il faut le
+deviner. Et il existe un cas où le texte seul ne peut pas trancher : quand
+plusieurs lignes identiques se suivent, ce qui arrive en permanence en farm
+(dix « Pierre noire (arme) x1 » d'affilée). Plusieurs recouvrements sont alors
+textuellement valides, et choisir le mauvais fait recompter des drops.
+
+Trois garde-fous répondent à ce problème :
+
+1. `expected_new`, une prédiction issue du **décalage en pixels** (voir
+   `scroll.py`), qui est un signal totalement indépendant du texte. Quand le
+   texte hésite, les pixels tranchent.
+2. `is_glitch_frame`, qui refuse une image ayant brutalement perdu tout
+   recouvrement. Une seule ligne fantôme décale tout et effondre le
+   recouvrement à zéro, ce qui ferait recompter la fenêtre entière.
+3. `is_implausible_jump`, qui refuse une image annonçant plus de nouvelles
+   lignes qu'il n'est physiquement possible entre deux captures espacées d'un
+   dixième de seconde.
+
+Les trois sont bornés dans le temps : un vrai changement massif finit toujours
+par être accepté, sinon le tracker se figerait sur un désaccord permanent.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any
+
+from .models import ObservedLine
+from .similarity import MatchConfig, line_similarity
+
+# Nombre d'images consécutives sans recouvrement qu'on accepte d'ignorer avant
+# de céder. Au-delà, on considère que l'écran a réellement changé.
+GLITCH_MAX_SKIPS = 3
+
+# En dessous de cette taille, l'image précédente n'était pas une vraie fenêtre
+# de journal, donc perdre le recouvrement n'a rien d'anormal.
+GLITCH_MIN_BASELINE = 3
+
+# Au-delà de ce nombre de nouvelles lignes entre deux captures, l'estimation du
+# recouvrement est presque sûrement fausse. Le journal ne défile pas de dix
+# lignes en un dixième de seconde.
+PLAUSIBLE_MAX_NEW = 10
+
+
+@dataclass(slots=True)
+class AlignmentResult:
+    """Résultat de l'alignement de deux captures."""
+
+    overlap: int
+    """Nombre de lignes communes retenues."""
+
+    new_lines: list[ObservedLine]
+    """Lignes réellement nouvelles, soit `current[overlap:]`."""
+
+    confidence: float
+    """Similarité moyenne des paires du recouvrement retenu, 0 si aucun."""
+
+    zero_overlap: bool
+    """Vrai seulement si les deux images sont non vides et ne partagent rien.
+
+    C'est le cas suspect : soit l'écran a vraiment tout changé, soit l'OCR a
+    produit une image aberrante. `is_glitch_frame` sert à trancher.
+    """
+
+    diagnostics: dict[str, Any] = field(default_factory=dict)
+    """Détail du choix, conservé pour comprendre après coup un comptage faux.
+
+    Un tracker qui se trompe sans laisser de trace n'est pas diagnosticable :
+    l'utilisateur voit un chiffre, pas le raisonnement qui l'a produit.
+    """
+
+
+def _overlap_score(
+    previous: Sequence[ObservedLine],
+    current: Sequence[ObservedLine],
+    k: int,
+    cfg: MatchConfig,
+) -> float | None:
+    """Similarité moyenne si les `k` paires passent le seuil, sinon None.
+
+    Les paires pour un recouvrement `k` sont `previous[lp - k + j]` contre
+    `current[j]`, pour j de 0 à k exclu.
+    """
+    if k == 0:
+        # Vide de sens mais toujours valide : aucune paire à contredire.
+        return 1.0
+    lp = len(previous)
+    total = 0.0
+    for j in range(k):
+        similarity = line_similarity(previous[lp - k + j], current[j], cfg)
+        if similarity < cfg.line_accept:
+            return None
+        total += similarity
+    return total / k
+
+
+def align(
+    previous: Sequence[ObservedLine],
+    current: Sequence[ObservedLine],
+    cfg: MatchConfig | None = None,
+    expected_new: int | None = None,
+) -> AlignmentResult:
+    """Aligne deux captures et renvoie les lignes réellement nouvelles.
+
+    Sans `expected_new`, on retient le **plus grand** recouvrement valide,
+    règle classique du suffixe/préfixe : plus le recouvrement est grand, moins
+    on déclare de nouvelles lignes, donc moins on risque de recompter.
+
+    Avec `expected_new` (prédiction en pixels), on retient le recouvrement
+    valide le plus proche de ce que les pixels annoncent. C'est ce qui départage
+    le mur de lignes identiques, où le texte seul ne peut pas choisir.
+    """
+    cfg = cfg or MatchConfig()
+    lp, lc = len(previous), len(current)
+    max_k = min(lp, lc)
+
+    scores: dict[int, float] = {}
+    for k in range(max_k, -1, -1):
+        score = _overlap_score(previous, current, k, cfg)
+        if score is not None:
+            scores[k] = score
+
+    positive = [k for k in scores if k > 0]
+    largest_valid = max(positive) if positive else 0
+
+    diagnostics: dict[str, Any] = {
+        "previous_lines": lp,
+        "current_lines": lc,
+        "valid_overlaps": sorted(scores, reverse=True),
+        "largest_valid": largest_valid,
+        "expected_new": expected_new,
+        "target_overlap": None,
+        "disagreement": False,
+    }
+
+    if expected_new is None:
+        chosen = largest_valid
+    else:
+        target = max(0, lc - expected_new)
+        diagnostics["target_overlap"] = target
+        # Recouvrement valide le plus proche de la prédiction. À égalité de
+        # distance, on préfère le plus grand, qui déclare moins de nouveautés.
+        chosen = min(scores, key=lambda k: (abs(k - target), -k))
+        diagnostics["disagreement"] = chosen != largest_valid
+
+    confidence = scores[chosen] if chosen > 0 else 0.0
+    zero_overlap = chosen == 0 and lp > 0 and lc > 0
+    if zero_overlap:
+        diagnostics["reason"] = (
+            f"aucun recouvrement n'a franchi le seuil ({cfg.line_accept}), "
+            f"les {lc} lignes sont traitées comme nouvelles"
+        )
+
+    return AlignmentResult(
+        overlap=chosen,
+        new_lines=list(current[chosen:]),
+        confidence=confidence,
+        zero_overlap=zero_overlap,
+        diagnostics=diagnostics,
+    )
+
+
+def is_glitch_frame(
+    result: AlignmentResult,
+    previous_length: int,
+    consecutive_skips: int,
+    *,
+    max_skips: int = GLITCH_MAX_SKIPS,
+    min_baseline: int = GLITCH_MIN_BASELINE,
+) -> bool:
+    """Vrai si une image bien remplie a brutalement perdu tout recouvrement.
+
+    Une seule ligne fantôme, ou une ligne tellement abîmée qu'elle ne
+    ressemble plus à rien, décale toutes les autres d'un cran et fait tomber le
+    recouvrement à zéro. L'appelant recompterait alors la fenêtre entière.
+
+    C'est presque toujours un raté passager de l'OCR plutôt qu'un vrai
+    changement d'écran, d'où le rejet de l'image. Mais seulement `max_skips`
+    fois de suite : au-delà, l'écran a probablement vraiment changé et
+    s'entêter figerait le tracker.
+    """
+    return result.zero_overlap and previous_length >= min_baseline and consecutive_skips < max_skips
+
+
+def is_implausible_jump(
+    result: AlignmentResult,
+    consecutive_skips: int,
+    expected_new: int | None = None,
+    *,
+    max_new: int = PLAUSIBLE_MAX_NEW,
+    max_skips: int = GLITCH_MAX_SKIPS,
+) -> bool:
+    """Vrai si une image annonce plus de nouvelles lignes que physiquement possible.
+
+    Deux captures sont espacées d'environ un dixième de seconde. Il en tombe au
+    plus quelques lignes. Un nombre bien supérieur signifie que le recouvrement
+    a été mal estimé, ce qui est précisément la façon dont des doublons se
+    glissent dans le total.
+
+    Une confirmation par les pixels (`expected_new`) lève le plafond : deux
+    signaux indépendants qui disent la même chose valent mieux que notre
+    supposition sur ce qui est plausible.
+    """
+    new_count = len(result.new_lines)
+    if new_count <= max_new or consecutive_skips >= max_skips:
+        return False
+    # La tolérance d'une ligne absorbe le cas où un drop arrive entre la mesure
+    # de défilement et la capture du texte, décalage d'une image au plus.
+    confirmed_by_pixels = expected_new is not None and new_count <= expected_new + 1
+    return not confirmed_by_pixels
