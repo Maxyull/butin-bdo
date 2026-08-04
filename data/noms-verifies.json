@@ -20,15 +20,36 @@
     "    \"verifie_le\": \"2026-08-04\"",
     "  }",
     "",
-    "Vide pour l'instant : aucun recoupement n'a encore été fait. Le catalogue",
-    "amont sert donc de source unique en attendant, ce qui est un risque connu",
-    "et assumé, pas un oubli."
+    "La source « capture-jeu » désigne une observation directe du client",
+    "français, capture d'écran à l'appui. C'est l'autorité la plus forte : le",
+    "but de tout ce fichier est de correspondre à ce que le jeu AFFICHE, et",
+    "une base tierce n'en est qu'un reflet, parfois périmé."
   ],
   "sources": {
     "bdocodex": "https://bdocodex.com/fr/",
     "garmoth": "https://garmoth.com/",
     "bdolytics": "https://bdolytics.com/fr",
-    "grumpygreen": "https://grumpygreen.cricket/"
+    "grumpygreen": "https://grumpygreen.cricket/",
+    "capture-jeu": "observation directe du client français"
   },
-  "items": {}
+  "items": {
+    "16001": {
+      "nom": "Pierre noire",
+      "sources": ["bdocodex", "capture-jeu"],
+      "verifie_le": "2026-08-04",
+      "_note": [
+        "Le jeu a FUSIONNÉ « Pierre noire (arme) » et « Pierre noire (armure) »",
+        "en un seul objet. L'objet survivant garde son identifiant 16001 et perd",
+        "son suffixe. Même motif sur 16004, la Pierre noire magique concentrée.",
+        "",
+        "veliainn nomme toujours 16001 « Pierre noire (arme) » : il est périmé",
+        "d'au moins une mise à jour. Sans cette entrée, le drop le plus fréquent",
+        "du jeu tombe entre deux voisins du catalogue et la marge d'ambiguïté le",
+        "rejette, à juste titre et avec le pire résultat possible.",
+        "",
+        "39105 porte le même nom dans bdocodex. Écarté : doublon de base, pas un",
+        "drop de farm."
+      ]
+    }
+  }
 }
