@@ -42,7 +42,7 @@ class Lecteur:
         self.fenetres = fenetres
         self.appels = 0
 
-    def read_lines(self, image: np.ndarray) -> list[str]:
+    def read_text(self, image: np.ndarray) -> list[str]:
         fenetre = self.fenetres[min(self.appels, len(self.fenetres) - 1)]
         self.appels += 1
         return list(fenetre)

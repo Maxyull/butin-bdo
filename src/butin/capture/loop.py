@@ -70,7 +70,7 @@ class FrameSource(Protocol):
 class LineSource(Protocol):
     """Ce que la boucle attend d'un lecteur de texte."""
 
-    def read_lines(self, image: GrayImage) -> list[str]: ...
+    def read_text(self, image: GrayImage) -> list[str]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,7 +215,7 @@ class CaptureLoop:
     def _read(self, image: GrayImage, now: float) -> TickResult:
         self._last_ocr_at = now
         parsed = parse_frame(
-            self.reader.read_lines(image), self.matcher, fmt=self.fmt, scope=self.scope
+            self.reader.read_text(image), self.matcher, fmt=self.fmt, scope=self.scope
         )
         current = [ligne.observed for ligne in parsed]
         silver = sum(ligne.silver for ligne in parsed)

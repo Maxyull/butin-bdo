@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from .. import paths
+from . import bdocodex, source
 from . import overrides as overrides_module
-from . import source
 from .models import LOCALE_EN, LOCALE_FR, Item
 from .normalize import fold
 from .overrides import VerifiedName
@@ -120,20 +120,32 @@ class ItemCatalog:
         overrides_path: Path | None = None,
         locale: str = LOCALE_FR,
         allow_download: bool = True,
+        names_source: str = "bdocodex",
     ) -> ItemCatalog:
         """Charge le catalogue depuis le cache, en téléchargeant si nécessaire.
 
         `allow_download=False` interdit tout accès réseau. Les tests s'en
         servent pour garantir qu'aucun test ne dépend d'internet.
+
+        `names_source` vaut « bdocodex » par défaut, et « veliainn » pour
+        l'ancienne source de marché. Ce défaut vient d'une mesure sur une vraie
+        capture : voir `bdocodex.py`.
         """
-        path = path or paths.catalog_path()
-        data = source.load_cached(path)
-        if data is None:
-            if not allow_download:
-                raise source.CatalogError(
-                    f"aucun catalogue en cache dans {path} et téléchargement désactivé"
-                )
-            data = source.refresh(path)
+        if names_source == "bdocodex":
+            # Source de noms par défaut, et pour une raison mesurée : voir
+            # bdocodex.py. Le catalogue de marché causait des attributions
+            # FAUSSES, pas seulement des oublis.
+            data = bdocodex.to_catalog_payload(bdocodex.load(allow_download=allow_download))
+        else:
+            path = path or paths.catalog_path()
+            cached = source.load_cached(path)
+            if cached is None:
+                if not allow_download:
+                    raise source.CatalogError(
+                        f"aucun catalogue en cache dans {path} et téléchargement désactivé"
+                    )
+                cached = source.refresh(path)
+            data = cached
         verified = overrides_module.load(overrides_path or overrides_module.default_path())
         if verified:
             _log.info("%d noms français vérifiés à la main appliqués", len(verified))
