@@ -185,7 +185,11 @@ def bgra_to_gray(frame: npt.NDArray[np.uint8] | npt.NDArray[np.floating[Any]]) -
             "image BGRA attendue en (hauteur, largeur, 3 ou 4 canaux), "
             f"reçu un tableau de forme {pixels.shape}"
         )
-    gray: npt.NDArray[np.float32] = (
+    # Volontairement sans annotation intermédiaire : selon la version de numpy,
+    # les stubs déduisent float32 ou float64 du produit d'un flottant Python par
+    # un tableau float32. Annoter l'un des deux fait échouer mypy sur l'autre,
+    # pour une valeur qui est de toute façon convertie en uint8 juste après.
+    gray = (
         _WEIGHT_BLUE * pixels[:, :, 0]
         + _WEIGHT_GREEN * pixels[:, :, 1]
         + _WEIGHT_RED * pixels[:, :, 2]
