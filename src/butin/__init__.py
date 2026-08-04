@@ -11,4 +11,8 @@ Le paquet est découpé en couches indépendantes, chacune testable seule :
 Aucune couche n'importe une couche située au-dessus d'elle.
 """
 
-__version__ = "0.1.0"
+# Doit rester identique à la version de pyproject.toml. Un test le vérifie :
+# deux sources de vérité qui divergent produisent un numéro faux à l'exécution,
+# ce que personne ne remarque avant un rapport de bogue. Voir
+# docs/versionnage.md pour la politique de version.
+__version__ = "0.1.0.dev0"
