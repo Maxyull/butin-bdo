@@ -60,16 +60,26 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Installation
-        run: pip install -e ".[dev]"
+      # Installer puis désinstaller « butin » peut surprendre, mais c'est le
+      # seul moyen d'auditer nos dépendances sans nous auditer nous-mêmes.
+      #
+      # pip-audit interroge PyPI pour chaque distribution présente dans
+      # l'environnement. « butin » n'y est pas publié, donc le job échouait sur
+      # notre propre code au lieu d'une vraie vulnérabilité. --skip-editable ne
+      # règle rien : avec --strict, un paquet ignoré compte comme un échec, les
+      # deux options se contredisent.
+      #
+      # L'installation reste le moyen de résoudre les dépendances déclarées
+      # dans pyproject.toml : elles restent en place après la désinstallation
+      # de notre seul paquet, et la liste ne peut pas se désynchroniser comme
+      # le ferait un requirements.txt tenu à la main.
+      - name: Installation des dépendances
+        run: |
+          pip install -e ".[dev]"
+          pip uninstall --yes butin
 
       # Job séparé de la matrice : une alerte de vulnérabilité ne dépend pas de
       # la version de Python, la répéter trois fois n'apprendrait rien et
-      # tripleerait le bruit sur un même avis.
-      # --skip-editable exclut « butin » lui-même. Le paquet est installé en
-      # mode éditable pour les besoins de la CI, et pip-audit tente alors de le
-      # chercher sur PyPI où il n'existe pas, ce qui fait échouer le job sur
-      # notre propre code au lieu d'une vraie vulnérabilité. Les dépendances,
-      # elles, restent toutes auditées.
+      # triplerait le bruit sur un même avis.
       - name: Audit (pip-audit)
-        run: pip-audit --strict --desc --skip-editable
+        run: pip-audit --strict --desc
