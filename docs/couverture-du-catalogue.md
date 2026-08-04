@@ -44,20 +44,61 @@ l'erreur.
 Les autres absences donnent une non-reconnaissance : le drop n'est pas compté,
 c'est une perte visible dans le compteur de lignes non résolues.
 
-`Pierre noire` fait pire. Le catalogue contient `Pierre noire (arme)` et
-`Pierre noire (armure)`, deux objets réels, deux prix différents. Une lecture de
-`Pierre noire` est à distance égale des deux.
+`Pierre noire` fait pire, mais **pas de la façon qu'on avait d'abord écrite
+ici**. On avait affirmé que la marge d'ambiguïté refusait de trancher. Mesuré
+sur le catalogue réel de 8344 objets, c'est faux :
 
-La marge d'ambiguïté de `catalog/matcher.py` fait alors exactement ce pour quoi
-elle a été écrite : elle **refuse de trancher**. C'est le bon comportement, et
-il produit ici le pire résultat possible, puisque la pierre noire est l'un des
-drops les plus fréquents du jeu.
+| Candidat | Score |
+| --- | --- |
+| `pierre noire arme` | **95** |
+| `pierre noire armure` | 90 |
+| `poudre de pierre noire` | 90 |
 
-Explication la plus probable, **à vérifier** : les captures montrent de
-l'équipement Tuvala, donc un serveur de saison, où existe une « Pierre noire »
-distincte servant à l'amélioration Tuvala, liée au personnage donc absente du
-marché. Ce n'est pas une troncature d'affichage mais un troisième objet. À
-confirmer sur bdocodex avant d'agir dessus.
+La reconnaissance **fonctionne**, et elle tombe même sur le bon objet. Mais pour
+une raison qui n'a rien à voir avec la bonne : `arme` est plus court que
+`armure`, donc il score plus haut. Rien de sémantique là-dedans.
+
+Et c'est plus grave qu'un échec :
+
+- **La marge est de 4 points, l'écart de 5.** Il s'en faut d'un seul point que
+  le drop le plus fréquent du jeu ne soit plus compté du tout.
+- **Si le jeu avait fusionné dans l'autre sens**, le même mécanisme aurait rendu
+  l'objet « (armure) », faux, en silence, avec la même assurance.
+
+Un résultat juste par accident est plus dangereux qu'un échec franc, parce que
+rien ne le signale. C'est la raison d'être de la correction dans
+`data/noms-verifies.json` : elle rend la reconnaissance **exacte** et retire la
+chance de l'équation.
+
+**Hypothèse d'abord formulée ici, et fausse.** On avait supposé un objet de
+saison distinct servant à l'amélioration Tuvala. Vérification faite, ce n'est
+pas ça du tout.
+
+**La vraie cause : le jeu a fusionné les deux objets.** « Pierre noire (arme) »
+et « Pierre noire (armure) » ne sont plus deux objets, ils n'en font plus qu'un.
+Le motif est visible dans bdocodex, et il est systématique :
+
+| Identifiant | Nom actuel | Statut |
+| --- | --- | --- |
+| 16001 | `Pierre noire` | l'ancienne version « (arme) », qui a **perdu son suffixe** |
+| 16002 | `Pierre noire (armure)` | ancienne entrée, conservée dans la base |
+| 16004 | `Pierre noire magique concentrée` | même fusion |
+| 16005 | `Pierre noire magique concentrée (armure)` | ancienne entrée |
+
+L'objet qui survit à la fusion garde son identifiant et perd son suffixe.
+
+### Ce que ça dit de veliainn
+
+veliainn nomme toujours 16001 « Pierre noire (arme) ». **Il est périmé d'au
+moins une mise à jour du jeu.**
+
+Ce n'est plus seulement un problème de couverture, c'en est un d'exactitude : un
+catalogue peut contenir un objet et lui donner un nom que le jeu n'affiche plus.
+Les deux défauts sont silencieux et se ressemblent de l'extérieur, l'objet n'est
+pas reconnu et rien ne dit pourquoi.
+
+**Conséquence : bdocodex fait autorité sur les noms, veliainn seulement sur les
+prix.** Chacun sur ce pour quoi il est tenu à jour.
 
 ## Ce que ça change
 
@@ -115,10 +156,14 @@ Pour l'objet **16001**, veliainn dit `Pierre noire (arme)` et bdocodex dit
 `Pierre noire`. **C'est bdocodex qui correspond à ce que le jeu affiche**, comme
 le montrent les captures.
 
-`Pierre noire` reste ambigu même dans la base complète : deux objets portent ce
-nom exact (39105 et 16001). Cette ambiguïté-là est réelle et non un défaut de
-source, donc elle se tranche dans `data/noms-verifies.json` et nulle part
-ailleurs.
+`Pierre noire` reste porté par deux identifiants dans la base complète, 16001 et
+39105. **Tranché en faveur de 16001** dans `data/noms-verifies.json` : c'est
+l'objet historique qui a survécu à la fusion décrite plus haut, celui que le jeu
+fait tomber. 39105 est un doublon de base, pas un drop de farm.
+
+C'est exactement le genre de décision qui n'a pas sa place dans le code : elle
+repose sur une connaissance du jeu, pas sur une règle qu'un algorithme pourrait
+appliquer.
 
 C'est précisément la raison d'être du recoupement sur plusieurs sources : une
 source unique n'aurait rien signalé, ni l'écart de nom ni l'homonymie.

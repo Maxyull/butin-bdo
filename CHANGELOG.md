@@ -50,6 +50,12 @@ dans [docs/versionnage.md](docs/versionnage.md).
 - **Script de jointure reproductible** (`scripts/joindre_butin.py`) entre la
   liste de butin curée à la main et la base complète de bdocodex.
 
+- **Premier nom vérifié à la main** : `Pierre noire`. Le jeu a fusionné
+  « Pierre noire (arme) » et « (armure) » en un seul objet, ce que veliainn n'a
+  pas suivi. Sans cette correction, le drop le plus fréquent du jeu était
+  reconnu **par accident**, avec un seul point de marge, et aurait désigné le
+  mauvais objet si la fusion s'était faite dans l'autre sens.
+
 ### Sécurité
 
 - Téléchargement du catalogue durci : HTTPS imposé, hôte en liste blanche
@@ -81,8 +87,8 @@ dans [docs/versionnage.md](docs/versionnage.md).
   moteur de reconnaissance vers cette source n'est pas encore faite : pour
   l'instant `data/butin-connu.json` existe sans être branché. Voir
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
-- `Pierre noire` reste ambigu même dans la base complète : deux objets portent
-  ce nom exact. À trancher dans `data/noms-verifies.json`.
+- veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
+  n'est plus une source de noms, seulement de prix.
 - La reconnaissance de texte coûte 336 ms par image, contre 100 ms envisagés.
   Le calcul de marge tient encore, l'arbitrage de cadence n'est pas tranché.
 - Aucune boucle de capture ni interface : les briques existent, l'assemblage

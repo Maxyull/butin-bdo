@@ -188,6 +188,49 @@ class TestApplicationAuCatalogue:
         assert match is not None
         assert match.item.item_id == 4998
 
+    def test_le_drop_le_plus_frequent_du_jeu_est_reconnu(
+        self, raw_catalog: dict[str, dict[str, object]]
+    ) -> None:
+        """Régression : « Pierre noire » ne doit plus être reconnu par accident.
+
+        Le jeu a fusionné « Pierre noire (arme) » et « Pierre noire (armure) »
+        en un seul objet, qui garde l'identifiant 16001 et perd son suffixe.
+        veliainn n'a pas suivi et nomme toujours 16001 « Pierre noire (arme) ».
+
+        Sans correction, la reconnaissance **fonctionne quand même**, mais pour
+        une raison qui n'a rien à voir avec la bonne : le score flou place
+        « pierre noire arme » à 95 et « pierre noire armure » à 90, simplement
+        parce que le premier est plus court. Vérifié sur le catalogue réel de
+        8344 objets. La marge d'ambiguïté est de 4 points et l'écart de 5 : il
+        s'en faut d'un seul point que le drop le plus fréquent du jeu ne soit
+        plus compté du tout.
+
+        Et si le jeu avait fusionné dans l'autre sens, ce même mécanisme aurait
+        rendu l'objet « (armure) », faux, en silence, avec la même assurance.
+
+        Un résultat juste par accident est plus dangereux qu'un échec franc :
+        rien ne le signale. La correction rend la reconnaissance **exacte**, ce
+        qui supprime la chance de l'équation.
+
+        Ce test utilise le VRAI fichier livré : il échouera si quelqu'un retire
+        ou casse cette entrée.
+        """
+        from butin.catalog import ItemMatcher
+
+        sans = ItemMatcher(ItemCatalog.from_raw(raw_catalog)).resolve("Pierre noire")
+        assert sans is not None
+        assert sans.method.value == "flou", "avant correction, la reconnaissance est fragile"
+        assert sans.score < 100
+
+        corrige = ItemCatalog.from_raw(
+            raw_catalog, overrides=overrides.load(overrides.default_path())
+        )
+        match = ItemMatcher(corrige).resolve("Pierre noire")
+        assert match is not None
+        assert match.item.item_id == 16001
+        assert match.method.value == "exact", "après correction, plus aucune part de chance"
+        assert match.score == 100.0
+
     def test_un_identifiant_absent_du_catalogue_est_sans_effet(
         self, raw_catalog: dict[str, dict[str, object]]
     ) -> None:
