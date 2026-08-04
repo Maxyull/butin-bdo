@@ -53,6 +53,11 @@ dans [docs/versionnage.md](docs/versionnage.md).
   l'hôtel des ventes ne s'applique qu'aux objets vendables, jamais au butin
   vendu au marchand ni au silver ramassé. Les objets non valorisés et les prix
   périmés sont comptés et affichés à part.
+- **Interface web locale** (`butin interface`), avec les deux sélecteurs
+  demandés : langue FR/EN pour les noms d'objets, région EU/NA pour les prix.
+  Servie par la bibliothèque standard, sur la boucle locale uniquement, sans
+  aucune dépendance ajoutée. Les objets sans valeur connue et les prix périmés
+  y sont signalés explicitement plutôt que noyés dans le total.
 - **Interface en ligne de commande** minimale : état du catalogue et test de
   reconnaissance d'un nom.
 

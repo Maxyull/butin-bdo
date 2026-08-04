@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Butin</title>
+<style>
+  :root {
+    --fond: #0d0f14;
+    --panneau: #151922;
+    --bord: #242b38;
+    --texte: #d7dce6;
+    --doux: #8a94a8;
+    --or: #d4a955;
+    --vert: #6fdc6f;
+    --rouge: #e0715f;
+    --bleu: #7ea6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--fond); color: var(--texte);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+  h1 span { color: var(--doux); font-weight: 400; font-size: 13px; margin-left: 10px; }
+  .haut { display: flex; align-items: center; justify-content: space-between;
+          flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+  .panneau { background: var(--panneau); border: 1px solid var(--bord);
+             border-radius: 10px; padding: 18px; }
+  .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 14px; margin-bottom: 18px; }
+  .chiffre { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .etiquette { color: var(--doux); font-size: 12px; text-transform: uppercase;
+               letter-spacing: .8px; margin-bottom: 6px; }
+  .or { color: var(--or); }
+
+  /* Les deux sliders. Un vrai interrupteur a deux positions, pas une liste
+     deroulante : le choix est binaire et doit se voir sans ouvrir quoi que ce soit. */
+  .sliders { display: flex; gap: 14px; flex-wrap: wrap; }
+  .slider { display: flex; align-items: center; gap: 10px;
+            background: var(--panneau); border: 1px solid var(--bord);
+            border-radius: 999px; padding: 6px 8px 6px 14px; }
+  .slider > span { color: var(--doux); font-size: 12px; text-transform: uppercase;
+                   letter-spacing: .8px; }
+  .bascule { display: flex; background: #0b0e13; border-radius: 999px; padding: 3px; }
+  .bascule button {
+    border: 0; background: transparent; color: var(--doux); cursor: pointer;
+    padding: 5px 14px; border-radius: 999px; font: inherit; font-size: 13px;
+    font-weight: 600; transition: background .12s, color .12s;
+  }
+  .bascule button[aria-pressed="true"] { background: var(--or); color: #14161c; }
+  .bascule button:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
+
+  button.action {
+    border: 1px solid var(--bord); background: #1b2130; color: var(--texte);
+    border-radius: 8px; padding: 9px 18px; font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+  button.action.demarrer { background: var(--or); color: #14161c; border-color: var(--or); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--bord); }
+  th { color: var(--doux); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px;
+           border: 1px solid var(--bord); color: var(--doux); }
+  .badge.marche { color: var(--vert); border-color: #2c4a30; }
+  .badge.perime { color: var(--or); border-color: #4a3d20; }
+  .badge.vendeur { color: var(--bleu); border-color: #24384f; }
+  .badge.inconnu { color: var(--rouge); border-color: #4d2b26; }
+
+  .avertissement { margin-top: 14px; padding: 12px 14px; border-radius: 8px;
+                   border: 1px solid #4a3d20; background: #1e1a10; color: #e8c876;
+                   font-size: 13px; }
+  .vide { color: var(--doux); padding: 26px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="haut">
+  <h1>Butin <span id="version">suivi de butin, Black Desert Online</span></h1>
+  <div class="sliders">
+    <div class="slider">
+      <span>Langue</span>
+      <div class="bascule" id="langue">
+        <button data-valeur="fr" aria-pressed="true">FR</button>
+        <button data-valeur="us" aria-pressed="false">EN</button>
+      </div>
+    </div>
+    <div class="slider">
+      <span>Région</span>
+      <div class="bascule" id="region">
+        <button data-valeur="eu" aria-pressed="true">EU</button>
+        <button data-valeur="na" aria-pressed="false">NA</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grille">
+  <div class="panneau">
+    <div class="etiquette">Silver par heure</div>
+    <div class="chiffre or" id="par-heure">0</div>
+  </div>
+  <div class="panneau">
+    <div class="etiquette">Total net</div>
+    <div class="chiffre" id="total">0</div>
+  </div>
+  <div class="panneau">
+    <div class="etiquette">Durée</div>
+    <div class="chiffre" id="duree">00:00:00</div>
+  </div>
+  <div class="panneau">
+    <div class="etiquette">Objets valorisés</div>
+    <div class="chiffre" id="couverture">100 %</div>
+  </div>
+</div>
+
+<div class="panneau" style="margin-bottom:18px">
+  <button class="action demarrer" id="bouton-session">Démarrer une session</button>
+  <span id="etat-session" style="margin-left:14px;color:var(--doux)">Aucune session en cours</span>
+</div>
+
+<div class="panneau">
+  <table>
+    <thead>
+      <tr>
+        <th>Objet</th>
+        <th class="num">Quantité</th>
+        <th class="num">Valeur unitaire</th>
+        <th class="num">Total</th>
+        <th>Provenance</th>
+      </tr>
+    </thead>
+    <tbody id="butin"></tbody>
+  </table>
+  <div class="vide" id="vide">Aucun butin enregistré pour l'instant.</div>
+</div>
+
+<div id="avertissements"></div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const nombre = (v) => new Intl.NumberFormat("fr-FR").format(Math.round(v || 0));
+
+function duree(secondes) {
+  const s = Math.max(0, Math.floor(secondes || 0));
+  const h = String(Math.floor(s / 3600)).padStart(2, "0");
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  return `${h}:${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+async function poster(chemin, corps) {
+  const reponse = await fetch(chemin, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(corps || {}),
+  });
+  return reponse.json();
+}
+
+function brancherBascule(id, champ) {
+  const groupe = $(id);
+  groupe.addEventListener("click", async (evenement) => {
+    const bouton = evenement.target.closest("button");
+    if (!bouton) return;
+    for (const autre of groupe.querySelectorAll("button")) {
+      autre.setAttribute("aria-pressed", String(autre === bouton));
+    }
+    // Le serveur reste la source de vérité : on affiche ce qu'il confirme,
+    // pas ce qu'on vient de cliquer. Une valeur refusee doit se voir revenir.
+    afficher(await poster("/api/reglages", { [champ]: bouton.dataset.valeur }));
+  });
+}
+
+const LIBELLES = {
+  marche: ["Marché", "marche"],
+  "marche-perime": ["Marché (périmé)", "perime"],
+  vendeur: ["Marchand", "vendeur"],
+  inconnu: ["Inconnu", "inconnu"],
+};
+
+function afficher(etat) {
+  if (!etat) return;
+
+  for (const [id, champ] of [["langue", "langue"], ["region", "region"]]) {
+    const valeur = etat.reglages ? etat.reglages[champ] : null;
+    for (const bouton of $(id).querySelectorAll("button")) {
+      bouton.setAttribute("aria-pressed", String(bouton.dataset.valeur === valeur));
+    }
+  }
+
+  const stats = etat.stats;
+  $("par-heure").textContent = nombre(stats ? stats.par_heure : 0);
+  $("total").textContent = nombre(stats ? stats.total : 0);
+  $("duree").textContent = duree(etat.session ? etat.session.duree_s : 0);
+  $("couverture").textContent =
+    Math.round((stats ? stats.couverture : 1) * 100) + " %";
+
+  const enCours = Boolean(etat.session && etat.session.en_cours);
+  $("bouton-session").textContent = enCours ? "Arrêter la session" : "Démarrer une session";
+  $("bouton-session").classList.toggle("demarrer", !enCours);
+  $("etat-session").textContent = enCours
+    ? "Session en cours" + (etat.session.spot ? " : " + etat.session.spot : "")
+    : "Aucune session en cours";
+
+  const corps = $("butin");
+  corps.innerHTML = "";
+  for (const ligne of etat.butin || []) {
+    const [libelle, classe] = LIBELLES[ligne.source] || ["?", "inconnu"];
+    const tr = document.createElement("tr");
+    // textContent partout : un nom d'objet vient d'une source externe, l'injecter
+    // en HTML serait une porte d'entree pour du balisage arbitraire.
+    const cellules = [
+      [ligne.nom || "#" + ligne.item_id, ""],
+      [nombre(ligne.quantite), "num"],
+      [nombre(ligne.valeur_unitaire), "num"],
+      [nombre(ligne.valeur_totale), "num"],
+    ];
+    for (const [texte, classeCellule] of cellules) {
+      const td = document.createElement("td");
+      td.textContent = texte;
+      if (classeCellule) td.className = classeCellule;
+      tr.appendChild(td);
+    }
+    const tdSource = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = "badge " + classe;
+    badge.textContent = libelle;
+    tdSource.appendChild(badge);
+    tr.appendChild(tdSource);
+    corps.appendChild(tr);
+  }
+  $("vide").style.display = (etat.butin || []).length ? "none" : "block";
+
+  // Ce qui rend le chiffre interpretable plutot que decoratif.
+  const avertissements = [];
+  if (stats && stats.objets_inconnus > 0) {
+    avertissements.push(
+      `${nombre(stats.objets_inconnus)} objet(s) sans valeur connue, comptés pour zéro. ` +
+      `Le total est donc un minimum.`
+    );
+  }
+  if (stats && stats.prix_perimes > 0) {
+    avertissements.push(
+      `${nombre(stats.prix_perimes)} objet(s) valorisés avec un prix périmé. ` +
+      `Le marché n'a pas répondu, ce n'est pas un cours du jour.`
+    );
+  }
+  const zone = $("avertissements");
+  zone.innerHTML = "";
+  for (const texte of avertissements) {
+    const div = document.createElement("div");
+    div.className = "avertissement";
+    div.textContent = texte;
+    zone.appendChild(div);
+  }
+}
+
+$("bouton-session").addEventListener("click", async () => {
+  const etat = await (await fetch("/api/etat")).json();
+  const enCours = Boolean(etat.session && etat.session.en_cours);
+  afficher(await poster(enCours ? "/api/session/arreter" : "/api/session/demarrer", {}));
+});
+
+brancherBascule("langue", "langue");
+brancherBascule("region", "region");
+
+async function rafraichir() {
+  try {
+    afficher(await (await fetch("/api/etat")).json());
+  } catch (erreur) {
+    // Le serveur local peut avoir ete arrete : on ne fait pas clignoter la page
+    // avec une erreur, la prochaine tentative suffit.
+  }
+}
+
+rafraichir();
+setInterval(rafraichir, 1000);
+</script>
+</body>
+</html>

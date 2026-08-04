@@ -1,0 +1,309 @@
+"""Interface web locale.
+
+Pourquoi le web et pas une fenêtre native
+------------------------------------------
+
+Trois raisons, dans l'ordre d'importance :
+
+1. **Zéro dépendance ajoutée.** Tout vient de la bibliothèque standard. Une
+   boîte à outils graphique pèse plus de cent mégaoctets et devrait être
+   embarquée dans l'installeur, pour une interface qui tient en une page.
+2. **Vérifiable.** Une page web se charge, se lit et se teste. Une fenêtre
+   native ne se vérifie qu'à l'œil, sur la machine de celui qui la code.
+3. **Modifiable par l'utilisateur.** Le fichier de la page est en clair à côté
+   du programme.
+
+Sécurité : écoute sur la boucle locale, et nulle part ailleurs
+--------------------------------------------------------------
+
+Le serveur se lie à `127.0.0.1` et **jamais** à `0.0.0.0`. La différence n'est
+pas cosmétique : la seconde exposerait l'historique de farm à tout le réseau
+local, donc à un réseau partagé ou à un point d'accès public, sans que rien ne
+le signale à l'utilisateur.
+
+Il n'y a ni authentification ni jeton, et c'est cohérent **uniquement** parce
+que rien d'extérieur ne peut atteindre le port. Si quelqu'un change l'adresse
+d'écoute un jour, il devra ajouter les deux.
+
+Aucun en-tête `Access-Control-Allow-Origin` n'est émis : la politique de même
+origine du navigateur empêche alors une page web quelconque, ouverte dans un
+autre onglet, d'interroger ce serveur à l'insu de l'utilisateur.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+
+from ..catalog import ItemCatalog
+from ..market import PriceBook, Region
+from ..store import SessionStore, compute
+from ..store.stats import MARKET_RATE_BASE
+
+_log = logging.getLogger(__name__)
+
+# Boucle locale uniquement. Voir la note de sécurité en tête de module avant de
+# toucher à cette valeur.
+HOST = "127.0.0.1"
+DEFAULT_PORT = 8771
+
+STATIC = Path(__file__).resolve().parent / "static"
+
+# Plafond de taille d'un corps de requête. Les nôtres font quelques dizaines
+# d'octets : au-delà, c'est autre chose et on refuse plutôt que de lire.
+MAX_BODY = 64 * 1024
+
+
+class AppState:
+    """État partagé entre les requêtes.
+
+    Verrouillé parce que le serveur est multi-fils : deux requêtes simultanées
+    qui démarreraient une session laisseraient une session orpheline ouverte
+    pour toujours dans la base.
+    """
+
+    def __init__(
+        self, store: SessionStore, book: PriceBook, catalog: ItemCatalog | None = None
+    ) -> None:
+        self.store = store
+        self.book = book
+        self.catalog = catalog
+        """Sert à nommer les objets. C'est tout l'objet du sélecteur de langue :
+        sans lui, il ne changerait rien de visible."""
+        self.lock = threading.Lock()
+        self.language = "fr"
+        self.region = Region.EU
+        self.market_rate = MARKET_RATE_BASE
+        self.session_id: int | None = None
+
+    # -- lecture ---------------------------------------------------------
+
+    def snapshot(self, *, now: float | None = None) -> dict[str, Any]:
+        maintenant = time.time() if now is None else now
+        with self.lock:
+            session_id = self.session_id
+            reglages = {
+                "langue": self.language,
+                "region": self.region.value,
+                "taux_marche": self.market_rate,
+            }
+            taux = self.market_rate
+            langue = self.language
+
+        if session_id is None:
+            return {"reglages": reglages, "session": None, "stats": None, "butin": []}
+
+        session = self.store.get_session(session_id)
+        if session is None:
+            return {"reglages": reglages, "session": None, "stats": None, "butin": []}
+
+        quantites = self.store.quantities(session_id)
+        stats = compute(
+            quantites,
+            self.book,
+            duration_s=session.duration_s(maintenant),
+            silver_direct=session.silver_direct,
+            market_rate=taux,
+            now=maintenant,
+        )
+        return {
+            "reglages": reglages,
+            "session": {
+                "id": session.id,
+                "spot": session.spot,
+                "duree_s": session.duration_s(maintenant),
+                "en_cours": session.is_open,
+            },
+            "stats": {
+                "total": stats.total,
+                "par_heure": round(stats.per_hour),
+                "net_marche": stats.net_market,
+                "brut_marche": stats.gross_market,
+                "marchand": stats.vendor,
+                "silver_direct": stats.silver_direct,
+                "objets_inconnus": stats.unknown_items,
+                "prix_perimes": stats.stale_prices,
+                "couverture": round(stats.coverage, 3),
+                "complet": stats.is_complete,
+            },
+            "butin": self._loot_rows(quantites, maintenant, langue),
+        }
+
+    def _name(self, item_id: int, langue: str) -> str:
+        """Nom de l'objet dans la langue choisie.
+
+        Repli sur l'identifiant plutôt que sur une chaîne vide : une ligne sans
+        nom serait indistinguable des autres dans le tableau, alors qu'un
+        « #44118 » se cherche et se corrige.
+        """
+        if self.catalog is None:
+            return f"#{item_id}"
+        item = self.catalog.get(item_id)
+        return item.name(langue) if item is not None else f"#{item_id}"
+
+    def _loot_rows(
+        self, quantites: dict[tuple[int, int], int], maintenant: float, langue: str
+    ) -> list[dict[str, Any]]:
+        lignes: list[dict[str, Any]] = []
+        for (item_id, sid), qty in quantites.items():
+            prix = self.book.price(item_id, sid=sid, now=maintenant)
+            lignes.append(
+                {
+                    "item_id": item_id,
+                    "sid": sid,
+                    "nom": self._name(item_id, langue),
+                    "quantite": qty,
+                    "valeur_unitaire": prix.value,
+                    "valeur_totale": prix.value * qty,
+                    "source": prix.source.value,
+                }
+            )
+        lignes.sort(key=lambda ligne: ligne["valeur_totale"], reverse=True)
+        return lignes
+
+    # -- écriture --------------------------------------------------------
+
+    def set_settings(self, data: dict[str, Any]) -> None:
+        with self.lock:
+            langue = data.get("langue")
+            if langue in ("fr", "us"):
+                self.language = langue
+            region = data.get("region")
+            if isinstance(region, str):
+                try:
+                    self.region = Region(region)
+                except ValueError:
+                    _log.warning("région inconnue ignorée : %r", region)
+            taux = data.get("taux_marche")
+            if isinstance(taux, (int, float)) and 0 < float(taux) <= 1:
+                self.market_rate = float(taux)
+
+    def start(self, spot: str, *, now: float | None = None) -> int:
+        maintenant = time.time() if now is None else now
+        with self.lock:
+            if self.session_id is not None:
+                # Démarrer deux fois laisserait la première session ouverte pour
+                # toujours, donc une durée qui gonfle sans fin.
+                return self.session_id
+            session = self.store.start_session(
+                started_at=maintenant, spot=spot, region=self.region.value
+            )
+            self.session_id = session.id
+            return session.id
+
+    def stop(self, *, now: float | None = None) -> None:
+        maintenant = time.time() if now is None else now
+        with self.lock:
+            if self.session_id is None:
+                return
+            self.store.end_session(self.session_id, ended_at=maintenant)
+            self.session_id = None
+
+
+class Handler(BaseHTTPRequestHandler):
+    """Routes de l'interface. Volontairement peu nombreuses."""
+
+    server_version = "Butin"
+    state: AppState
+
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        # Le journal par défaut écrit sur la sortie d'erreur à chaque requête,
+        # ce qui noie tout le reste quand la page rafraîchit chaque seconde.
+        _log.debug("%s - %s", self.address_string(), format % args)
+
+    # -- utilitaires -----------------------------------------------------
+
+    def _send_json(self, payload: Any, *, status: int = 200) -> None:
+        corps = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(corps)))
+        # Interdit au navigateur de deviner un autre type que celui annoncé.
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(corps)
+
+    def _send_file(self, name: str) -> None:
+        chemin = (STATIC / name).resolve()
+        # Garde-fou de traversée : sans lui, une requête « /../../secrets » se
+        # servirait dans le disque entier.
+        if not chemin.is_file() or STATIC.resolve() not in chemin.parents:
+            self._send_json({"erreur": "introuvable"}, status=404)
+            return
+        corps = chemin.read_bytes()
+        types = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript"}
+        self.send_response(200)
+        self.send_header("Content-Type", types.get(chemin.suffix, "application/octet-stream"))
+        self.send_header("Content-Length", str(len(corps)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(corps)
+
+    def _read_json(self) -> dict[str, Any]:
+        try:
+            taille = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return {}
+        if taille <= 0 or taille > MAX_BODY:
+            return {}
+        try:
+            data = json.loads(self.rfile.read(taille).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    # -- routes ----------------------------------------------------------
+
+    def do_GET(self) -> None:
+        if self.path in ("/", "/index.html"):
+            self._send_file("index.html")
+        elif self.path == "/api/etat":
+            self._send_json(self.state.snapshot())
+        else:
+            self._send_json({"erreur": "introuvable"}, status=404)
+
+    def do_POST(self) -> None:
+        if self.path == "/api/reglages":
+            self.state.set_settings(self._read_json())
+            self._send_json(self.state.snapshot())
+        elif self.path == "/api/session/demarrer":
+            spot = str(self._read_json().get("spot") or "")
+            self.state.start(spot)
+            self._send_json(self.state.snapshot())
+        elif self.path == "/api/session/arreter":
+            self.state.stop()
+            self._send_json(self.state.snapshot())
+        else:
+            self._send_json({"erreur": "introuvable"}, status=404)
+
+
+def build_server(state: AppState, port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
+    """Construit le serveur, lié à la boucle locale uniquement."""
+    handler = type("BoundHandler", (Handler,), {"state": state})
+    return ThreadingHTTPServer((HOST, port), handler)
+
+
+def serve(*, port: int = DEFAULT_PORT, store: SessionStore | None = None) -> None:
+    """Lance l'interface jusqu'à interruption."""
+    try:
+        catalog: ItemCatalog | None = ItemCatalog.load()
+    except Exception as exc:
+        # Le catalogue sert à NOMMER les objets, pas à les compter. Son absence
+        # dégrade l'affichage, elle ne doit pas empêcher de lancer l'interface.
+        _log.warning("catalogue indisponible, les objets seront affichés par identifiant : %s", exc)
+        catalog = None
+    state = AppState(store or SessionStore(), PriceBook(), catalog)
+    serveur = build_server(state, port)
+    print(f"Butin : interface sur http://{HOST}:{port}")
+    try:
+        serveur.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        serveur.server_close()
+        state.book.save()
