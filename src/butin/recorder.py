@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 
 from .capture.loop import CaptureLoop, TickResult
+from .catalog.zones import detect_spot, load_zones
 from .store import LootRow, SessionStore
 
 _log = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ class SessionRecorder:
         self.session_id = session_id
         self.recorded_events = 0
         self.recorded_silver = 0
+        self._seen_ids: set[int] = set()
+        self._zones = load_zones()
         self.skipped_frames = 0
         """Images écartées par les garde-fous. Une valeur qui grimpe signale un
         problème de calibrage, pas une absence de butin, et c'est la seule façon
@@ -75,8 +78,23 @@ class SessionRecorder:
         self.recorded_events += ecrites
         return ecrites
 
+    @property
+    def detected_spot(self) -> str | None:
+        """Spot déduit du trash loot observé, ou None si ce n'est pas net.
+
+        Le trash loot est propre à son spot : c'est lui qui permet de nommer une
+        session sans rien demander à l'utilisateur, qui oublierait de le faire.
+        """
+        return detect_spot(self._seen_ids, self._zones)
+
     def _persist(self, resultat: TickResult, now: float) -> None:
         if resultat.events:
+            self._seen_ids.update(event.item.item_id for event in resultat.events)
+            spot = self.detected_spot
+            if spot is not None:
+                # N'écrase jamais un nom saisi à la main : c'est le store qui
+                # applique cette règle, pas l'appelant.
+                self.store.set_spot(self.session_id, spot)
             lignes = [
                 LootRow(item_id=event.item.item_id, qty=event.qty, at=now)
                 for event in resultat.events
