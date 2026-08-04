@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from butin.market import Price, PriceBook, PriceCache, PriceSource
-from butin.store import LootRow, SessionStore, Stats, compute
+from butin.store import LootRow, SessionStore, Stats, TaxProfile, compute
 from butin.store.stats import MARKET_RATE_BASE
 
 HEURE = 3600.0
@@ -179,6 +179,59 @@ class TestTaxe:
     def test_le_silver_direct_n_est_jamais_taxe(self, tmp_path: Path) -> None:
         stats = compute({}, livre(tmp_path), duration_s=HEURE, silver_direct=10_000_000)
         assert stats.total == 10_000_000
+
+
+class TestTauxDeTaxe:
+    """Le taux vient d'un profil de compte, pas d'une constante.
+
+    Les valeurs sont vérifiées contre le calculateur de garmoth, capture à
+    l'appui, et non déduites de la documentation.
+    """
+
+    def test_point_de_mesure_reel_garmoth(self) -> None:
+        """Régression : l'ancre qui valide toute la formule.
+
+        Relevé sur le calculateur de garmoth le 05/08/2026 : Value Pack oui,
+        anneau de marchand non, renommée familiale 11952, taux affiché
+        **85,47 %**.
+
+        C'est ce point qui prouve que les bonus **multiplient** le taux de base
+        au lieu de s'y ajouter. L'addition donnerait 0,65 + 0,30 + 0,015 = 0,965,
+        soit une surestimation de 13 % sur chaque vente, appliquée à toutes.
+        """
+        profil = TaxProfile(value_pack=True, merchant_ring=False, family_fame=11952)
+        assert profil.net_rate == pytest.approx(0.8547, abs=0.0001)
+
+    def test_sans_aucun_bonus(self) -> None:
+        """L'hôtel des ventes prélève 35 %."""
+        assert TaxProfile().net_rate == pytest.approx(0.65)
+
+    def test_abonnement_seul_donne_le_chiffre_bien_connu(self) -> None:
+        assert TaxProfile(value_pack=True).net_rate == pytest.approx(0.845)
+
+    def test_les_paliers_de_renommee(self) -> None:
+        assert TaxProfile(family_fame=999).fame_bonus == 0.0
+        assert TaxProfile(family_fame=1000).fame_bonus == 0.005
+        assert TaxProfile(family_fame=4000).fame_bonus == 0.010
+        assert TaxProfile(family_fame=7000).fame_bonus == 0.015
+        assert TaxProfile(family_fame=99999).fame_bonus == 0.015
+
+    def test_tout_cumule(self) -> None:
+        profil = TaxProfile(value_pack=True, merchant_ring=True, family_fame=7000)
+        assert profil.net_rate == pytest.approx(0.65 * 1.365)
+
+    def test_le_profil_alimente_le_calcul(self, tmp_path: Path) -> None:
+        """Le profil n'est pas décoratif : il change le total."""
+        book = livre(tmp_path)
+        book.cache.put(
+            Price(item_id=16001, value=1_000_000, source=PriceSource.MARKET, fetched_at=1000.0)
+        )
+        profil = TaxProfile(value_pack=True, family_fame=11952)
+        stats = compute(
+            {(16001, 0): 1}, book, duration_s=HEURE, market_rate=profil.net_rate, now=1100.0
+        )
+
+        assert stats.net_market == 854_750
 
 
 class TestSilverParHeure:
