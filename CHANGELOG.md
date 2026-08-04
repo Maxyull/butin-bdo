@@ -48,6 +48,11 @@ dans [docs/versionnage.md](docs/versionnage.md).
   de repli qui donne toujours une valeur et dit toujours d'où elle vient : prix
   frais, prix périmé daté, valeur au marchand, ou inconnu. Un échec réseau
   n'interrompt jamais une session.
+- **Sessions de farm et silver par heure.** Base SQLite locale, numérotée dès la
+  première version pour que l'historique survive aux mises à jour. La taxe de
+  l'hôtel des ventes ne s'applique qu'aux objets vendables, jamais au butin
+  vendu au marchand ni au silver ramassé. Les objets non valorisés et les prix
+  périmés sont comptés et affichés à part.
 - **Interface en ligne de commande** minimale : état du catalogue et test de
   reconnaissance d'un nom.
 
