@@ -41,6 +41,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="force le retéléchargement même si le cache est valide",
     )
 
+    interface = commandes.add_parser("interface", help="lance l'interface web locale")
+    interface.add_argument(
+        "--port", type=int, default=8771, help="port d'écoute sur la boucle locale"
+    )
+
     reconnaitre = commandes.add_parser(
         "reconnaitre", help="teste la reconnaissance d'un nom tel que l'OCR le lirait"
     )
@@ -99,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.commande == "catalogue":
             return _commande_catalogue(args.rafraichir)
+        if args.commande == "interface":
+            from .ui import serve
+
+            serve(port=args.port)
+            return 0
         if args.commande == "reconnaitre":
             return _commande_reconnaitre(args.texte)
     except CatalogError as exc:

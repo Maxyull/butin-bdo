@@ -59,7 +59,7 @@ butin = "butin.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-butin = ["py.typed"]
+butin = ["py.typed", "ui/static/*.html", "ui/static/*.css", "ui/static/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -68,7 +68,16 @@ addopts = "-q --strict-markers --strict-config"
 markers = [
   "reseau: test nécessitant un accès réseau réel (désactivé par défaut en CI)",
 ]
-filterwarnings = ["error"]
+filterwarnings = [
+  "error",
+  # Les tests de l'interface lancent un VRAI serveur HTTP plutôt que de le
+  # simuler, ce qui est le bon choix : c'est la seule façon de vérifier
+  # l'adresse d'écoute et l'absence d'en-tête CORS. Le contrecoup est qu'arrêter
+  # ce serveur laisse le ramasse-miettes signaler une socket fermée, depuis un
+  # fil de travail et à un moment imprévisible. C'est un artefact du démontage,
+  # pas un défaut du code testé.
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+]
 
 [tool.coverage.run]
 source = ["src/butin"]

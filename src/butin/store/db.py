@@ -27,6 +27,7 @@ partagé, ce qui rend un rapport de bogue bien plus facile à envoyer.
 from __future__ import annotations
 
 import sqlite3
+import threading
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -101,8 +102,16 @@ class SessionStore:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or paths.database_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(self.path)
+        # `check_same_thread=False` plus un verrou à nous, et pas l'un sans
+        # l'autre. SQLite lie sa connexion au fil qui l'a créée, or le serveur
+        # de l'interface traite chaque requête dans un fil différent : sans
+        # cette option, toute requête HTTP échouerait. Mais lever la garde sans
+        # sérialiser les accès échangerait une erreur franche contre une
+        # corruption silencieuse, ce qui serait bien pire sur un historique de
+        # farm.
+        self._connection = sqlite3.connect(self.path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
         # Sans cette option, SQLite ignore silencieusement les clés étrangères :
         # supprimer une session laisserait son butin orphelin pour toujours.
         self._connection.execute("PRAGMA foreign_keys = ON")
@@ -121,7 +130,15 @@ class SessionStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        with self._connection:
+        with self._lock, self._connection:
+            yield self._connection
+
+    @contextmanager
+    def _reading(self) -> Iterator[sqlite3.Connection]:
+        """Lecture sérialisée. Les lectures aussi doivent passer par le verrou :
+        une lecture pendant une écriture d'un autre fil rendrait une vue à
+        moitié écrite."""
+        with self._lock:
             yield self._connection
 
     def _migrate(self) -> None:
@@ -197,16 +214,18 @@ class SessionStore:
     # -- lecture ---------------------------------------------------------
 
     def get_session(self, session_id: int) -> Session | None:
-        ligne = self._connection.execute(
-            "SELECT * FROM sessions WHERE id = ?", (session_id,)
-        ).fetchone()
+        with self._reading() as connection:
+            ligne = connection.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
         return _to_session(ligne) if ligne else None
 
     def sessions(self, *, limit: int = 50) -> list[Session]:
         """Sessions de la plus récente à la plus ancienne."""
-        lignes = self._connection.execute(
-            "SELECT * FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
-        ).fetchall()
+        with self._reading() as connection:
+            lignes = connection.execute(
+                "SELECT * FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
+            ).fetchall()
         return [_to_session(ligne) for ligne in lignes]
 
     def quantities(self, session_id: int) -> dict[tuple[int, int], int]:
@@ -216,18 +235,20 @@ class SessionStore:
         contient des milliers de lignes, et c'est exactement ce qu'une base sait
         faire mieux que nous.
         """
-        lignes = self._connection.execute(
-            "SELECT item_id, sid, SUM(qty) AS total FROM loot "
-            "WHERE session_id = ? GROUP BY item_id, sid",
-            (session_id,),
-        ).fetchall()
+        with self._reading() as connection:
+            lignes = connection.execute(
+                "SELECT item_id, sid, SUM(qty) AS total FROM loot "
+                "WHERE session_id = ? GROUP BY item_id, sid",
+                (session_id,),
+            ).fetchall()
         return {(int(ligne["item_id"]), int(ligne["sid"])): int(ligne["total"]) for ligne in lignes}
 
     def loot_count(self, session_id: int) -> int:
-        ligne = self._connection.execute(
-            "SELECT COALESCE(SUM(qty), 0) AS total FROM loot WHERE session_id = ?",
-            (session_id,),
-        ).fetchone()
+        with self._reading() as connection:
+            ligne = connection.execute(
+                "SELECT COALESCE(SUM(qty), 0) AS total FROM loot WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
         return int(ligne["total"])
 
 
