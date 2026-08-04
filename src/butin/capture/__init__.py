@@ -9,6 +9,7 @@ Le format des lignes du client français est relevé sur de vraies captures dans
 """
 
 from .lines import ChatLineFormat, LineParts, ParsedLine, parse_frame, parse_line, split_line
+from .loop import CaptureLoop, LoopConfig, TickResult
 from .ocr import (
     DEFAULT_SCALE,
     OcrEngine,
@@ -26,9 +27,11 @@ from .screen import CaptureError, GrayImage, Region, ScreenCapture, bgra_to_gray
 __all__ = [
     "DEFAULT_SCALE",
     "CaptureError",
+    "CaptureLoop",
     "ChatLineFormat",
     "GrayImage",
     "LineParts",
+    "LoopConfig",
     "OcrEngine",
     "ParsedLine",
     "Region",
@@ -36,6 +39,7 @@ __all__ = [
     "TextBox",
     "TextLine",
     "TextReader",
+    "TickResult",
     "bgra_to_gray",
     "boxes_from_result",
     "group_boxes",
