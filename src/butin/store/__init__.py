@@ -6,7 +6,7 @@ rapport de bogue sans rien révéler de son propriétaire.
 """
 
 from .db import SCHEMA_VERSION, LootRow, Session, SessionStore
-from .stats import MARKET_RATE_BASE, VENDOR_RATE, Stats, compute
+from .stats import MARKET_RATE_BASE, VENDOR_RATE, Stats, TaxProfile, compute
 
 __all__ = [
     "MARKET_RATE_BASE",
@@ -16,5 +16,6 @@ __all__ = [
     "Session",
     "SessionStore",
     "Stats",
+    "TaxProfile",
     "compute",
 ]

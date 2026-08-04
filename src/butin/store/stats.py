@@ -45,13 +45,68 @@ from dataclasses import dataclass, field
 from ..market import PriceBook, PriceSource
 
 MARKET_RATE_BASE = 0.65
-"""Part du prix affiché réellement reçue à l'hôtel des ventes, sans aucun bonus.
+"""Part reçue sans aucun bonus. L'hôtel des ventes prélève 35%.
 
-⚠️ À confirmer et à rendre réglable par l'utilisateur. Ce n'est pas une
-constante du jeu mais une propriété de son compte : les bonus d'abonnement et
-d'objets la font monter nettement. Une valeur fausse ici décale le total de
-façon systématique.
+Ce n'est PAS le taux à utiliser tel quel : voir `TaxProfile`, qui le compose
+avec ce que possède le joueur.
 """
+
+# Les bonus ne s'additionnent pas au taux, ils MULTIPLIENT le taux de base.
+# C'est ce qui explique le chiffre bien connu de 84,5% avec l'abonnement :
+# 0,65 x 1,30 = 0,845, et non 0,65 + 0,30. Additionner donnerait 0,95, soit une
+# surestimation de 12% sur chaque vente.
+VALUE_PACK_BONUS = 0.30
+MERCHANT_RING_BONUS = 0.05
+
+# Paliers de renommée familiale, confirmés par l'INFOBULLE EN JEU, ce qui est
+# la source la plus forte possible, au-dessus de tout site tiers :
+#
+#     1000 : +0,5 % de gains sur les ventes au Marché commun
+#     4000 : +1 %
+#     7000 : +1,5 %  (et « Chances de butin +10 % », sans effet sur la taxe)
+#
+# Le palier à 7000 augmente aussi le taux de drop. Ça ne change rien au calcul
+# de la taxe, mais ça vaut d'être noté : ça veut dire qu'un joueur très renommé
+# ramasse davantage ET perd moins à la vente, donc deux sessions comparées entre
+# deux comptes ne sont pas comparables sans ce contexte.
+FAME_TIERS: tuple[tuple[int, float], ...] = (
+    (7000, 0.015),
+    (4000, 0.010),
+    (1000, 0.005),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class TaxProfile:
+    """Ce que possède le joueur, et qui détermine sa part reçue.
+
+    Le taux n'est pas une constante du jeu mais une propriété du **compte**.
+    Le demander sous forme de cases à cocher plutôt que d'un pourcentage évite
+    à l'utilisateur de calculer lui-même, donc de se tromper : il sait s'il a
+    un abonnement, il ne sait pas forcément que ça fait 84,5%.
+    """
+
+    value_pack: bool = False
+    merchant_ring: bool = False
+    family_fame: int = 0
+
+    @property
+    def fame_bonus(self) -> float:
+        for seuil, bonus in FAME_TIERS:
+            if self.family_fame >= seuil:
+                return bonus
+        return 0.0
+
+    @property
+    def net_rate(self) -> float:
+        """Part du prix affiché réellement reçue, de 0 à 1."""
+        multiplicateur = 1.0 + self.fame_bonus
+        if self.value_pack:
+            multiplicateur += VALUE_PACK_BONUS
+        if self.merchant_ring:
+            multiplicateur += MERCHANT_RING_BONUS
+        return MARKET_RATE_BASE * multiplicateur
+
 
 VENDOR_RATE = 1.0
 """Part reçue en vendant au marchand : la totalité, il n'y a pas de taxe."""
