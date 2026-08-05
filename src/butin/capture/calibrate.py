@@ -74,7 +74,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -86,6 +86,15 @@ from .screen import GrayImage, Region
 FloatFrame = npt.NDArray[np.float32]
 """Image de travail. Le calibrage compare des moyennes, donc il travaille en
 flottant du début à la fin plutôt que de reconvertir à chaque étape."""
+
+FloatProfile = npt.NDArray[np.floating[Any]]
+"""Profil 1D dérivé de l'image.
+
+⚠️ Précision volontairement non fixée. Selon la version de numpy, la moyenne
+d'un tableau `float32` est annotée `float32` ou `float64`, et figer l'une des
+deux fait échouer l'analyse de types sur les interpréteurs où l'autre est
+déduite. C'est arrivé sur le job 3.12 alors que 3.10 et 3.11 passaient.
+"""
 
 LAGS = np.arange(14, 42)
 """Pas de ligne envisagés, en pixels. De 14 à 41 couvre l'échelle d'interface du
@@ -296,7 +305,7 @@ def _refine_pitch(image: FloatFrame, left: int, right: int, coarse: int) -> floa
     return float(coarse) + correction
 
 
-def _vertical_extent(profile: npt.NDArray[np.float64], pitch: int) -> tuple[int, int]:
+def _vertical_extent(profile: FloatProfile, pitch: int) -> tuple[int, int]:
     """Plage de rangées où le profil se répète vraiment au pas `pitch`.
 
     Compare l'accord au pas entier à l'accord au demi-pas. Un vrai motif de
@@ -334,8 +343,8 @@ def _vertical_extent(profile: npt.NDArray[np.float64], pitch: int) -> tuple[int,
 
 
 def _snap(
-    plein: npt.NDArray[np.float64],
-    demi: npt.NDArray[np.float64],
+    plein: FloatProfile,
+    demi: FloatProfile,
     haut: int,
     bas: int,
     pitch: int,
