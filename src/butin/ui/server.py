@@ -442,7 +442,9 @@ class AppState:
         que ce n'était pas le jeu. Personne ne confond les deux quand les lignes
         lues sont sous ses yeux.
         """
-        from ..capture.calibrate import CALIBRATION_FRAMES, calibrate_frames
+        import base64
+
+        from ..capture.calibrate import CALIBRATION_FRAMES, calibrate_frames, draw_preview
         from ..capture.lines import parse_frame
         from ..capture.ocr import TextReader
         from ..capture.screen import ScreenCapture
@@ -473,11 +475,13 @@ class AppState:
         gains = 0
         if self.catalog is not None:
             gains = len(parse_frame(list(rangees), ItemMatcher(self.catalog)))
+        apercu = base64.b64encode(draw_preview(image, calibrage)).decode("ascii")
         return {
             "zone": calibrage.describe(),
             "rangees": calibrage.rows,
             "extrait": [ligne[:90] for ligne in rangees[:4]],
             "gains": gains,
+            "apercu": f"data:image/png;base64,{apercu}",
         }
 
     def start(self, spot: str, *, now: float | None = None) -> int:
