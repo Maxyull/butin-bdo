@@ -127,28 +127,41 @@ def _commande_calibrer(delai: float, ecran: int, sans_ocr: bool) -> int:
     """
     import time
 
-    from .capture.calibrate import CalibrationError, find_chat, measure_width
+    from .capture.calibrate import (
+        CALIBRATION_FRAMES,
+        CalibrationError,
+        calibrate_frames,
+        combine,
+        find_chat,
+    )
     from .capture.screen import ScreenCapture
 
     print(f"Capture dans {delai:.0f} s. Reviens dans le jeu, journal d'acquisition visible.")
     time.sleep(delai)
 
+    images = []
     with ScreenCapture(monitor=ecran) as capture:
         zone = capture.target_monitor()
-        image = capture.grab(zone)
-
-    try:
-        calibrage = find_chat(image, origin=(zone.left, zone.top))
-    except CalibrationError as exc:
-        print(f"Échec du calibrage : {exc}", file=sys.stderr)
-        return 1
+        for index in range(CALIBRATION_FRAMES):
+            if index:
+                time.sleep(0.4)
+            images.append(capture.grab(zone))
+    image = images[-1]
 
     from .capture.ocr import TextReader
 
     lecteur = TextReader()
-    if not sans_ocr:
-        print("Mesure de la largeur utile du texte…")
-        calibrage = measure_width(image, calibrage, lecteur)
+    try:
+        if sans_ocr:
+            # Sans reconnaissance, la largeur reste celle de la géométrie. La
+            # médiane vaut quand même : c'est le cadrage qui varie le plus.
+            calibrage = combine([find_chat(vue, origin=(zone.left, zone.top)) for vue in images])
+        else:
+            print(f"Mesure sur {CALIBRATION_FRAMES} images…")
+            calibrage = calibrate_frames(images, lecteur, origin=(zone.left, zone.top))
+    except CalibrationError as exc:
+        print(f"Échec du calibrage : {exc}", file=sys.stderr)
+        return 1
 
     chemin = calibrage.save()
     print(f"Zone du chat : {calibrage.describe()}")

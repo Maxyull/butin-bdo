@@ -442,19 +442,31 @@ class AppState:
         que ce n'était pas le jeu. Personne ne confond les deux quand les lignes
         lues sont sous ses yeux.
         """
-        from ..capture.calibrate import find_chat, measure_width
+        from ..capture.calibrate import CALIBRATION_FRAMES, calibrate_frames
         from ..capture.lines import parse_frame
         from ..capture.ocr import TextReader
         from ..capture.screen import ScreenCapture
 
+        # ⭐ PLUSIEURS images, pas une. Mesuré sur une vraie session : la
+        # largeur trouvée va de 468 à 542 px d'une image à l'autre, et trois
+        # calibrages successifs d'un joueur qui n'avait rien touché ont rendu
+        # 476, 560 puis 731 px. Une zone une fois et demie trop large ralentit
+        # la reconnaissance pendant TOUTE la session, en silence, donc le
+        # compteur rate des lignes sans que rien ne le dise.
+        images = []
         with ScreenCapture(monitor=monitor) as capture:
             ecran = capture.target_monitor()
-            image = capture.grab(ecran)
+            for index in range(CALIBRATION_FRAMES):
+                if index:
+                    # Espacées, pour ne pas mesurer cinq fois le même instant :
+                    # c'est la variation qui donne la médiane son intérêt.
+                    time.sleep(0.4)
+                images.append(capture.grab(ecran))
 
-        calibrage = find_chat(image, origin=(ecran.left, ecran.top))
         lecteur = TextReader()
-        calibrage = measure_width(image, calibrage, lecteur)
+        calibrage = calibrate_frames(images, lecteur, origin=(ecran.left, ecran.top))
         calibrage.save()
+        image = images[-1]
 
         zone = calibrage.region
         rangees = lecteur.read_text(image[zone.top : zone.bottom, zone.left : zone.right])
