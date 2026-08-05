@@ -80,10 +80,12 @@ def _tally(
     )
 
 
-def tally_events(events: Sequence[LootEvent], *, silver: int = 0) -> Tally:
+def tally_events(events: Sequence[LootEvent], *, silver: int = 0, silver_lines: int = 0) -> Tally:
     """Total du côté du compteur."""
     return _tally(
-        [(event.item.item_id, event.item.name(), event.qty) for event in events], silver=silver
+        [(event.item.item_id, event.item.name(), event.qty) for event in events],
+        silver=silver,
+        silver_lines=silver_lines,
     )
 
 
@@ -167,12 +169,12 @@ class BenchReport:
         compté comme nouveau. Les deux effets jouent en sens contraire.
 
         Mesuré sur la rafale du 05/08/2026 : 45 lignes de silver par recalage
-        contre 48 par empreinte, soit -6,2 %. L'écart s'explique entièrement par
-        la première image, où le lecteur n'a retrouvé que 10 des 12 lignes de
-        silver visibles. C'est cet ordre de grandeur qui rend la référence
-        utilisable, pas une égalité qu'aucune des deux méthodes ne promet.
+        contre 44 par empreinte. Le reste de l'écart tient à la première image,
+        où le lecteur n'a retrouvé que 10 des 12 lignes de silver visibles.
+        C'est cet ordre de grandeur qui rend la référence utilisable, pas une
+        égalité qu'aucune des deux méthodes ne promet.
         """
-        return _ecart(self.reference.silver_lines, self.fingerprints.distinct)
+        return _ecart(self.reference.silver_lines, self.fingerprints.kept)
 
     @property
     def pixels_usable(self) -> bool:
@@ -197,7 +199,30 @@ class BenchReport:
 
     @property
     def silver_gap(self) -> float | None:
-        return _ecart(self.counted.silver, self.reference.silver)
+        """Écart du montant de silver, mesuré contre les EMPREINTES.
+
+        Et non contre le recalage du texte, délibérément. Sur le nombre de
+        lignes le recalage fait autorité ; sur les montants il ne vaut pas mieux
+        que le compteur, puisqu'il lit les mêmes chiffres avec le même moteur.
+        Mesuré : 4 de ses 45 lignes portent un montant illisible, donc comptées
+        1 au lieu de deux mille, ce qui le rend 5 % trop bas. Comparer deux
+        mesures de qualité égale n'apprend rien.
+
+        Les empreintes, elles, ne retiennent un montant qu'après l'avoir vu au
+        moins trois fois. Elles sont donc la seule des trois à pouvoir arbitrer
+        ici.
+        """
+        return _ecart(self.counted.silver, self.fingerprints.total)
+
+    @property
+    def silver_line_gap(self) -> float | None:
+        """Écart sur le NOMBRE de lignes de silver, pas sur le montant.
+
+        Les deux séparés, parce qu'ils ne se corrigent pas au même endroit :
+        rater une ligne est un problème de cadence ou d'alignement, mal lire un
+        montant est un problème de vote.
+        """
+        return _ecart(self.counted.silver_lines, self.reference.silver_lines)
 
     @property
     def within_ceiling(self) -> bool:
@@ -220,8 +245,9 @@ class BenchReport:
             "1. La référence est-elle croyable ?",
             f"   lignes passées, par recalage   : {self.reference_lines}",
             f"   dont lignes de silver          : {self.reference.silver_lines}",
-            f"   lignes de silver, par empreinte : {self.fingerprints.distinct}"
-            f"   (collisions attendues : {self.fingerprints.expected_collisions:.1f})",
+            f"   lignes de silver, par empreinte : {self.fingerprints.kept}"
+            f"   (+{self.fingerprints.dropped} sans support, "
+            f"collisions attendues : {self.fingerprints.expected_collisions:.1f})",
             f"   accord des deux méthodes       : {_pourcent(self.corroboration)}",
             f"   lectures par empreinte, médiane : {self.fingerprints.median_support:.0f}",
             f"   lignes vues une seule fois     : {self.assembly.fragile_count}",
@@ -238,8 +264,11 @@ class BenchReport:
             f"{self.reference.events}   ({_pourcent(self.event_gap)})",
             f"   quantité cumulée               : {self.counted.quantity} / "
             f"{self.reference.quantity}   ({_pourcent(self.quantity_gap)})",
-            f"   silver                         : {self.counted.silver} / "
-            f"{self.reference.silver}   ({_pourcent(self.silver_gap)})",
+            f"   silver, contre empreintes      : {self.counted.silver} / "
+            f"{self.fingerprints.total}   ({_pourcent(self.silver_gap)})",
+            f"   pour mémoire, par recalage     : {self.reference.silver}",
+            f"   lignes de silver               : {self.counted.silver_lines} / "
+            f"{self.reference.silver_lines}   ({_pourcent(self.silver_line_gap)})",
             f"   sous le plafond des lignes     : {'oui' if self.within_ceiling else 'NON'}",
             "",
             "3. Ce qui explique l'écart",
@@ -279,7 +308,11 @@ def build_report(
 ) -> BenchReport:
     """Rassemble les mesures indépendantes en un rapport."""
     return BenchReport(
-        counted=tally_events(replay_result.events, silver=replay_result.silver),
+        counted=tally_events(
+            replay_result.events,
+            silver=replay_result.silver,
+            silver_lines=replay_result.silver_lines,
+        ),
         reference=tally_lines(
             [ligne.text for ligne in assembly.stream], matcher, fmt=fmt, scope=scope
         ),

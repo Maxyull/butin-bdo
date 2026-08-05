@@ -22,30 +22,26 @@ Le défilement accumulé entre deux passages d'OCR est exactement ce que
 pas seulement moins coûteux, il rend la prédiction **plus fine** : un défilement
 rapide qui aurait été vu d'un bloc à 350 ms est vu en trois mesures à 100 ms.
 
-⛔ La règle de mesure retenue ici ne fonctionne pas
----------------------------------------------------
+La règle de mesure : la colonne du texte, sur un masque de pixels clairs
+------------------------------------------------------------------------
 
-📕 `docs/banc-essai.md`, partie 4 B. Le banc l'a mesuré le 05/08/2026 sur 300
-images de vrai farm : **zéro détection de défilement sûre sur 299 transitions**,
-et la colonne des pastilles est la **pire** des quatre bandes testées, avec 0
-décalage juste sur 20 alors que 92 lignes sont réellement passées.
+📕 `docs/banc-essai.md`, partie 4 B. La règle d'origine était la **colonne des
+pastilles de canal**, et le banc l'a réfutée le 05/08/2026 sur 300 images de
+vrai farm : **zéro décalage juste sur les 37 transitions** où une ligne apparaît
+réellement, la pire des bandes essayées.
 
 La raison est structurelle : les pastilles `Système` sont toutes identiques et
-espacées de 21 px. Un défilement d'exactement une ligne superpose la pastille
-`n` sur la pastille `n+1`, donc ne change rien. C'est précisément la colonne qui
-ne peut pas voir ce qu'on lui demande de voir.
+espacées d'exactement un pas de ligne. Un défilement d'une ligne superpose la
+pastille `n` sur la pastille `n+1`, donc ne change rien. C'était précisément la
+colonne aveugle à ce qu'on lui demandait de voir. Le chiffre de 3,9 contre 11,3
+qui l'avait fait retenir comparait deux captures de scènes **différentes** : il
+mesurait le bruit du décor, pas un défilement.
 
-Le chiffre de 3,9 contre 11,3 qui l'avait fait retenir comparait deux captures
-de scènes **différentes** : il mesurait le bruit du décor, pas un défilement.
-
-Conséquence, et elle est lourde : `expected_new` vaut toujours `None`,
-l'alignement travaille sur le texte seul, et surtout `_should_read` retombe en
-permanence sur son minuteur de repli. La boucle ne lit alors que **15 images sur
-300**, là où le seul coût de l'OCR en autoriserait 27.
-
-Le code est laissé tel quel, sans réglage bricolé : trouver où mesurer le
-défilement est le même problème que le calibrage de la zone, et les deux se
-tranchent ensemble.
+Ce qui marche : la colonne du **texte**, comparée sur un **masque de pixels
+clairs**. Le texte du journal est peint en clair, le monde du jeu est sombre
+(médiane 21 sur 255) : le masque le fait disparaître, et il ne reste que les
+lettres, qui elles défilent. **32 décalages justes sur 37**, aucune fausse
+détection sur 262 transitions immobiles, et jamais de décalage faux.
 
 ⚠️ Le garde-fou de stabilité n'est PAS utilisé pour conditionner l'OCR, et c'est
 délibéré. Il a été écrit pour un fond fixe, où l'immobilité signifie que
@@ -76,6 +72,7 @@ from ..tracking.scroll import (
     estimate_text_scroll_px,
     expected_new_lines,
 )
+from ..tracking.similarity import MatchConfig
 from ..tracking.staging import LootStager
 from .lines import DEFAULT_FORMAT, ChatLineFormat, parse_frame
 from .screen import GrayImage, Region
@@ -156,9 +153,40 @@ class LoopConfig:
     farm actif. Au-delà, la mesure se tait et l'alignement textuel reprend seul.
     """
 
-    min_sightings: int = 3
-    """Observations concordantes avant de valider un drop. Ne pas augmenter
-    « par prudence » : mesuré, ça fait perdre du butin."""
+    match: MatchConfig = field(default_factory=MatchConfig)
+    """Tolérance de la comparaison de deux lignes, et part des paires qui
+    doivent s'accorder pour qu'un recouvrement soit valide.
+
+    Exposée ici plutôt que laissée implicite : c'est le réglage qui décide de
+    ce qu'on accepte comme « la même ligne », donc celui qu'il faut pouvoir
+    faire varier pour le mesurer au banc. Un réglage qu'on ne peut pas balayer
+    est un réglage qu'on ne peut pas justifier.
+    """
+
+    min_sightings: int = 2
+    """Observations concordantes avant de valider un drop.
+
+    ⚠️ Ne pas augmenter « par prudence » : c'est contre-intuitif et c'est
+    mesuré. Balayage du 05/08/2026 sur la rafale du banc, à quatre cadences de
+    lecture, drops comptés sur 47 et écart sur la quantité cumulée :
+
+    | seuil | OCR 0,7 s | OCR 1,1 s | OCR 1,5 s | OCR 2,2 s |
+    | --- | --- | --- | --- | --- |
+    | 1 | 44, −14,7 % | 47, −13,2 % | 47, −6,2 % | 44, −3,1 % |
+    | **2** | **43, −5,4 %** | **47, +0,0 %** | **47, −0,8 %** | **43, −3,9 %** |
+    | 3 | 43, −5,4 % | 46, −1,6 % | 43, −7,0 % | 35, −15,5 % |
+    | 4 | 43, −5,4 % | 41, −9,3 % | 40, −10,1 % | 20, −57,4 % |
+
+    Deux choses se lisent dans ce tableau, et elles vont en sens contraire.
+    Attendre **une** observation de plus protège des ratés de lecture : à 1, tous
+    les drops sont trouvés mais leurs quantités sont fausses de 13 %, faute de
+    vote. Attendre **davantage** fait sortir la ligne de l'écran avant qu'elle
+    n'atteigne le seuil, et c'est une perte sèche.
+
+    2 est le meilleur des quatre valeurs à **chacune** des quatre cadences, ce
+    qui en fait un choix mesuré et non un point de chance. Il a aussi le bon
+    sens d'erreur : il sous-compte le silver là où 3 le sur-compte.
+    """
 
 
 @dataclass(slots=True)
@@ -301,7 +329,7 @@ class CaptureLoop:
             self._seeded = True
             return TickResult(ocr_ran=True, expected_new=expected)
 
-        result = align(self._previous_lines, current, expected_new=expected)
+        result = align(self._previous_lines, current, cfg=self.config.match, expected_new=expected)
 
         motif = self._rejection_reason(result, expected, depuis)
         if motif:
@@ -312,18 +340,19 @@ class CaptureLoop:
         self._previous_lines = current
         evenements = self.stager.observe(result.overlap, current)
 
-        # ⚠️ Sur les lignes NOUVELLES seulement, jamais sur la fenêtre entière.
-        # Une ligne de silver reste affichée une dizaine de secondes et se
-        # retrouve donc dans toutes les lectures de cet intervalle : la
-        # réadditionner à chaque fois compte le même gain autant de fois qu'il
-        # a été vu. Mesuré par le banc le 05/08/2026, avec seulement 6 lectures
-        # exploitées sur 300 images : 123 409 silver comptés pour 93 161 réels,
-        # soit +32,5 %. À cadence normale l'erreur serait bien plus grosse.
+        # ⚠️ Le silver vient du VOTE de la couche de suivi, exactement comme les
+        # objets, et non d'une lecture. Deux défauts mesurés par le banc d'essai
+        # ont conduit ici, dans cet ordre :
         #
-        # Le découpage `result.overlap:` est exactement celui qui définit
-        # `result.new_lines`, donc le silver suit la même règle que les objets
-        # et ne peut pas s'en désynchroniser.
-        silver = sum(ligne.silver for ligne in parsed[result.overlap :])
+        # 1. il était additionné sur la fenêtre entière à chaque lecture, donc
+        #    autant de fois qu'une ligne restait affichée : +32,5 % ;
+        # 2. corrigé en ne comptant que les lignes nouvelles, il était alors lu
+        #    **une seule fois**. Or le montant est un nombre à quatre chiffres,
+        #    et 13,6 % des lectures de lignes de silver en ont un d'illisible.
+        #
+        # Le suivi ne rend donc un montant qu'une fois la ligne vue plusieurs
+        # fois, et le tranche au vote pondéré sur toutes ses lectures.
+        silver = self.stager.drain_silver()
         self.total_silver += silver
         return TickResult(ocr_ran=True, events=evenements, silver=silver, expected_new=expected)
 
@@ -360,5 +389,12 @@ class CaptureLoop:
     # -- fin de session --------------------------------------------------
 
     def flush(self) -> list[LootEvent]:
-        """Valide les drops encore en attente, à l'arrêt de la session."""
-        return self.stager.flush()
+        """Valide les drops encore en attente, à l'arrêt de la session.
+
+        Le silver en attente est crédité au passage. Sans ça, faire voter les
+        montants ferait perdre toutes les lignes de pièces encore à l'écran au
+        moment de l'arrêt, c'est-à-dire une fenêtre entière.
+        """
+        evenements = self.stager.flush()
+        self.total_silver += self.stager.drain_silver()
+        return evenements

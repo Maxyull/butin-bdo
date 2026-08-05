@@ -75,6 +75,7 @@ class Replay:
 
     events: tuple[LootEvent, ...]
     silver: int
+    silver_lines: int
 
     read_frames: tuple[int, ...]
     """Images que la boucle a vraiment fait lire. Sa cadence réelle, mesurée
@@ -142,6 +143,7 @@ def replay(
     return Replay(
         events=tuple(evenements),
         silver=boucle.total_silver,
+        silver_lines=boucle.stager.silver_lines,
         read_frames=tuple(reader.read_indices),
         skipped=tuple(ecartees),
         lost_resolved=boucle.stager.lost_resolved,

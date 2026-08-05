@@ -89,7 +89,9 @@ def matcher(catalog: ItemCatalog) -> ItemMatcher:
 def construire(fenetres: list[list[str]], matcher: ItemMatcher, **reglages: object):
     source = SourceFactice()
     lecteur = LecteurFactice(fenetres)
-    config = LoopConfig(min_sightings=2, **reglages)  # type: ignore[arg-type]
+    # Le seuil par défaut du produit est déjà 2 ; le répéter ici permet à un
+    # test de le surcharger sans que l'argument arrive deux fois.
+    config = LoopConfig(**{"min_sightings": 2, **reglages})  # type: ignore[arg-type]
     return source, lecteur, CaptureLoop(source, lecteur, matcher, REGION, config=config)
 
 
@@ -252,13 +254,18 @@ class TestComptage:
         assert identifiants.count(5956) == 1, "Trace de sauvagerie comptée une seule fois"
 
     def test_le_silver_est_accumule_a_part(self, matcher: ItemMatcher) -> None:
-        """« Pièces » ne passe jamais par une recherche de prix."""
+        """« Pièces » ne passe jamais par une recherche de prix.
+
+        Le montant est crédité au vote, comme la quantité d'un objet, donc
+        après plusieurs lectures concordantes et non à la première apparition.
+        """
         avant = [gain("Pierre noire (arme)")]
         apres = [gain("Pierre noire (arme)"), "Système Vous avez obtenu : [Pièces] x1,000 (21:54)"]
-        _, _, boucle = construire([avant, apres], matcher, ocr_max_idle_s=0.1)
+        _, _, boucle = construire([avant] + [apres] * 2, matcher, ocr_max_idle_s=0.1)
 
         boucle.tick(now=0.0)
-        resultat = boucle.tick(now=0.5)
+        boucle.tick(now=0.5)
+        resultat = boucle.tick(now=1.0)
 
         assert resultat.silver == 1000
         assert boucle.total_silver == 1000
@@ -310,6 +317,103 @@ class TestComptage:
         # correction, la boucle rendait 1845 + 2146 + 2009 + 1825 par lecture
         # retenue, soit plus de sept fois ce total.
         assert boucle.total_silver == montants[2] + montants[3]
+
+
+class TestSeuilDeValidation:
+    """Combien de fois une ligne doit être vue avant d'être comptée.
+
+    La fenêtre fait 8 lignes et le journal reçoit une ligne par capture, donc
+    une ligne reste huit captures à l'écran. La boucle n'en lit qu'une sur
+    quatre : chaque ligne est donc vue **exactement deux fois**. C'est le régime
+    réel, mesuré au banc, et c'est là que le seuil se joue.
+    """
+
+    def _compte(self, matcher: ItemMatcher, seuil: int) -> tuple[int, int]:
+        flux = [gain("Pierre noire (arme)", (index % 3) + 1) for index in range(60)]
+        fenetres = [flux[debut : debut + 8] for debut in range(len(flux) - 7)]
+        source, _, boucle = construire(fenetres, matcher, min_sightings=seuil)
+
+        evenements = []
+        for pas, _ in enumerate(fenetres):
+            # Les pixels défilent avec le texte, sinon la boucle ne déclenche
+            # jamais de lecture anticipée et le régime testé n'existe pas.
+            source.decalage = pas
+            evenements += boucle.tick(now=pas * 0.1).events
+        evenements += boucle.flush()
+        return len(evenements), sum(event.qty for event in evenements)
+
+    def test_deux_observations_comptent_tout_le_butin(self, matcher: ItemMatcher) -> None:
+        """Le vote ne coûte aucun drop tant que la ligne est vue deux fois."""
+        assert self._compte(matcher, 2) == (52, 105)
+
+    def test_en_attendre_une_de_plus_fait_perdre_du_butin(self, matcher: ItemMatcher) -> None:
+        """Régression : monter le seuil « par prudence » dégrade le résultat.
+
+        Contre-intuitif, et mesuré. Ici la ligne est vue exactement deux fois
+        avant de sortir de l'écran : en exiger trois ne les rend pas plus sûres,
+        ça les fait disparaître. La chute est brutale, de 52 drops à 8.
+
+        Le balayage du 05/08/2026 sur la rafale du banc donne le même verdict à
+        quatre cadences de lecture différentes : 47 drops sur 47 avec un seuil
+        de 2, 46 à 3, 41 à 4, et seulement 20 à 4 quand la lecture ralentit.
+        2 est le meilleur des quatre valeurs à **chacune** des quatre cadences,
+        ce qui en fait un choix mesuré et non un point de chance.
+        """
+        drops_a_deux, _ = self._compte(matcher, 2)
+        drops_a_trois, _ = self._compte(matcher, 3)
+
+        assert drops_a_trois < drops_a_deux / 2
+
+
+class TestSilverAuVote:
+    def test_un_montant_illisible_est_corrige_par_les_autres_lectures(
+        self, matcher: ItemMatcher
+    ) -> None:
+        """Régression : le montant était lu une seule fois, sans rattrapage.
+
+        Le montant de silver est un **nombre à quatre chiffres**, donc bien
+        plus fragile à l'OCR qu'un nom d'objet, que la reconnaissance floue
+        rattrape. Mesuré par le banc d'essai le 05/08/2026 sur 300 images de
+        vrai farm : **13,6 % des lectures de lignes de silver ont un montant
+        illisible** (470 sur 3 456), contre 4 lignes sur 45 dans une référence
+        qui tranche chaque position au vote.
+
+        Une lecture ratée coûtait donc environ deux mille silver, définitivement.
+        Ici la ligne est lue trois fois, dont une fois avec le « x » mangé, et
+        le vote doit rendre le vrai montant.
+        """
+        avant = [gain("Pierre noire (arme)")]
+        nette = "Système Vous avez obtenu : [Pièces] x1,845 (21:54)"
+        abimee = "Système Vous avez obtenu : [Pièces] x?,84S (21:54)"
+        _, _, boucle = construire(
+            [avant, [*avant, abimee], [*avant, nette], [*avant, nette]],
+            matcher,
+            ocr_max_idle_s=0.1,
+        )
+
+        for pas in range(4):
+            boucle.tick(now=pas * 0.5)
+
+        assert boucle.total_silver == 1845
+
+    def test_le_silver_encore_a_l_ecran_est_credite_a_l_arret(self, matcher: ItemMatcher) -> None:
+        """Sinon faire voter les montants perdrait une fenêtre entière.
+
+        Une ligne vue une seule fois n'a pas atteint le seuil de validation. À
+        l'arrêt de la session il n'y aura pas d'autre lecture : ce qui attend
+        doit être crédité, exactement comme les drops le sont déjà.
+        """
+        avant = [gain("Pierre noire (arme)")]
+        apres = [*avant, "Système Vous avez obtenu : [Pièces] x2,146 (21:54)"]
+        _, _, boucle = construire([avant, apres], matcher, ocr_max_idle_s=0.1)
+
+        boucle.tick(now=0.0)
+        boucle.tick(now=0.5)
+        assert boucle.total_silver == 0, "une seule lecture ne suffit pas à trancher"
+
+        boucle.flush()
+
+        assert boucle.total_silver == 2146
 
 
 class TestPlafondDeVraisemblance:

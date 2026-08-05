@@ -252,16 +252,23 @@ class ParsedLine:
 
     observed: ObservedLine
     stamp: str = ""
-    silver: int = 0
-    """Montant de silver quand la ligne en annonce, sinon 0.
-
-    Le silver ne passe jamais par une recherche de prix : il est déjà exprimé
-    dans l'unité finale.
-    """
 
     @property
     def is_silver(self) -> bool:
-        return self.silver > 0
+        return self.observed.silver
+
+    @property
+    def silver(self) -> int:
+        """Montant de silver quand la ligne en annonce, sinon 0.
+
+        Dérivé de la ligne observée plutôt que stocké à côté : le montant est
+        déjà `observed.qty`, et le garder en double laisserait les deux
+        diverger le jour où l'un des deux serait corrigé sans l'autre.
+
+        Le silver ne passe jamais par une recherche de prix : il est déjà
+        exprimé dans l'unité finale.
+        """
+        return self.observed.qty if self.observed.silver else 0
 
 
 def parse_line(
@@ -292,9 +299,9 @@ def parse_line(
                 qty=parts.qty,
                 name_confidence=1.0,
                 quantity_uncertain=parts.quantity_uncertain,
+                silver=True,
             ),
             stamp=parts.stamp,
-            silver=parts.qty,
         )
 
     match = matcher.resolve(parts.name, scope=scope)

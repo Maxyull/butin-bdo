@@ -10,32 +10,39 @@ Le code du banc est dans `src/butin/bench/`, ses tests dans
 
 ## 1. Le résultat, en une ligne
 
-> Sur 30 secondes de farm réel, le compteur enregistre **46 drops sur 47**, soit
-> une perte de **2,1 %** (**1,6 %** en quantité cumulée), et **70 714 silver sur
-> 93 161**, soit **−24,1 %**.
+> Sur 30 secondes de farm réel, le compteur enregistre **47 drops sur 47**, une
+> **quantité cumulée exacte** (129 sur 129), **45 lignes de silver sur 45**, et
+> un montant de silver à **−1,5 %**.
 
-Le comptage des objets est bon. Ce qui reste est un défaut **du silver**, et il
-a sa propre cause, chiffrée en partie 4 E.
+⚠️ **Ce que ce chiffre ne dit pas.** Il est mesuré sur **une seule rafale de
+30 secondes**, à un seul endroit de farm, sur une seule configuration d'écran.
+Il dit que le compteur est juste sur ces 300 images ; il ne dit pas qu'il l'est
+partout. Les réglages ayant été balayés contre cette même rafale, le risque de
+surajustement est réel et traité en partie 6.
 
 ### Historique des mesures
 
 | Date | Drops | Quantité | Silver | Ce qui a changé |
 | --- | --- | --- | --- | --- |
 | 05/08, mesure initiale | 12 / 47 | −70,5 % | **+32,5 %** | — |
-| 05/08, cause D corrigée | 12 / 47 | −70,5 % | **−25,9 %** | le silver ne compte que les lignes nouvelles |
+| 05/08, cause D corrigée | 12 / 47 | −70,5 % | −25,9 % | le silver ne compte que les lignes nouvelles |
 | 05/08, cause C corrigée | 41 / 47 | −8,5 % | −22,8 % | les garde-fous ne jettent plus les lectures valides |
-| 05/08, cause B corrigée | **46 / 47** | **−1,6 %** | −24,1 % | la mesure de défilement fonctionne enfin |
+| 05/08, cause B corrigée | 46 / 47 | −1,6 % | −24,1 % | la mesure de défilement fonctionne enfin |
+| 05/08, cause E corrigée | 46 / 47 | −1,6 % | +0,4 % | le silver passe par le vote multi-images |
+| 05/08, seuil recalé | **47 / 47** | **+0,0 %** | **−1,5 %** | valider après 2 observations et non 3 |
 
-Trois façons de lire ce tableau, et les trois comptent :
+Quatre choses se lisent dans ce tableau, et les quatre comptent :
 
-* la correction de la cause D **n'améliore pas le total, elle en inverse le
-  signe**. Le compteur cesse d'inventer du gain et se contente d'en rater, ce
-  qui est le seul comportement acceptable ici ;
-* la cause C fait passer la perte de **74,5 % à 12,8 %**, et ramène les images
-  jetées de 9 à **0**. C'était bien le plus gros levier du lot ;
-* la cause B la ramène à **2,1 %**, et fait passer les images lues de 15 à 22.
-  Elle ajoute surtout une **troisième mesure indépendante** au banc, qui était
-  muette jusque-là.
+* la cause D **n'améliore pas le total, elle en inverse le signe**. Le compteur
+  cesse d'inventer du gain et se contente d'en rater, ce qui est le seul
+  comportement acceptable ici ;
+* la cause C fait passer la perte de **74,5 % à 12,8 %** et les images jetées de
+  9 à 0. C'était le plus gros levier du lot ;
+* la cause B la ramène à **2,1 %** et donne au banc sa troisième mesure
+  indépendante, muette jusque-là ;
+* la cause E ne touche pas aux objets et **corrige le silver à elle seule**, ce
+  qui montre que les deux se comptaient par des chemins différents alors qu'ils
+  n'auraient jamais dû.
 
 Aucune de ces causes n'a jamais été dans la logique d'anti-double-comptage
 elle-même.
@@ -126,7 +133,7 @@ tombait sous zéro, le placement sans aucun recouvrement gagnait avec zéro, et 
 référence déclarait une fenêtre entière de lignes nouvelles. À elles seules, ces
 13 images ajoutaient **312 lignes fantômes sur 374**.
 
-## 4. Pourquoi le compteur perd les trois quarts du butin
+## 4. Les six causes, et ce que chacune coûtait
 
 Aucune des quatre causes n'est dans l'anti-double-comptage. Elles sont toutes en
 amont, et elles se composent.
@@ -266,10 +273,10 @@ imputable au silver : c'est la même perte que sur les objets, causes B et C.
 Deux tests de régression le figent dans `tests/test_loop.py`, tous deux vérifiés
 en échec sans le correctif.
 
-### E. Le silver ne passe pas par le vote multi-images
+### E. Le silver ne passait pas par le vote multi-images — CORRIGÉ
 
-Trouvé en cherchant pourquoi l'écart sur le silver reste à −24,1 % quand celui
-sur les objets est tombé à −2,1 %.
+Trouvé en cherchant pourquoi l'écart sur le silver restait à −24,1 % quand celui
+sur les objets était tombé à −2,1 %.
 
 Un objet est tranché au **vote sur toutes les lectures** de sa ligne, par
 `tracking/staging.py`. Le silver, lui, est lu une fois : à la première
@@ -283,34 +290,110 @@ silver pour une ligne de pièces. La référence, qui tranche chaque position au
 vote sur des dizaines de lectures, n'a le même problème que sur **4 lignes sur
 45**.
 
-Le sens de l'erreur reste le bon : on sous-compte. Mais c'est une perte
-évitable, et elle a la même forme que celles déjà corrigées, un mécanisme
-existant qui n'est pas branché là où il faudrait.
+Le sens de l'erreur restait le bon : on sous-comptait. Mais c'était une perte
+évitable, et de la même forme que les précédentes : un mécanisme existant qui
+n'est pas branché là où il faudrait.
+
+**Corrigé** : une ligne de silver occupe désormais un emplacement de suivi comme
+n'importe quelle autre, et son montant est tranché au **même vote pondéré** que
+la quantité d'un objet. Les lectures dont le marqueur était illisible pèsent
+0,4 contre 1, donc elles attestent la présence de la ligne sans pouvoir décider
+du montant.
+
+**Cette correction a forcé le banc à s'améliorer**, et c'est intéressant. Le
+compteur est passé de −24,1 % à **+5,8 %** contre le recalage du texte, ce qui
+semblait le faire sur-compter. En réalité le recalage rend 4 de ses 45 lignes
+avec un montant illisible, donc comptées 1 au lieu de deux mille : c'est **lui**
+qui était 5 % trop bas.
+
+Il a fallu une mesure capable d'arbitrer, et les empreintes de montants la
+donnent : en ne retenant que les montants vus au moins trois fois, elles rendent
+**98 157** silver. Le compteur en rendait 98 565, soit **+0,4 %**. La leçon vaut
+d'être retenue : sur le nombre de lignes le recalage fait autorité, sur les
+montants il ne vaut pas mieux que le compteur, et comparer deux mesures de même
+qualité n'apprend rien.
+
+### F. Le seuil de validation était trop haut d'une unité
+
+Une fois les quatre causes traitées, il restait un drop manquant sur 47 et
+1,6 % de quantité. Un balayage des réglages de la boucle contre le banc a montré
+qu'un seul d'entre eux bouge le résultat : `min_sightings`, le nombre
+d'observations concordantes exigées avant de valider une ligne.
+
+Drops comptés sur 47 et écart sur la quantité cumulée, à quatre cadences de
+lecture :
+
+| seuil | OCR 0,7 s | OCR 1,1 s | OCR 1,5 s | OCR 2,2 s |
+| --- | --- | --- | --- | --- |
+| 1 | 44, −14,7 % | 47, −13,2 % | 47, −6,2 % | 44, −3,1 % |
+| **2** | **43, −5,4 %** | **47, +0,0 %** | **47, −0,8 %** | **43, −3,9 %** |
+| 3 | 43, −5,4 % | 46, −1,6 % | 43, −7,0 % | 35, −15,5 % |
+| 4 | 43, −5,4 % | 41, −9,3 % | 40, −10,1 % | 20, −57,4 % |
+
+Deux effets contraires se lisent dans ce tableau. Attendre **une** observation
+de plus protège des ratés de lecture : à 1, tous les drops sont trouvés mais
+leurs quantités sont fausses de 13 %, faute de vote. Attendre **davantage** fait
+sortir la ligne de l'écran avant qu'elle n'atteigne le seuil, et c'est une perte
+sèche.
+
+2 est le meilleur des quatre valeurs à **chacune** des quatre cadences, ce qui
+en fait un choix mesuré et non un point de chance. Il a aussi le bon sens
+d'erreur : il sous-compte le silver là où 3 le sur-compte.
 
 ## 5. Ce que ça commande pour la suite
 
-Dans cet ordre, et parce que le banc le montre :
-
-1. ~~**Corriger le silver** (cause D).~~ **Fait.** L'erreur est passée de
-   +32,5 % à −25,9 %, donc du mauvais côté au bon.
-2. ~~**Ne plus jeter les lectures valides** (cause C).~~ **Fait.** La perte est
-   passée de 74,5 % à 12,8 %, et les images jetées de 9 à 0.
+1. ~~**Corriger le silver** (cause D).~~ **Fait.** De +32,5 % à −25,9 %, donc du
+   mauvais côté au bon.
+2. ~~**Ne plus jeter les lectures valides** (cause C).~~ **Fait.** De −74,5 % à
+   −12,8 %, images jetées de 9 à 0.
 3. ~~**Trouver une règle de mesure du défilement qui marche** (cause B).~~
-   **Fait.** La perte est passée à 2,1 %, et le banc a gagné sa troisième
-   mesure indépendante.
-4. **Faire passer le silver par le vote multi-images** (cause E). C'est tout ce
-   qui reste d'écart mesurable, et le mécanisme existe déjà pour les objets.
-5. **Recaler le budget d'OCR sur la taille réelle de la zone** (cause A). Non
-   bloquant : la boucle lit maintenant assez d'images pour ne perdre que 2 %.
+   **Fait.** De −12,8 % à −2,1 %, et le banc gagne sa troisième mesure.
+4. ~~**Faire passer le silver par le vote multi-images** (cause E).~~ **Fait.**
+   De −24,1 % à −1,5 % sur le montant.
+5. ~~**Recaler le seuil de validation** (cause F).~~ **Fait.** 47 drops sur 47.
+6. **Recaler le budget d'OCR sur la taille réelle de la zone** (cause A). Non
+   bloquant : la boucle lit assez d'images pour ne rien perdre sur cette rafale.
 
-Reste ensuite le **calibrage de la zone**, qui n'est pas une cause du banc mais
-la condition pour qu'un utilisateur autre que nous puisse s'en servir. Les
-bandes et le pas vertical sont mesurés sur une seule configuration d'écran.
+Reste le **calibrage de la zone**, qui n'est pas une cause du banc mais la
+condition pour qu'un utilisateur autre que nous puisse s'en servir.
 
-Le banc se relance après chaque correction et rend le même rapport : c'est
-exactement ce pour quoi il a été écrit.
+## 6. Ce qu'on n'a pas le droit d'annoncer
 
-## 6. Relancer le banc
+Le banc dit que le compteur est juste **sur cette rafale**. Trois réserves, à
+lever avant d'écrire « ce compteur est juste » quelque part de public.
+
+**Une seule rafale.** 30 secondes, un seul endroit de farm, deux objets, une
+seule configuration d'écran. Le journal y alterne silver et objet, toutes les
+lignes portant la même minute, et il n'y contient **aucune conversation de
+joueurs** alors que le canal `Système` est normalement entrelacé avec elle.
+
+**Les réglages ont été balayés contre cette même rafale.** C'est du
+surajustement en puissance. Deux garde-fous ont été appliqués, et ils ne
+suppriment pas le risque, ils le réduisent :
+
+* un réglage n'a été retenu que s'il a un **mécanisme explicable**, pas
+  seulement un meilleur chiffre. Le seul modifié, `min_sightings`, l'a été sur
+  un compromis déjà écrit noir sur blanc avant la mesure ;
+* il devait **dominer à quatre cadences de lecture différentes**, pas seulement
+  à celle de la machine du jour. Les réglages qui bougeaient de façon
+  non monotone, comme `ocr_max_idle_s`, ont été laissés tels quels précisément
+  pour ça.
+
+Trois réglages se sont révélés être sur un **plateau** et non sur une crête, ce
+qui est rassurant : la part de paires qui doivent s'accorder donne le même
+résultat de 0,40 à 0,70, le seuil de clarté de 90 à 150, et le pas vertical de
+21,0 à 21,9.
+
+**La géométrie est relevée sur un seul écran.** Les bandes de mesure, en
+fraction de la largeur, et le pas vertical de 21,6 px viennent d'un 2560 × 1440
+avec une échelle d'interface donnée. Rien ne garantit qu'ils tiennent ailleurs,
+et c'est exactement ce que le calibrage de la zone doit résoudre.
+
+Ce qu'on peut dire aujourd'hui, et rien de plus : **sur 30 secondes de farm réel
+mesurées de trois façons indépendantes, le compteur n'a raté aucun drop et
+n'en a inventé aucun.**
+
+## 7. Relancer le banc
 
 ```
 python -X utf8 scripts/banc_essai.py

@@ -127,6 +127,18 @@ dans [docs/versionnage.md](docs/versionnage.md).
   un plancher qui garantit qu'il ne devient jamais plus sévère qu'avant.
   Mesuré : ces deux corrections ramènent les images jetées de 9 à **0**, le
   butin reconnu puis perdu de 21 à **1**, et la perte de **74,5 % à 12,8 %**.
+- **Le montant de silver était lu une seule fois**, alors que les objets étaient
+  déjà tranchés au vote sur toutes les lectures de leur ligne. Or le montant est
+  un nombre à quatre chiffres, bien plus fragile qu'un nom que la
+  reconnaissance floue rattrape : **13,6 % des lectures de lignes de silver en
+  ont un d'illisible**, et chaque raté coûtait environ deux mille silver sans
+  rattrapage possible. Le silver passe désormais par le même vote pondéré que
+  les quantités d'objets. Écart ramené de −24,1 % à −1,5 %.
+- **Le seuil de validation était trop haut d'une unité.** Exiger trois
+  observations concordantes plutôt que deux fait sortir des lignes de l'écran
+  avant qu'elles n'y parviennent. Balayé à quatre cadences de lecture : deux
+  observations donnent le meilleur résultat à **chacune** des quatre, et le bon
+  sens d'erreur. Dernier drop manquant récupéré, quantité cumulée exacte.
 - ⛔ **La mesure de défilement en pixels ne détectait rien.** Elle prenait pour
   règle la colonne des pastilles de canal, qui sont toutes identiques et
   espacées d'exactement un pas de ligne : un défilement d'une ligne superpose
@@ -147,12 +159,11 @@ dans [docs/versionnage.md](docs/versionnage.md).
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- **Le compteur perd 2,1 % des drops et 24,1 % du silver.** Mesuré par le banc
-  d'essai sur 30 secondes de farm réel : 46 drops enregistrés sur 47, et 70 714
-  silver comptés pour 93 161 réels. Le comptage des objets est bon ; l'écart
-  restant est un défaut **du silver**, qui ne passe pas par le vote
-  multi-images dont bénéficient les objets. Mesuré : 13,6 % des lectures de
-  lignes de silver ont un montant illisible.
+- **Le compteur est juste sur les 30 secondes de farm mesurées** : 47 drops sur
+  47, quantité cumulée exacte, 45 lignes de silver sur 45, montant du silver à
+  −1,5 %. ⚠️ Une seule rafale, un seul endroit de farm, une seule configuration
+  d'écran, et des réglages balayés contre cette même rafale : ce qu'on peut
+  annoncer et ce qu'on ne peut pas est écrit en partie 6 de
   [docs/banc-essai.md](docs/banc-essai.md).
 - La reconnaissance de texte coûte 336 ms par image sur une zone de 520 x 385,
   et **1 100 ms** sur une zone de 780 x 575. Le découplage de la boucle absorbe
@@ -163,4 +174,7 @@ dans [docs/versionnage.md](docs/versionnage.md).
   donc entièrement sur le vote multi-images.
 - Aucune interface, et aucun calibrage automatique de la zone. Les bandes de
   mesure et le pas vertical de 21,6 px sont relevés sur une seule configuration
-  d'écran.
+  d'écran, ce qui reste le vrai obstacle à un usage par quelqu'un d'autre.
+- La reconnaissance n'est lancée que 22 fois sur 300 images, faute de pouvoir
+  aller plus vite. Sans conséquence sur la rafale mesurée, mais sans marge non
+  plus si un journal défilait deux fois plus vite.
