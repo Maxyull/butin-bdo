@@ -40,6 +40,7 @@ import logging
 import threading
 from typing import Any
 
+from . import paths
 from .capture.worker import CaptureWorker
 from .catalog import ItemCatalog, ItemMatcher
 from .market import PriceBook
@@ -51,10 +52,59 @@ _log = logging.getLogger(__name__)
 TITLE = "Butin — suivi de butin, Black Desert Online"
 WIDTH = 1100
 HEIGHT = 820
+OVERLAY_WIDTH = 430
+OVERLAY_HEIGHT = 380
+"""Taille du panneau en surimpression. Assez pour une dizaine de drops et les
+trois chiffres, assez peu pour ne pas manger le champ de vision du jeu."""
+
 MIN_SIZE = (860, 620)
 """Taille minimale de la fenêtre. En dessous, le tableau du butin se replie et
 les quatre chiffres passent les uns sous les autres : lisible, mais ce n'est
 plus la même lecture d'un coup d'œil."""
+
+
+class Overlay:
+    """Le panneau en surimpression, posé par-dessus le jeu.
+
+    Sans cadre, translucide et toujours au-dessus : c'est le seul écran que le
+    joueur regarde pendant qu'il farme, et il ne doit ni cacher le jeu ni passer
+    derrière lui au premier clic.
+
+    ⚠️ Une poignée de déplacement est dessinée dans la page. Sans cadre de
+    fenêtre, rien n'indiquerait qu'on peut bouger le panneau, et le joueur le
+    croirait cloué là où il est tombé.
+    """
+
+    def __init__(self, url: str) -> None:
+        self._url = url
+        self._window: Any = None
+
+    def open(self) -> None:
+        if self._window is not None:
+            return
+        import webview
+
+        self._window = webview.create_window(
+            "Butin — en direct",
+            self._url,
+            width=OVERLAY_WIDTH,
+            height=OVERLAY_HEIGHT,
+            frameless=True,
+            on_top=True,
+            transparent=True,
+            easy_drag=True,
+        )
+
+    def close(self) -> None:
+        fenetre, self._window = self._window, None
+        if fenetre is None:
+            return
+        try:
+            fenetre.destroy()
+        except Exception as exc:
+            # Fermer une fenêtre déjà partie n'est pas une panne : l'utilisateur
+            # a pu la refermer lui-même. Le dire au journal suffit.
+            _log.debug("fenêtre en surimpression déjà fermée : %s", exc)
 
 
 def build_state(store: SessionStore | None = None) -> AppState:
@@ -65,6 +115,15 @@ def build_state(store: SessionStore | None = None) -> AppState:
     consultable. En revanche la capture, elle, refusera de démarrer sans lui,
     parce qu'elle ne pourrait rien reconnaître.
     """
+    # Avant toute ouverture de base : une installation antérieure écrivait
+    # ailleurs, et sans ce déménagement la mise à jour ferait disparaître
+    # l'historique. Les fichiers seraient toujours là, mais le programme
+    # regarderait ailleurs, ce qui du point de vue de la personne revient au
+    # même.
+    ancien = paths.migrate_legacy()
+    if ancien is not None:
+        _log.info("données reprises depuis %s", ancien)
+
     try:
         catalog: ItemCatalog | None = ItemCatalog.load()
     except Exception as exc:
@@ -94,6 +153,11 @@ def run(
     state = state or build_state(store)
     serveur = build_server(state, port=port)
     adresse = f"http://127.0.0.1:{serveur.server_address[1]}/"
+    if state.overlay is None and window is None:
+        # Seulement pour la vraie fenêtre : un test qui injecte son ouverture
+        # n'a pas de couche graphique, et lui coller un panneau qui appelle
+        # webview le ferait échouer là où il ne mesure rien de tel.
+        state.overlay = Overlay(adresse + "overlay")
 
     fil = threading.Thread(target=serveur.serve_forever, daemon=True, name="butin-ui")
     fil.start()
