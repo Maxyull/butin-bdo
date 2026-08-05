@@ -39,7 +39,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "-v", "--verbeux", action="store_true", help="affiche les messages de diagnostic"
     )
 
-    commandes = parser.add_subparsers(dest="commande", required=True)
+    # Sans sous-commande, on ouvre l'application. C'est ce que fait un logiciel :
+    # on le lance, il s'ouvre. Les sous-commandes restent pour le diagnostic et
+    # pour une machine sans affichage.
+    commandes = parser.add_subparsers(dest="commande", required=False)
+
+    application = commandes.add_parser("app", help="ouvre la fenêtre de l'application")
+    application.add_argument(
+        "--port",
+        type=int,
+        default=0,
+        help="port du serveur local, 0 pour laisser le système en choisir un libre",
+    )
 
     catalogue = commandes.add_parser(
         "catalogue", help="état du catalogue d'objets et couverture française"
@@ -66,7 +77,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="ne mesure pas la largeur utile du texte, plus rapide mais zone trop large",
     )
 
-    interface = commandes.add_parser("interface", help="lance l'interface web locale")
+    interface = commandes.add_parser(
+        "interface", help="sert la même interface dans un navigateur, sans fenêtre"
+    )
     interface.add_argument(
         "--port", type=int, default=8771, help="port d'écoute sur la boucle locale"
     )
@@ -231,6 +244,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     try:
+        if args.commande in (None, "app"):
+            from .app import run
+
+            return run(port=getattr(args, "port", 0))
         if args.commande == "catalogue":
             return _commande_catalogue(args.rafraichir)
         if args.commande == "interface":
