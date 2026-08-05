@@ -53,6 +53,16 @@ dans [docs/versionnage.md](docs/versionnage.md).
   l'hôtel des ventes ne s'applique qu'aux objets vendables, jamais au butin
   vendu au marchand ni au silver ramassé. Les objets non valorisés et les prix
   périmés sont comptés et affichés à part.
+- **Le taux de taxe se règle enfin, et il tient d'un lancement à l'autre.** Le
+  calcul était juste depuis le début, mais personne ne pouvait dire au logiciel
+  ce qu'il possède : tout le monde était donc valorisé au taux **sans aucun
+  bonus**, soit 23 % de moins que ce que touche réellement un joueur avec
+  abonnement. Une erreur systématique, qui se répète à l'identique à chaque
+  session et qui ressemble à un farm pauvre. Trois cases dans les réglages —
+  abonnement, anneau de marchand, renommée familiale — et non un pourcentage à
+  saisir : le joueur sait s'il a un abonnement, il ne sait pas forcément que ça
+  fait 84,5 %. Les réglages (langue, région, profil de taxe) sont désormais
+  écrits dans `reglages.json`, à côté du calibrage.
 - **Le calibrage depuis l'interface.** Il n'y a plus rien à taper : un bouton
   **Calibrer la zone** avec un décompte de cinq secondes pour basculer dans le
   jeu, et la page affiche **les lignes qu'elle a lues** dans la zone retenue.

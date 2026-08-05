@@ -120,6 +120,11 @@
                    border: 1px solid #4a3d20; background: #1e1a10; color: #e8c876;
                    font-size: 13px; }
   .vide { color: var(--doux); padding: 26px 0; text-align: center; }
+
+  label.case { display: flex; align-items: center; gap: 8px; font-size: 14px;
+               color: var(--texte); cursor: pointer; }
+  label.case input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--or);
+                                    cursor: pointer; }
 </style>
 </head>
 <body>
@@ -179,6 +184,25 @@
     <button class="action" id="bouton-dossier">Changer</button>
   </div>
   <div id="etat-dossier" style="margin-top:8px;color:var(--doux);font-size:13px"></div>
+</div>
+
+<div class="panneau" style="margin-bottom:18px">
+  <div class="etiquette" style="margin-bottom:8px">Taxe de l'hôtel des ventes</div>
+  <!--
+    Des cases à cocher et non un pourcentage : le joueur sait s'il a un
+    abonnement, il ne sait pas forcément que ça fait 84,5 %. Lui demander le
+    taux reviendrait à lui demander de faire le calcul, donc de se tromper.
+  -->
+  <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+    <label class="case"><input id="abonnement" type="checkbox"> Abonnement</label>
+    <label class="case"><input id="anneau-marchand" type="checkbox"> Anneau de marchand</label>
+    <label class="case">Renommée familiale
+      <input id="renommee" type="number" min="0" step="1"
+             style="width:110px;background:#0f1116;color:var(--texte);
+                    border:1px solid #2a2e39;border-radius:8px;padding:7px 9px;
+                    font:inherit;font-size:14px"></label>
+  </div>
+  <div id="etat-taxe" style="margin-top:10px;color:var(--doux);font-size:13px"></div>
 </div>
 
 <div class="panneau" style="margin-bottom:18px">
@@ -361,6 +385,8 @@ function afficher(etat) {
       bouton.setAttribute("aria-pressed", String(bouton.dataset.valeur === valeur));
     }
   }
+
+  afficherLaTaxe(etat.reglages);
 
   const stats = etat.stats;
   $("par-heure").textContent = nombre(stats ? stats.par_heure : 0);
@@ -551,6 +577,52 @@ $("bouton-calibrer").addEventListener("click", async () => {
 
 brancherBascule("langue", "langue");
 brancherBascule("region", "region");
+
+// -- profil de taxe ---------------------------------------------------------
+//
+// Le taux affiché est celui que le serveur RENVOIE, jamais un calcul refait
+// ici. Deux formules pour un même chiffre finiraient par diverger, et c'est le
+// chiffre sur lequel tout le logiciel est jugé.
+
+function afficherLaTaxe(reglages) {
+  const taxe = reglages && reglages.taxe;
+  if (!taxe) return;
+  // Les cases sont replacées sans condition, même si elles ont le focus : ce
+  // qu'on affiche est ce que le serveur confirme, pas ce qu'on vient de
+  // cliquer. Une case cochée que le serveur aurait refusée doit se décocher
+  // toute seule.
+  $("abonnement").checked = taxe.abonnement;
+  $("anneau-marchand").checked = taxe.anneau_marchand;
+  // Le champ de saisie, lui, est protégé : le rafraîchissement d'une seconde
+  // replacerait le curseur au début à chaque chiffre tapé.
+  if (document.activeElement !== $("renommee")) $("renommee").value = taxe.renommee;
+
+  const taux = reglages.taux_marche;
+  $("etat-taxe").textContent =
+    "Tu touches " + (taux * 100).toFixed(3).replace(/\.?0+$/, "").replace(".", ",") +
+    " % du prix affiché. La taxe ne s'applique qu'au marché : le butin vendu au " +
+    "marchand et le silver ramassé n'en paient pas.";
+}
+
+async function envoyerLaTaxe() {
+  // Les trois champs partent ensemble : le serveur est la source de vérité et
+  // renvoie l'état complet, donc envoyer le tout évite qu'une case cliquée
+  // pendant une requête en cours se fasse écraser par la réponse de l'autre.
+  const renommee = Number.parseInt($("renommee").value, 10);
+  afficher(await poster("/api/reglages", {
+    taxe: {
+      abonnement: $("abonnement").checked,
+      anneau_marchand: $("anneau-marchand").checked,
+      renommee: Number.isFinite(renommee) && renommee >= 0 ? renommee : 0,
+    },
+  }));
+}
+
+$("abonnement").addEventListener("change", envoyerLaTaxe);
+$("anneau-marchand").addEventListener("change", envoyerLaTaxe);
+// « change » et non « input » : sur un champ numérique, « input » enverrait une
+// requête par chiffre tapé, et « 11 » partirait avant « 11952 ».
+$("renommee").addEventListener("change", envoyerLaTaxe);
 
 function basculer(page) {
   const surSession = page === "session";

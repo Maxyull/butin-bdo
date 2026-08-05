@@ -55,6 +55,16 @@ class TestEmplacementParDefaut:
 
         assert paths.storage_root() == tmp_path / "data"
 
+    def test_les_reglages_suivent_les_donnees_et_non_le_cache(self) -> None:
+        """Le profil de taxe décrit le COMPTE de jeu, ça ne se retélécharge pas.
+
+        Dans le cache, il disparaîtrait au premier nettoyage et le silver par
+        heure retomberait au taux sans bonus sans que rien ne le dise. Rangé
+        avec le calibrage, il suit le dossier de sessions.
+        """
+        assert paths.settings_path().parent == paths.data_dir()
+        assert paths.settings_path().parent == paths.calibration_path().parent
+
 
 class TestChoixDeL_utilisateur:
     def test_le_dossier_choisi_est_retenu(self, sans_redirection: Path) -> None:
