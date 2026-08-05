@@ -163,6 +163,16 @@ dans [docs/versionnage.md](docs/versionnage.md).
 
 ### Corrigé
 
+- ⭐ **Le calibrage se fait sur plusieurs images, pas une seule.** Mesuré sur une
+  vraie session : la largeur trouvée variait de 468 à 542 px d'une image à
+  l'autre, et trois calibrages successifs d'un joueur qui n'avait rien touché
+  ont rendu 476, 560 puis 731 px pour la même fenêtre de chat. Ce n'était pas
+  cosmétique : une zone une fois et demie trop large ralentit la reconnaissance
+  pendant **toute la session** (1 439 ms contre 846 pour lire exactement les
+  mêmes lignes), donc le compteur rate des lignes sans que rien ne le dise. Le
+  calibrage prend désormais cinq images espacées et retient la **médiane** de
+  chaque bord, qui écarte une mesure aberrante au lieu de s'y laisser tirer par
+  une moyenne. Une image où le chat est masqué est ignorée plutôt que fatale.
 - ⭐⭐ **Le compteur créditait le journal DÉJÀ À L'ÉCRAN au démarrage**, donc il
   **inventait des drops** — l'erreur que ce projet refuse avant toute autre.
   Trouvé au premier vrai farm, le 05/08/2026, et prouvé sur 600 images de

@@ -72,8 +72,10 @@ nom tronqué est un drop perdu en silence.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from statistics import median
 from typing import Any, Protocol
 
 import numpy as np
@@ -543,3 +545,91 @@ def measure_width(
         rows=calibration.rows,
         strength=calibration.strength,
     )
+
+
+CALIBRATION_FRAMES = 5
+"""Images prises pour un calibrage.
+
+⭐ Une seule ne suffit pas, et c'est mesuré. Sur sept images d'une vraie session
+de farm, la largeur trouvée allait de **468 à 542 px**, soit 16 % d'écart, et
+les trois calibrages successifs d'un vrai joueur ont rendu 476, 560 puis
+**731 px** pour la même fenêtre de chat qu'il n'avait pas touchée.
+
+Ce n'est pas cosmétique : la largeur décide du coût de la reconnaissance, et une
+zone 1,5 fois trop large la ralentit d'autant **pendant toute la session**, en
+silence. Le compteur rate alors des lignes sans que rien ne le dise.
+
+Cinq images, parce que le calibrage est une opération unique : il peut payer
+quelques secondes là où la boucle ne le peut pas.
+"""
+
+
+def combine(calibrations: Sequence[Calibration]) -> Calibration:
+    """Fusionne plusieurs calibrages en un seul, robuste à l'image ratée.
+
+    **La médiane de chaque bord**, et non une moyenne ni le meilleur score. Une
+    moyenne se laisse tirer par une seule mesure aberrante, or c'est exactement
+    ce contre quoi on se protège : une image prise pendant que le chat s'estompe
+    donne une zone franchement fausse, pas un peu fausse.
+
+    Bord par bord plutôt qu'un choix parmi les mesures : les quatre bords se
+    trompent indépendamment, et prendre la mesure « la plus centrale » garderait
+    l'erreur de ses autres bords.
+
+    Le pas vertical et la force restent la médiane des mesures : le premier est
+    remarquablement stable (21,7 px sur les sept images mesurées), la seconde
+    n'est qu'un indicateur de confiance affiché.
+    """
+    if not calibrations:
+        raise CalibrationError("aucun calibrage à fusionner")
+
+    def milieu(valeurs: Sequence[float]) -> float:
+        return float(median(valeurs))
+
+    gauche = int(milieu([c.region.left for c in calibrations]))
+    haut = int(milieu([c.region.top for c in calibrations]))
+    droite = int(milieu([c.region.left + c.region.width for c in calibrations]))
+    bas = int(milieu([c.region.top + c.region.height for c in calibrations]))
+
+    # `ruler_*` sont des fractions de la largeur : les reprendre telles quelles
+    # sur une largeur différente déplacerait la bande de mesure. On les ramène
+    # donc en pixels sur la médiane, puis on refait la fraction.
+    largeur = max(1, droite - gauche)
+    ruler_gauche = milieu([c.ruler_left_ratio * c.region.width for c in calibrations]) / largeur
+    ruler_droite = milieu([c.ruler_right_ratio * c.region.width for c in calibrations]) / largeur
+
+    return Calibration(
+        region=Region(left=gauche, top=haut, width=largeur, height=max(1, bas - haut)),
+        row_height_px=milieu([c.row_height_px for c in calibrations]),
+        ruler_left_ratio=min(0.9, max(0.0, ruler_gauche)),
+        ruler_right_ratio=min(1.0, max(ruler_gauche + 0.05, ruler_droite)),
+        rows=int(milieu([c.rows for c in calibrations])),
+        strength=milieu([c.strength for c in calibrations]),
+    )
+
+
+def calibrate_frames(
+    frames: Sequence[GrayImage],
+    reader: BoxSource,
+    *,
+    origin: tuple[int, int] = (0, 0),
+) -> Calibration:
+    """Calibre sur plusieurs images et rend la zone médiane.
+
+    Une image sur laquelle la détection échoue est **ignorée**, pas fatale : le
+    chat s'estompe, un effet du jeu passe devant, et une image ratée sur cinq ne
+    doit pas empêcher de calibrer. En revanche, si aucune ne donne de zone, on
+    lève avec le motif de la dernière — refuser en disant pourquoi vaut mieux
+    que de rendre une zone au hasard, qui donnerait un journal vide en silence.
+    """
+    zones: list[Calibration] = []
+    dernier: CalibrationError | None = None
+    for image in frames:
+        try:
+            trouve = find_chat(image, origin=origin)
+            zones.append(measure_width(image, trouve, reader))
+        except CalibrationError as exc:
+            dernier = exc
+    if not zones:
+        raise dernier or CalibrationError("aucune image exploitable pour le calibrage")
+    return combine(zones)

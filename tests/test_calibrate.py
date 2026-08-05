@@ -21,6 +21,8 @@ from butin.capture.calibrate import (
     MIN_ROWS,
     Calibration,
     CalibrationError,
+    calibrate_frames,
+    combine,
     find_chat,
     measure_width,
 )
@@ -324,3 +326,91 @@ class TestBranchementSurLaBoucle:
 
         assert reglage.min_sightings == 4
         assert reglage.ocr_min_interval_s == 1.5
+
+
+class TestPlusieursImages:
+    """⭐ Un calibrage sur UNE image n'est pas reproductible, et ça se paie cher.
+
+    Mesuré le 05/08/2026 sur une vraie session de farm : la largeur trouvée
+    allait de **468 à 542 px** d'une image à l'autre, et trois calibrages
+    successifs d'un joueur qui n'avait **rien touché** ont rendu 476, 560 puis
+    **731 px** pour la même fenêtre de chat.
+
+    Ce n'est pas cosmétique. La largeur décide du coût de la reconnaissance :
+    mesuré sur ses images, 731 px coûte 1 439 ms là où 420 px en coûte 846 pour
+    exactement les mêmes 23 lignes lues. Une zone une fois et demie trop large
+    ralentit donc la lecture **pendant toute la session**, et le compteur rate
+    des lignes sans que rien ne le signale.
+    """
+
+    @staticmethod
+    def _zone(largeur: int, *, gauche: int = 62, haut: int = 775, hauteur: int = 506):
+        return Calibration(
+            region=Region(left=gauche, top=haut, width=largeur, height=hauteur),
+            row_height_px=21.7,
+            ruler_left_ratio=0.07,
+            ruler_right_ratio=1.0,
+            rows=23,
+            strength=0.8,
+        )
+
+    def test_la_mediane_ecarte_la_mesure_aberrante(self) -> None:
+        """Les cinq largeurs réellement mesurées sur les images 250 à 254.
+
+        Quatre s'accordent à 475-478, la cinquième saute à 540. Une moyenne
+        rendrait 489 et se laisserait tirer par l'intruse ; la médiane rend 476.
+        """
+        zones = [self._zone(largeur) for largeur in (476, 476, 475, 478, 540)]
+
+        assert combine(zones).region.width == 476
+
+    def test_une_seule_image_ratee_ne_decide_pas_du_cadrage(self) -> None:
+        """Le cas réel : une détection accrochée 50 px trop à gauche et 250 px
+        trop large. Seule, elle ferait payer 1,7× la reconnaissance."""
+        bonnes = [self._zone(475) for _ in range(4)]
+        aberrante = self._zone(731, gauche=11, haut=734)
+
+        fusion = combine([*bonnes, aberrante])
+
+        assert fusion.region.left == 62
+        assert fusion.region.width == 475
+
+    def test_la_bande_de_mesure_suit_le_changement_de_largeur(self) -> None:
+        """Régression : `ruler_*` sont des FRACTIONS de la largeur.
+
+        Les reprendre telles quelles sur une largeur médiane différente
+        déplacerait la bande où le défilement est mesuré, donc casserait la
+        seule mesure qui empêche de recompter une ligne.
+        """
+        zones = [self._zone(400), self._zone(500), self._zone(600)]
+
+        fusion = combine(zones)
+
+        assert fusion.region.width == 500
+        # 0,07 x 500 px, la même bande en pixels que sur chaque mesure.
+        assert fusion.ruler_left_ratio == pytest.approx(0.07, abs=0.005)
+        assert fusion.ruler_left_ratio < fusion.ruler_right_ratio <= 1.0
+
+    def test_fusionner_sans_rien_est_une_erreur_explicite(self) -> None:
+        with pytest.raises(CalibrationError):
+            combine([])
+
+    def test_une_image_ou_le_chat_est_masque_est_ignoree(self) -> None:
+        """Le chat s'estompe, un effet du jeu passe devant : une image ratée sur
+        cinq ne doit pas empêcher de calibrer."""
+        lecteur = TestLargeurMesureeParOcr._Lecteur([])
+        images = [_ecran_avec_chat(rangees=20, graine=k) for k in range(4)]
+        images.append(_decor(graine=99))
+
+        calibrage = calibrate_frames(images, lecteur)
+
+        assert calibrage.rows >= MIN_ROWS
+
+    def test_si_aucune_image_ne_montre_le_chat_on_refuse_en_disant_pourquoi(self) -> None:
+        """⚠️ Refuser vaut mieux que rendre une zone au hasard : un mauvais
+        cadrage donne un journal parfaitement vide, sans erreur, et le compteur
+        affiche zéro drop sans que rien ne distingue ça d'un farm calme."""
+        lecteur = TestLargeurMesureeParOcr._Lecteur([])
+
+        with pytest.raises(CalibrationError):
+            calibrate_frames([_decor(graine=k) for k in range(3)], lecteur)
