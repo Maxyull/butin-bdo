@@ -39,6 +39,9 @@ def lancer(**kwargs: object) -> int:
     jobs : l'ordre décidait.
     """
     kwargs.setdefault("preload", lambda: 0)
+    # Même raison que le préchargement : sans ce défaut, chaque test lancerait
+    # une vraie requête réseau vers GitHub dans un fil qui survit au test.
+    kwargs.setdefault("check_update", lambda: None)
     return app.run(**kwargs)  # type: ignore[arg-type]
 
 
@@ -100,7 +103,7 @@ class TestPrechargementDesImages:
             # que le fil de fond travaille, dans l'application comme ici.
             appele.wait(timeout=3.0)
 
-        app.run(store=store, window=fenetre, preload=appele.set)
+        app.run(store=store, window=fenetre, preload=appele.set, check_update=lambda: None)
 
         assert appele.is_set()
 
@@ -120,10 +123,39 @@ class TestPrechargementDesImages:
             libere.wait(timeout=3.0)
             return 0
 
-        app.run(store=store, window=fenetre, preload=prechargement)
+        app.run(store=store, window=fenetre, preload=prechargement, check_update=lambda: None)
         libere.set()
 
         assert ouverte.is_set(), "la fenêtre a attendu le préchargement"
+
+
+class TestVerificationDeMiseAJour:
+    def test_elle_est_lancee_au_demarrage(self, store: SessionStore) -> None:
+        appele = threading.Event()
+
+        def fenetre(url: str) -> None:
+            appele.wait(timeout=3.0)
+
+        app.run(store=store, window=fenetre, preload=lambda: 0, check_update=appele.set)
+
+        assert appele.is_set()
+
+    def test_elle_ne_bloque_pas_l_ouverture_de_la_fenetre(self, store: SessionStore) -> None:
+        """Même piège que le préchargement des images : un aller-retour réseau
+        au premier plan ferait attendre le joueur devant un écran vide."""
+        ouverte = threading.Event()
+        libere = threading.Event()
+
+        def fenetre(url: str) -> None:
+            ouverte.set()
+
+        def verification() -> None:
+            libere.wait(timeout=3.0)
+
+        app.run(store=store, window=fenetre, preload=lambda: 0, check_update=verification)
+        libere.set()
+
+        assert ouverte.is_set(), "la fenêtre a attendu la vérification de mise à jour"
 
 
 class TestFermeture:

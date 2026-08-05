@@ -35,6 +35,15 @@
                letter-spacing: .8px; margin-bottom: 6px; }
   .or { color: var(--or); }
 
+  /* Bandeau de mise à jour : une notification, jamais un blocage. Il informe
+     et laisse l'utilisateur cliquer, il ne l'empêche de rien faire d'autre.
+     Voir update.py pour pourquoi ce n'est jamais automatique. */
+  .bandeau-maj { display: block; margin-bottom: 18px; padding: 10px 14px;
+                 border: 1px solid var(--or); border-radius: 8px;
+                 background: rgba(212, 169, 85, .08); color: var(--or);
+                 text-decoration: none; font-size: 14px; }
+  .bandeau-maj:hover { background: rgba(212, 169, 85, .16); }
+
   /* Les deux sliders. Un vrai interrupteur a deux positions, pas une liste
      deroulante : le choix est binaire et doit se voir sans ouvrir quoi que ce soit. */
   .sliders { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -139,6 +148,8 @@
 </style>
 </head>
 <body>
+
+<a class="bandeau-maj" id="bandeau-maj" hidden target="_blank" rel="noopener"></a>
 
 <div class="haut">
   <h1>Butin <span id="version">suivi de butin, Black Desert Online</span></h1>
@@ -416,8 +427,21 @@ const LIBELLES = {
   inconnu: ["Inconnu", "inconnu"],
 };
 
+function afficherLaMiseAJour(maj) {
+  const bandeau = $("bandeau-maj");
+  if (!maj || !maj.disponible) {
+    bandeau.hidden = true;
+    return;
+  }
+  bandeau.textContent = "Nouvelle version disponible : " + maj.version + " — cliquer pour l'obtenir";
+  bandeau.href = maj.url;
+  bandeau.hidden = false;
+}
+
 function afficher(etat) {
   if (!etat) return;
+
+  afficherLaMiseAJour(etat.maj);
 
   for (const [id, champ] of [["langue", "langue"], ["region", "region"]]) {
     const valeur = etat.reglages ? etat.reglages[champ] : null;
