@@ -36,6 +36,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from .. import paths
+
 _log = logging.getLogger(__name__)
 
 # Sites faisant autorité. Une entrée doit citer au moins l'un des deux.
@@ -153,5 +155,10 @@ def audit_sources(overrides: Mapping[int, VerifiedName]) -> list[VerifiedName]:
 
 
 def default_path() -> Path:
-    """Emplacement du fichier de noms vérifiés livré avec le projet."""
-    return Path(__file__).resolve().parents[3] / "data" / "noms-verifies.json"
+    """Emplacement du fichier de noms vérifiés livré avec le projet.
+
+    Voir `paths.bundled_data_dir` : ce n'est pas un `Path(__file__)` codé en
+    dur, parce que ce calcul se casse silencieusement dans une application
+    figée par PyInstaller.
+    """
+    return paths.bundled_data_dir() / "noms-verifies.json"

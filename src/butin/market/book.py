@@ -34,6 +34,7 @@ import logging
 import time
 from pathlib import Path
 
+from .. import paths
 from .client import (
     FRESH_FOR_S,
     MarketClient,
@@ -47,8 +48,13 @@ _log = logging.getLogger(__name__)
 
 
 def default_vendor_path() -> Path:
-    """Emplacement de la liste de butin livrée avec le projet."""
-    return Path(__file__).resolve().parents[3] / "data" / "butin-connu.json"
+    """Emplacement de la liste de butin livrée avec le projet.
+
+    Voir `paths.bundled_data_dir` : ce n'est pas un `Path(__file__)` codé en
+    dur, parce que ce calcul se casse silencieusement dans une application
+    figée par PyInstaller.
+    """
+    return paths.bundled_data_dir() / "butin-connu.json"
 
 
 def load_vendor_values(path: Path | None = None) -> dict[int, dict[str, int]]:
