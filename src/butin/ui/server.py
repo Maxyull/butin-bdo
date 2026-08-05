@@ -40,6 +40,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import ItemCatalog, ItemMatcher
 from ..market import PriceBook, Region
@@ -105,6 +106,15 @@ class AppState:
             langue = self.language
 
         capture = self.worker.status().to_dict() if self.worker is not None else None
+        # L'état du calibrage se lit à chaque rafraîchissement plutôt que d'être
+        # gardé en mémoire : le fichier peut être supprimé ou refait pendant que
+        # la page est ouverte, et afficher « calibré » sur un fichier disparu
+        # renverrait l'utilisateur vers la mauvaise cause quand rien ne compte.
+        try:
+            calibrage = Calibration.load()
+        except ValueError:
+            calibrage = None
+        reglages["calibrage"] = calibrage.describe() if calibrage is not None else ""
 
         if session_id is None:
             return {
@@ -206,6 +216,42 @@ class AppState:
             taux = data.get("taux_marche")
             if isinstance(taux, (int, float)) and 0 < float(taux) <= 1:
                 self.market_rate = float(taux)
+
+    def calibrate(self, *, monitor: int = 1) -> dict[str, Any]:
+        """Cherche la fenêtre de chat et enregistre la zone. Rend ce qu'elle contient.
+
+        ⚠️ Rend un **extrait de ce qui a été lu**, et pas seulement « c'est
+        calibré ». La détection cherche ce qui se répète verticalement ; elle ne
+        sait pas d'où vient l'image. Un essai réel a calibré très proprement sur
+        une capture du chat ouverte dans une visionneuse : tout était juste sauf
+        que ce n'était pas le jeu. Personne ne confond les deux quand les lignes
+        lues sont sous ses yeux.
+        """
+        from ..capture.calibrate import find_chat, measure_width
+        from ..capture.lines import parse_frame
+        from ..capture.ocr import TextReader
+        from ..capture.screen import ScreenCapture
+
+        with ScreenCapture(monitor=monitor) as capture:
+            ecran = capture.target_monitor()
+            image = capture.grab(ecran)
+
+        calibrage = find_chat(image, origin=(ecran.left, ecran.top))
+        lecteur = TextReader()
+        calibrage = measure_width(image, calibrage, lecteur)
+        calibrage.save()
+
+        zone = calibrage.region
+        rangees = lecteur.read_text(image[zone.top : zone.bottom, zone.left : zone.right])
+        gains = 0
+        if self.catalog is not None:
+            gains = len(parse_frame(list(rangees), ItemMatcher(self.catalog)))
+        return {
+            "zone": calibrage.describe(),
+            "rangees": calibrage.rows,
+            "extrait": [ligne[:90] for ligne in rangees[:4]],
+            "gains": gains,
+        }
 
     def start(self, spot: str, *, now: float | None = None) -> int:
         """Ouvre une session et lance la capture. Rien de tout ça sans l'autre.
@@ -328,6 +374,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"erreur": str(exc)}, status=409)
                 return
             self._send_json(self.state.snapshot())
+        elif self.path == "/api/calibrer":
+            try:
+                self._send_json(self.state.calibrate())
+            except CalibrationError as exc:
+                # 409 comme le refus de démarrer : ce n'est pas une panne du
+                # serveur, c'est une condition que l'utilisateur peut lever.
+                self._send_json({"erreur": str(exc)}, status=409)
         elif self.path == "/api/session/arreter":
             self.state.stop()
             self._send_json(self.state.snapshot())

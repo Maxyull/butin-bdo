@@ -119,8 +119,13 @@
 
 <div class="panneau" style="margin-bottom:18px">
   <button class="action demarrer" id="bouton-session">Démarrer une session</button>
+  <button class="action" id="bouton-calibrer">Calibrer la zone</button>
   <span id="etat-session" style="margin-left:14px;color:var(--doux)">Aucune session en cours</span>
   <div id="etat-capture" style="margin-top:10px;color:var(--doux);font-size:14px"></div>
+  <div id="etat-calibrage" style="margin-top:8px;color:var(--doux);font-size:14px"></div>
+  <pre id="extrait-calibrage" style="margin-top:8px;display:none;white-space:pre-wrap;
+       background:#0f1116;border:1px solid #2a2e39;border-radius:8px;padding:10px;
+       font-size:13px;color:var(--doux)"></pre>
 </div>
 
 <div class="panneau">
@@ -229,6 +234,11 @@ function afficher(etat) {
     ligneCapture.textContent = "";
   }
 
+  const calibrage = etat.reglages ? etat.reglages.calibrage : "";
+  $("etat-calibrage").textContent = calibrage
+    ? "Zone calibrée : " + calibrage
+    : "Zone non calibrée — la capture ne peut pas démarrer.";
+
   const corps = $("butin");
   corps.innerHTML = "";
   for (const ligne of etat.butin || []) {
@@ -302,6 +312,53 @@ $("bouton-session").addEventListener("click", async () => {
     return;
   }
   afficher(corps);
+});
+
+$("bouton-calibrer").addEventListener("click", async () => {
+  const bouton = $("bouton-calibrer");
+  const ligne = $("etat-calibrage");
+  const extrait = $("extrait-calibrage");
+  bouton.disabled = true;
+  extrait.style.display = "none";
+
+  // Le décompte est affiché ici plutôt que côté serveur : la requête reste
+  // courte, et l'utilisateur voit combien de temps il lui reste pour basculer
+  // dans le jeu. Une requête de sept secondes ressemblerait à un blocage.
+  for (let reste = 5; reste > 0; reste--) {
+    ligne.textContent = "Bascule dans le jeu, journal d'acquisition visible… " + reste;
+    await new Promise((suite) => setTimeout(suite, 1000));
+  }
+  ligne.textContent = "Recherche de la fenêtre de chat…";
+
+  try {
+    const reponse = await fetch("/api/calibrer", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: "{}",
+    });
+    const corps = await reponse.json();
+    if (!reponse.ok) {
+      ligne.className = "avertissement";
+      ligne.textContent = corps.erreur || "calibrage impossible";
+      return;
+    }
+    ligne.className = "";
+    ligne.textContent = "Zone calibrée : " + corps.zone;
+    // Montrer ce qui a été lu, et pas seulement « c'est calibré » : la
+    // détection ne sait pas d'où vient l'image, et un essai réel a calibré
+    // proprement sur une capture du chat ouverte dans une visionneuse.
+    extrait.style.display = "block";
+    extrait.textContent =
+      (corps.gains
+        ? corps.gains + " lignes de gain reconnues. Vérifie que c'est bien ton chat :"
+        : "AUCUNE ligne de journal dans cette zone. Si ce n'est pas ton chat, recommence :") +
+      "
+" + (corps.extrait.length ? corps.extrait.join("
+") : "(aucun texte lu)");
+    afficher(await (await fetch("/api/etat")).json());
+  } finally {
+    bouton.disabled = false;
+  }
 });
 
 brancherBascule("langue", "langue");

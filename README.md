@@ -112,23 +112,22 @@ butin catalogue
 Télécharge et vérifie le catalogue d'objets français. À faire une fois.
 
 ```bash
-butin calibrer
-```
-
-Trouve la fenêtre de chat sur votre écran, le pas vertical entre deux lignes et
-la bande où mesurer le défilement. Lancez-la, revenez dans le jeu, laissez le
-journal d'acquisition visible : la capture arrive cinq secondes plus tard.
-
-Si le chat n'est pas trouvé, la commande le dit et n'enregistre rien, plutôt que
-de retenir une zone au hasard qui donnerait un journal vide.
-
-```bash
 butin interface
 ```
 
-Ouvre l'interface locale sur `http://127.0.0.1:8771`. Le bouton **Démarrer une
-session** lance la capture ; la page affiche ce qu'elle compte, et ce qu'elle
-rate.
+Ouvre l'interface locale sur `http://127.0.0.1:8771`. **Tout le reste s'y
+fait**, il n'y a plus rien à taper :
+
+- **Calibrer la zone** cherche la fenêtre de chat sur votre écran, le pas
+  vertical entre deux lignes et la bande où mesurer le défilement. Un décompte
+  de cinq secondes vous laisse basculer dans le jeu, journal d'acquisition
+  visible. La page affiche ensuite **les lignes qu'elle a lues**, pour que vous
+  vérifiiez qu'elle regarde bien votre chat ;
+- **Démarrer une session** lance la capture. La page montre ce qu'elle compte,
+  et ce qu'elle rate : lectures, drops, images écartées, lignes perdues.
+
+Le calibrage reste disponible en ligne de commande, `butin calibrer`, pour
+diagnostiquer sans navigateur.
 
 ## État d'avancement
 
