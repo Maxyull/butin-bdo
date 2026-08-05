@@ -52,6 +52,12 @@ from .loop import CaptureLoop, LoopConfig, config_from_calibration
 _log = logging.getLogger(__name__)
 
 
+def _minute_du_jour() -> int:
+    """Minute du jour à l'heure locale, celle qu'affiche le journal du jeu."""
+    maintenant = time.localtime()
+    return maintenant.tm_hour * 60 + maintenant.tm_min
+
+
 class CaptureUnavailable(RuntimeError):
     """La capture ne peut pas démarrer, et on dit pourquoi.
 
@@ -139,6 +145,7 @@ class CaptureWorker:
         calibration_loader: Callable[[], Calibration | None] = Calibration.load,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        clock_of_day: Callable[[], int] | None = None,
     ) -> None:
         self._store = store
         self._matcher = matcher
@@ -149,6 +156,12 @@ class CaptureWorker:
         self._calibration_loader = calibration_loader
         self._clock = clock
         self._sleep = sleep
+        self._clock_of_day = clock_of_day or _minute_du_jour
+        """Minute du jour, à l'heure LOCALE. Injectable pour les tests, qui ne
+        peuvent pas dépendre de l'heure qu'il est quand ils tournent.
+
+        ⚠️ Heure locale et non UTC : c'est celle que le client du jeu affiche
+        dans son journal, et c'est à elle qu'on compare."""
 
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -225,7 +238,10 @@ class CaptureWorker:
             )
 
         reglage = config_from_calibration(calibrage, self._config)
-        boucle = self._construire(calibrage, reglage)
+        # ⭐ L'heure du DÉMARRAGE, relue à chaque appel, reprise comprise. Sur
+        # une reprise c'est même exactement ce qu'il faut : tout ce qui date
+        # d'avant la pause est déjà compté, et le refuser évite de le recompter.
+        boucle = self._construire(calibrage, reglage, self._clock_of_day())
         self._recorder = SessionRecorder(boucle, self._store, session_id)
         self._compteurs = _Compteurs()
         self._stop.clear()
@@ -291,7 +307,9 @@ class CaptureWorker:
 
     # -- interne ---------------------------------------------------------
 
-    def _construire(self, calibration: Calibration, config: LoopConfig) -> CaptureLoop:
+    def _construire(
+        self, calibration: Calibration, config: LoopConfig, session_start_min: int
+    ) -> CaptureLoop:
         if self._loop_factory is not None:
             return self._loop_factory(calibration, config)
 
@@ -315,6 +333,7 @@ class CaptureWorker:
             config=config,
             fmt=self._fmt,
             scope=self._scope,
+            session_start_min=session_start_min,
         )
 
     def _tourner(self, interval_s: float) -> None:

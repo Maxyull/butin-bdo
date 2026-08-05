@@ -173,7 +173,130 @@ class TestAmorce:
         assert boucle.flush() == []
 
 
-class TestDefilementAccumule:
+class TestJournalPerime:
+    """⭐ LE défaut trouvé au premier vrai farm, le 05/08/2026.
+
+    Ce qui s'est passé, relevé sur 600 images de Thornwood Forest :
+
+    * l'image 0 rend **0 ligne** — le chat était estompé et réapparaissait ;
+    * l'amorce s'est donc faite sur une lecture **partielle**, 4 lignes ;
+    * les quatre alignements suivants ont rendu **recouvrement 0** contre ces
+      4 lignes, donc **23 lignes déclarées neuves**, quatre fois de suite ;
+    * ces 23 lignes dataient de **16:40 à 17:14**, la session ayant commencé à
+      **17:19**. Trente-neuf minutes de butin déjà ramassé, recompté.
+
+    Le compteur a ainsi inventé cinq objets que le joueur n'avait pas eus.
+    Mesuré sur la rafale : 104 drops / 305 unités sans le filtre, 96 / 253 avec,
+    et zéro objet fantôme.
+
+    ⚠️ L'amorce ne suffit pas et ne pouvait pas suffire : elle suppose que la
+    première lecture montre la fenêtre entière. Le filtre sur l'heure ne suppose
+    rien, il lit ce que le jeu écrit.
+    """
+
+    DEPART = 17 * 60 + 19
+
+    @staticmethod
+    def _ligne(nom: str, heure: str, qty: int = 1) -> str:
+        suffixe = f" x{qty}" if qty > 1 else "."
+        return f"Système Vous avez obtenu : [{nom}]{suffixe} ({heure})"
+
+    def test_le_vieux_journal_n_est_pas_compte_meme_sans_amorce_utile(
+        self, matcher: ItemMatcher
+    ) -> None:
+        """Le scénario réel, reproduit : amorce sur une lecture partielle, puis
+        la fenêtre entière du passé qui réapparaît."""
+        partielle = [self._ligne("Pierre noire (arme)", "17:19")]
+        ancienne = [
+            self._ligne("Trace de sauvagerie", "16:40"),
+            self._ligne("Fragment de mémoire", "17:07"),
+            self._ligne("Pierre de Caphras", "17:10"),
+            self._ligne("Pierre noire (arme)", "17:19"),
+        ]
+        source = SourceFactice()
+        lecteur = LecteurFactice([partielle] + [ancienne] * 8)
+        boucle = CaptureLoop(
+            source,
+            lecteur,
+            matcher,
+            REGION,
+            config=LoopConfig(min_sightings=2),
+            session_start_min=self.DEPART,
+        )
+
+        comptes: list[str] = []
+        for tour in range(9):
+            comptes += [e.item.name("fr") for e in boucle.tick(now=tour * 0.5).events]
+        comptes += [e.item.name("fr") for e in boucle.flush()]
+
+        assert "Trace de sauvagerie" not in comptes
+        assert "Fragment de mémoire" not in comptes
+        assert "Pierre de Caphras" not in comptes
+
+    def test_sans_le_filtre_le_meme_scenario_invente_des_drops(self, matcher: ItemMatcher) -> None:
+        """La contre-épreuve. Un garde-fou qui ne peut pas échouer ne garde rien.
+
+        Sans `session_start_min`, exactement le même enchaînement crédite le
+        butin du passé : c'est le comportement qu'on vient de corriger.
+        """
+        partielle = [self._ligne("Pierre noire (arme)", "17:19")]
+        ancienne = [
+            self._ligne("Trace de sauvagerie", "16:40"),
+            self._ligne("Fragment de mémoire", "17:07"),
+            self._ligne("Pierre de Caphras", "17:10"),
+            self._ligne("Pierre noire (arme)", "17:19"),
+        ]
+        _, _, boucle = construire([partielle] + [ancienne] * 8, matcher)
+
+        comptes: list[str] = []
+        for tour in range(9):
+            comptes += [e.item.name("fr") for e in boucle.tick(now=tour * 0.5).events]
+        comptes += [e.item.name("fr") for e in boucle.flush()]
+
+        assert "Trace de sauvagerie" in comptes, "le scénario ne reproduit plus le défaut"
+
+    def test_le_butin_du_farm_est_toujours_compte(self, matcher: ItemMatcher) -> None:
+        """⚠️ Le filtre ne doit pas manger ce qui tombe vraiment.
+
+        Une correction qui supprimerait le sur-comptage en cessant de compter
+        serait pire que le défaut : elle serait invisible.
+        """
+        depart = [self._ligne("Trace de sauvagerie", "16:40")]
+        apres = [
+            self._ligne("Trace de sauvagerie", "16:40"),
+            self._ligne("Pierre noire (arme)", "17:20"),
+            self._ligne("Fragment de mémoire", "17:20"),
+        ]
+        source = SourceFactice()
+        lecteur = LecteurFactice([depart] + [apres] * 8)
+        boucle = CaptureLoop(
+            source,
+            lecteur,
+            matcher,
+            REGION,
+            config=LoopConfig(min_sightings=2),
+            session_start_min=self.DEPART,
+        )
+
+        comptes: list[str] = []
+        for tour in range(9):
+            comptes += [e.item.name("fr") for e in boucle.tick(now=tour * 0.5).events]
+        comptes += [e.item.name("fr") for e in boucle.flush()]
+
+        assert "Pierre noire (arme)" in comptes
+        assert "Fragment de mémoire" in comptes
+        assert "Trace de sauvagerie" not in comptes
+
+    def test_sans_heure_de_depart_rien_n_est_filtre(self, matcher: ItemMatcher) -> None:
+        """Le banc d'essai rejoue des rafales dont il ignore l'heure de départ.
+
+        Il doit continuer de mesurer la boucle, et non ce filtre.
+        """
+        fenetre = [self._ligne("Trace de sauvagerie", "16:40")]
+        _, _, boucle = construire([fenetre] * 4, matcher)
+
+        assert boucle.session_start_min is None
+
     def test_le_defilement_s_accumule_entre_deux_lectures(self, matcher: ItemMatcher) -> None:
         """C'est le gain de finesse du découplage.
 

@@ -75,7 +75,7 @@ from ..tracking.scroll import (
 from ..tracking.similarity import MatchConfig
 from ..tracking.staging import LootStager
 from .calibrate import Calibration
-from .lines import DEFAULT_FORMAT, ChatLineFormat, parse_frame
+from .lines import DEFAULT_FORMAT, ChatLineFormat, ParsedLine, is_stale, parse_frame
 from .screen import GrayImage, Region
 
 
@@ -247,6 +247,7 @@ class CaptureLoop:
         config: LoopConfig | None = None,
         fmt: ChatLineFormat = DEFAULT_FORMAT,
         scope: Scope | None = None,
+        session_start_min: int | None = None,
     ) -> None:
         self.source = source
         self.reader = reader
@@ -255,6 +256,18 @@ class CaptureLoop:
         self.config = config or LoopConfig()
         self.fmt = fmt
         self.scope = scope
+        self.session_start_min = session_start_min
+        """Minute du jour où la session a commencé, ou None pour tout accepter.
+
+        ⭐ Sert à refuser le journal DÉJÀ À L'ÉCRAN au démarrage. Le chat garde
+        des dizaines de minutes de butin antérieur, et rien ne distingue « le
+        journal défile parce qu'il tombe du butin » de « le vieux journal
+        réapparaît ». Mesuré sur une vraie session : 39 minutes d'historique
+        affiché, et des drops inventés en conséquence.
+
+        None n'est pas un défaut : le banc d'essai rejoue des rafales dont on
+        ne connaît pas l'heure de départ, et il doit continuer de mesurer la
+        boucle et non ce filtre."""
 
         self.stager = LootStager(min_sightings=self.config.min_sightings)
         self.total_silver = 0
@@ -334,8 +347,14 @@ class CaptureLoop:
         # ont pu apparaître entre les deux images comparées.
         depuis = now - self._last_ocr_at if self._last_ocr_at is not None else 0.0
         self._last_ocr_at = now
-        parsed = parse_frame(
-            self.reader.read_text(image), self.matcher, fmt=self.fmt, scope=self.scope
+        # ⭐ Le vieux journal est retiré AVANT tout le reste, y compris avant
+        # l'amorce. L'amorce seule ne suffit pas : mesuré sur une vraie session,
+        # elle s'était faite sur une lecture partielle de 4 lignes pendant que
+        # le chat réapparaissait, et les lectures suivantes n'avaient donc plus
+        # aucun recouvrement avec elle. Les 23 lignes déjà à l'écran, vieilles
+        # de 39 minutes, sont alors passées pour neuves.
+        parsed = self._sans_le_vieux_journal(
+            parse_frame(self.reader.read_text(image), self.matcher, fmt=self.fmt, scope=self.scope)
         )
         current = [ligne.observed for ligne in parsed]
 
@@ -378,6 +397,22 @@ class CaptureLoop:
         silver = self.stager.drain_silver()
         self.total_silver += silver
         return TickResult(ocr_ran=True, events=evenements, silver=silver, expected_new=expected)
+
+    def _sans_le_vieux_journal(self, lignes: list[ParsedLine]) -> list[ParsedLine]:
+        """Retire les lignes datées d'avant le début de la session.
+
+        Le jeu horodate chaque ligne du journal. Une ligne de 16:40 pendant une
+        session ouverte à 17:19 n'est pas un drop, c'est de l'historique
+        affiché : aucune incertitude à trancher, le jeu le dit lui-même.
+
+        ⚠️ Le filtrage se fait sur `ParsedLine` et non sur `ObservedLine`, parce
+        que c'est la première qui porte l'heure. La seconde ne la connaît pas,
+        et la lui ajouter mêlerait le format du client français à une couche qui
+        en est aveugle.
+        """
+        if self.session_start_min is None:
+            return lignes
+        return [ligne for ligne in lignes if not is_stale(ligne.stamp, self.session_start_min)]
 
     def _expected_new(self, visible: int) -> int | None:
         """Convertit le défilement accumulé en nombre de lignes attendues.
