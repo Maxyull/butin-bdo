@@ -148,3 +148,31 @@ class TestRepriseD_uneAncienneInstallation:
         monkeypatch.setenv("BUTIN_HOME", str(tmp_path))
 
         assert paths.migrate_legacy() is None
+
+
+class TestDonneesLivreesAvecLeProjet:
+    """`data/butin-connu.json`, les noms vérifiés, les valeurs au marchand.
+
+    ⭐ Régression visée : `Path(__file__).resolve().parents[N]` se casse
+    silencieusement dans une application figée par PyInstaller, qui aplatit
+    tout sous `sys._MEIPASS`. Sans cette distinction, une installation figée
+    afficherait tous les objets sans zone de farm ni valeur au marchand, sans
+    la moindre erreur pour le dire.
+    """
+
+    def test_en_developpement_le_dossier_data_est_a_la_racine_du_depot(self) -> None:
+        dossier = paths.bundled_data_dir()
+
+        assert dossier.name == "data"
+        assert (dossier / "butin-connu.json").exists(), (
+            "le calcul ne pointe plus vers le vrai dossier data/ du dépôt"
+        )
+
+    def test_une_application_figee_cherche_sous_sys_meipass(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """`sys._MEIPASS` est l'attribut que PyInstaller pose sur `sys` au
+        démarrage d'une application figée. Absent en développement."""
+        monkeypatch.setattr(paths.sys, "_MEIPASS", str(tmp_path), raising=False)
+
+        assert paths.bundled_data_dir() == tmp_path / "data"

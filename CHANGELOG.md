@@ -163,6 +163,15 @@ dans [docs/versionnage.md](docs/versionnage.md).
 
 ### Corrigé
 
+- `Path(__file__).resolve().parents[3]` était utilisé à trois endroits
+  (`catalog/zones.py`, `catalog/overrides.py`, `market/book.py`) pour trouver
+  `data/butin-connu.json` et `data/noms-verifies.json`, en supposant que le
+  fichier source vit toujours dans un checkout du dépôt. Ce calcul se casse
+  **en silence** dans une application PyInstaller figée, qui aplatit tout sous
+  `sys._MEIPASS` : l'utilisateur verrait tous les objets sans zone de farm ni
+  valeur au marchand, sans la moindre erreur pour le dire. Centralisé dans
+  `paths.bundled_data_dir()`, qui détecte l'exécution figée et cherche au bon
+  endroit dans les deux cas. Première pierre d'un installeur.
 - ⭐ **Le calibrage se fait sur plusieurs images, pas une seule.** Mesuré sur une
   vraie session : la largeur trouvée variait de 468 à 542 px d'une image à
   l'autre, et trois calibrages successifs d'un joueur qui n'avait rien touché

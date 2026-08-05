@@ -43,12 +43,19 @@ import logging
 from collections.abc import Iterable
 from pathlib import Path
 
+from .. import paths
+
 _log = logging.getLogger(__name__)
 
 
 def default_path() -> Path:
-    """Fichier de butin connu livré avec le projet."""
-    return Path(__file__).resolve().parents[3] / "data" / "butin-connu.json"
+    """Fichier de butin connu livré avec le projet.
+
+    Voir `paths.bundled_data_dir` : ce n'est pas un `Path(__file__)` codé en
+    dur, parce que ce calcul se casse silencieusement dans une application
+    figée par PyInstaller.
+    """
+    return paths.bundled_data_dir() / "butin-connu.json"
 
 
 def load_zones(path: Path | None = None) -> dict[int, tuple[str, ...]]:

@@ -39,6 +39,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from platformdirs import user_cache_path, user_data_path, user_documents_path
@@ -162,6 +163,29 @@ def migrate_legacy() -> Path | None:
         shutil.move(str(ancien / fichier), str(nouveau / fichier))
     _log.info("données déplacées de %s vers %s : %s", ancien, nouveau, ", ".join(a_deplacer))
     return ancien
+
+
+def bundled_data_dir() -> Path:
+    """Dossier `data/` livré AVEC le projet : butin connu, noms vérifiés,
+    valeurs au marchand. Lecture seule, jamais écrit par le programme — c'est
+    une donnée du dépôt, pas un état de l'utilisateur, à ne pas confondre avec
+    `data_dir()` ci-dessous.
+
+    ⚠️ Deux dispositions coexistent, et c'est voulu. En développement (checkout
+    git), ce dossier vit à la racine du dépôt, trois niveaux au-dessus de ce
+    fichier. Dans une application PyInstaller figée, il n'y a plus de dépôt :
+    PyInstaller aplatit tout sous `sys._MEIPASS`, à l'endroit où le script de
+    construction l'a copié (voir `installeur/butin.spec`, `--add-data`).
+
+    Sans cette distinction, une installation figée afficherait tous les objets
+    sans zone de farm ni valeur au marchand, **en silence** : aucune erreur ne
+    le dirait, juste un produit dégradé que personne ne remarquerait avant un
+    rapport de bogue.
+    """
+    fige = getattr(sys, "_MEIPASS", None)
+    if fige is not None:
+        return Path(fige) / "data"
+    return Path(__file__).resolve().parents[2] / "data"
 
 
 def data_dir() -> Path:
