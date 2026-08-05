@@ -120,6 +120,7 @@
 <div class="panneau" style="margin-bottom:18px">
   <button class="action demarrer" id="bouton-session">Démarrer une session</button>
   <span id="etat-session" style="margin-left:14px;color:var(--doux)">Aucune session en cours</span>
+  <div id="etat-capture" style="margin-top:10px;color:var(--doux);font-size:14px"></div>
 </div>
 
 <div class="panneau">
@@ -207,6 +208,27 @@ function afficher(etat) {
     ? "Session en cours" + (etat.session.spot ? " : " + etat.session.spot : "")
     : "Aucune session en cours";
 
+  // Ce que fait la capture, et surtout ce qu'elle ne fait plus. Un fil de
+  // capture mort laisserait un total qui n'augmente pas, indistinguable d'un
+  // farm calme : c'est la seule chose qui permette de faire la différence.
+  const capture = etat.capture;
+  const ligneCapture = $("etat-capture");
+  ligneCapture.className = "";
+  if (!capture) {
+    ligneCapture.textContent = "";
+  } else if (capture.erreur) {
+    ligneCapture.className = "avertissement";
+    ligneCapture.textContent = "La capture s'est arrêtée : " + capture.erreur;
+  } else if (capture.en_cours) {
+    ligneCapture.textContent =
+      "Capture active — " + capture.lectures + " lectures, " +
+      capture.drops_enregistres + " drops, " +
+      capture.images_ecartees + " images écartées" +
+      (capture.butin_perdu ? ", " + capture.butin_perdu + " lignes perdues" : "");
+  } else {
+    ligneCapture.textContent = "";
+  }
+
   const corps = $("butin");
   corps.innerHTML = "";
   for (const ligne of etat.butin || []) {
@@ -263,7 +285,23 @@ function afficher(etat) {
 $("bouton-session").addEventListener("click", async () => {
   const etat = await (await fetch("/api/etat")).json();
   const enCours = Boolean(etat.session && etat.session.en_cours);
-  afficher(await poster(enCours ? "/api/session/arreter" : "/api/session/demarrer", {}));
+  const route = enCours ? "/api/session/arreter" : "/api/session/demarrer";
+  const reponse = await fetch(route, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({}),
+  });
+  const corps = await reponse.json();
+  if (!reponse.ok) {
+    // Un refus de démarrer n'est pas une panne : c'est une condition que
+    // l'utilisateur peut lever, typiquement un calibrage jamais fait. Le
+    // message le dit, il faut donc l'afficher plutôt que l'avaler.
+    const ligne = $("etat-capture");
+    ligne.className = "avertissement";
+    ligne.textContent = corps.erreur || "impossible de démarrer la capture";
+    return;
+  }
+  afficher(corps);
 });
 
 brancherBascule("langue", "langue");
