@@ -36,14 +36,20 @@ paquet, pas du code. `collect_data_files` les récupère avec leur
 `config.yaml`, au même endroit relatif que dans le paquet installé — c'est ce
 chemin-là que rapidocr utilise pour les retrouver, figé ou non.
 
+**L'icône** (`installeur/butin.ico`) : sans elle, `butin.exe` porte l'icône par
+défaut de PyInstaller, la première chose vue dans l'explorateur de fichiers ou
+le menu Démarrer. Générée en interne (gemme dorée sur fond sombre, pas d'actif
+téléchargé), en sept résolutions de 16 à 256 px pour rester lisible aussi bien
+en petite icône de barre des tâches qu'en grande vignette.
+
 Usage
 -----
 
     .venv\\Scripts\\pyinstaller installeur\\butin.spec
 
 Écrit dans `dist/butin/`, un dossier autonome. `dist/butin/butin.exe` est ce
-qu'on distribue — en zip pour l'instant, un vrai installeur (Inno Setup ou
-équivalent) est la suite logique, pas encore faite : voir `installeur/LISEZ-MOI.md`.
+qu'on distribue, désormais via un vrai installeur Windows (`installeur/butin.iss`,
+Inno Setup) plutôt qu'un dossier à copier-coller : voir `installeur/LISEZ-MOI.md`.
 
 ⚠️ Ni `dist/` ni `build/` ne sont versionnés : voir `.gitignore`. Une
 distribution figée pèse plusieurs centaines de mégaoctets, et se reconstruit à
@@ -84,6 +90,7 @@ exe = EXE(  # noqa: F821
     console=False,
     # ⚠️ Sans console : c'est le point qui fait la différence entre un
     # logiciel et un script qu'on a lancé, voir la note d'en-tête de app.py.
+    icon=str(RACINE / "installeur" / "butin.ico"),
 )
 
 COLLECT(  # noqa: F821
