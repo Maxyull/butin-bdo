@@ -70,6 +70,21 @@ MIN_ITEMS = 10_000
 _NAME_RE = re.compile(r"<b>(?:<span[^>]*>\s*</span>)?(.*?)</b>", re.DOTALL)
 _TAG_RE = re.compile(r"<[^>]+>")
 
+_GRADE_RE = re.compile(r"item_grade_(\d)")
+"""Rareté de l'objet, lue dans la classe de rendu de bdocodex.
+
+C'est le code couleur du jeu lui-même : blanc, vert, bleu, jaune, orange. La
+classe et la sixième colonne de l'export portent la même valeur, vérifié sur
+8 000 lignes sans un seul désaccord ; la classe est retenue parce qu'elle est
+nommée, là où un indice de colonne se décale en silence le jour où l'export
+gagne un champ.
+"""
+
+COMPACT_NAMES = "n"
+COMPACT_GRADE = "g"
+"""Clés du cache compact. Courtes parce que le fichier contient 68 000 entrées
+et qu'il est relu à chaque démarrage."""
+
 
 def compact_path() -> Path:
     """Cache compact, celui que le programme relit au démarrage."""
@@ -122,12 +137,12 @@ def download(lang: str, *, session: requests.Session | None = None) -> bytes:
             http.close()
 
 
-def extract(payload: bytes) -> dict[int, str]:
-    """Extrait `identifiant -> nom` d'un export brut.
+def _rows(payload: bytes) -> list[Any]:
+    """Lignes de l'export, ou une erreur qui dit ce qui manque.
 
-    Le nom arrive habillé de HTML de rendu. On le déshabille plutôt que de
-    demander une autre forme : c'est le seul point d'entrée public, et ce
-    balisage y est stable depuis longtemps.
+    Mis en commun entre les noms et les raretés : deux copies de cette
+    validation divergeraient le jour où bdocodex changera d'enveloppe, et l'une
+    des deux accepterait alors ce que l'autre refuse.
     """
     try:
         brut = json.loads(payload.decode("utf-8-sig"))
@@ -137,7 +152,17 @@ def extract(payload: bytes) -> dict[int, str]:
     lignes = brut.get("aaData") if isinstance(brut, dict) else None
     if not isinstance(lignes, list):
         raise CatalogError("export bdocodex : champ « aaData » manquant ou mal formé")
+    return lignes
 
+
+def extract(payload: bytes) -> dict[int, str]:
+    """Extrait `identifiant -> nom` d'un export brut.
+
+    Le nom arrive habillé de HTML de rendu. On le déshabille plutôt que de
+    demander une autre forme : c'est le seul point d'entrée public, et ce
+    balisage y est stable depuis longtemps.
+    """
+    lignes = _rows(payload)
     noms: dict[int, str] = {}
     for ligne in lignes:
         if not isinstance(ligne, list) or len(ligne) < 3:
@@ -160,32 +185,91 @@ def extract(payload: bytes) -> dict[int, str]:
     return noms
 
 
-def build_compact(par_langue: dict[str, dict[int, str]]) -> dict[str, dict[str, str]]:
-    """Fusionne les langues en `identifiant -> {locale: nom}`."""
-    compact: dict[str, dict[str, str]] = {}
+def extract_grades(payload: bytes) -> dict[int, int]:
+    """Extrait `identifiant -> rareté` d'un export brut.
+
+    Séparé de `extract` parce que ce n'est pas la même question, et surtout
+    parce que la rareté **ne dépend pas de la langue** : une seule des deux
+    langues téléchargées suffit à la relever, là où les noms demandent les deux.
+
+    Une ligne sans classe de rareté est ignorée plutôt que comptée zéro : zéro
+    est une vraie rareté, celle des objets communs, et la confondre avec
+    « inconnu » afficherait en blanc des objets dont on ne sait rien.
+    """
+    lignes = _rows(payload)
+    grades: dict[int, int] = {}
+    for ligne in lignes:
+        if not isinstance(ligne, list) or len(ligne) < 3:
+            continue
+        try:
+            item_id = int(ligne[0])
+        except (TypeError, ValueError):
+            continue
+        trouve = _GRADE_RE.search(str(ligne[2]))
+        if trouve is not None:
+            grades[item_id] = int(trouve.group(1))
+    return grades
+
+
+def build_compact(
+    par_langue: dict[str, dict[int, str]], grades: dict[int, int] | None = None
+) -> dict[str, dict[str, Any]]:
+    """Fusionne les langues et les raretés en `identifiant -> {noms, rareté}`.
+
+    ⚠️ Le format a changé : les noms sont désormais sous une clé au lieu d'être
+    à la racine. Un cache écrit par la version précédente est donc rejeté par
+    `load`, qui le reconstruit **depuis les exports bruts déjà sur le disque**,
+    sans retélécharger 70 Mo. C'est exactement ce pour quoi ce niveau
+    intermédiaire existe.
+    """
+    grades = grades or {}
+    compact: dict[str, dict[str, Any]] = {}
     for lang, noms in par_langue.items():
         for item_id, nom in noms.items():
-            compact.setdefault(str(item_id), {})[lang] = nom
+            entree = compact.setdefault(str(item_id), {COMPACT_NAMES: {}})
+            entree[COMPACT_NAMES][lang] = nom
+    for item_id, grade in grades.items():
+        connue = compact.get(str(item_id))
+        if connue is not None:
+            connue[COMPACT_GRADE] = grade
     return compact
 
 
-def refresh(*, session: requests.Session | None = None) -> dict[str, dict[str, str]]:
+def refresh(*, session: requests.Session | None = None) -> dict[str, dict[str, Any]]:
     """Télécharge les deux langues et écrit le cache compact."""
     par_langue: dict[str, dict[int, str]] = {}
+    grades: dict[int, int] = {}
     for lang in LANGS:
         payload = download(lang, session=session)
         write_cache(payload, raw_path(lang))
         par_langue[lang] = extract(payload)
+        if not grades:
+            # La rareté ne dépend pas de la langue : la relever une fois suffit.
+            grades = extract_grades(payload)
 
-    compact = build_compact(par_langue)
+    compact = build_compact(par_langue, grades)
     write_cache(json.dumps(compact, ensure_ascii=False).encode("utf-8"), compact_path())
     _log.info("bdocodex : %d objets mis en cache", len(compact))
     return compact
 
 
+def _compact_valide(data: object) -> bool:
+    """Vrai si le cache est au format courant, noms sous leur clé.
+
+    Un cache de la version précédente mettait les noms à la racine. Le
+    reconnaître explicitement vaut mieux que de le charger à moitié : les objets
+    s'afficheraient sans nom, ce qui ressemble à un défaut de catalogue alors
+    que c'est un format périmé qu'une reconstruction règle toute seule.
+    """
+    if not isinstance(data, dict) or len(data) < MIN_ITEMS:
+        return False
+    premiere = next(iter(data.values()), None)
+    return isinstance(premiere, dict) and COMPACT_NAMES in premiere
+
+
 def load(
     *, allow_download: bool = True, session: requests.Session | None = None
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, Any]]:
     """Charge les noms bdocodex, depuis le cache compact si possible.
 
     Trois niveaux, du moins cher au plus cher : le cache compact, la
@@ -197,22 +281,22 @@ def load(
     if chemin.exists():
         try:
             data = json.loads(chemin.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and len(data) >= MIN_ITEMS:
+            if _compact_valide(data):
                 return {k: v for k, v in data.items() if isinstance(v, dict)}
-            _log.warning("cache compact bdocodex anormalement court, reconstruction")
+            _log.warning("cache compact bdocodex périmé ou trop court, reconstruction")
         except (OSError, json.JSONDecodeError) as exc:
             _log.warning("cache compact bdocodex illisible (%s), reconstruction", exc)
 
     bruts = {lang: raw_path(lang) for lang in LANGS}
     if all(chemin_brut.exists() for chemin_brut in bruts.values()):
         try:
-            par_langue = {
-                lang: extract(chemin_brut.read_bytes()) for lang, chemin_brut in bruts.items()
-            }
-        except (CatalogError, OSError) as exc:
+            octets = {lang: chemin_brut.read_bytes() for lang, chemin_brut in bruts.items()}
+            par_langue = {lang: extract(brut) for lang, brut in octets.items()}
+            grades = extract_grades(next(iter(octets.values())))
+        except (CatalogError, OSError, StopIteration) as exc:
             _log.warning("exports bruts bdocodex inexploitables (%s)", exc)
         else:
-            compact = build_compact(par_langue)
+            compact = build_compact(par_langue, grades)
             write_cache(json.dumps(compact, ensure_ascii=False).encode("utf-8"), compact_path())
             return compact
 
@@ -221,11 +305,18 @@ def load(
     return refresh(session=session)
 
 
-def to_catalog_payload(compact: dict[str, dict[str, str]]) -> dict[str, Any]:
+def to_catalog_payload(compact: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Met les noms bdocodex à la forme attendue par `ItemCatalog.from_raw`.
 
     Passer par la même forme que le catalogue de marché évite un second chemin
     de construction, donc un second endroit où les règles d'indexation
     pourraient diverger sans qu'on le voie.
     """
-    return {item_id: {"id": int(item_id), "locale_name": noms} for item_id, noms in compact.items()}
+    return {
+        item_id: {
+            "id": int(item_id),
+            "locale_name": entree.get(COMPACT_NAMES, {}),
+            "grade": entree.get(COMPACT_GRADE, 0),
+        }
+        for item_id, entree in compact.items()
+    }

@@ -52,6 +52,33 @@
   .bascule button[aria-pressed="true"] { background: var(--or); color: #14161c; }
   .bascule button:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
 
+  /* Les couleurs de rareté du jeu. Un joueur reconnaît un drop rare à sa
+     couleur avant d'avoir lu son nom. */
+  .rarete-0 { color: #e6e8ee; }
+  .rarete-1 { color: #6fdb6f; }
+  .rarete-2 { color: #57a8ff; }
+  .rarete-3 { color: #f2c14e; }
+  .rarete-4 { color: #ff8b3d; }
+
+  #fil { max-height: 320px; overflow-y: auto; }
+  #fil .drop {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 6px 8px; border-bottom: 1px solid #20242e;
+  }
+  #fil .drop:last-child { border-bottom: none; }
+  #fil .quand { color: var(--doux); font-size: 12px; min-width: 62px; }
+  #fil .qte { color: var(--doux); }
+  #fil .valeur { margin-left: auto; font-variant-numeric: tabular-nums; }
+  /* L'apparition est brève et discrète : elle sert à attirer l'oeil sur la
+     ligne qui vient d'arriver, pas à faire clignoter la fenêtre pendant des
+     heures de farm. */
+  @keyframes arrivee {
+    from { background: rgba(242, 193, 78, 0.22); }
+    to   { background: transparent; }
+  }
+  #fil .drop.neuf { animation: arrivee 1.2s ease-out; }
+  #fil .vide { color: var(--doux); padding: 10px 8px; }
+
   button.action {
     border: 1px solid var(--bord); background: #1b2130; color: var(--texte);
     border-radius: 8px; padding: 9px 18px; font: inherit; font-weight: 600;
@@ -128,6 +155,11 @@
        font-size:13px;color:var(--doux)"></pre>
 </div>
 
+<div class="panneau" style="margin-bottom:18px">
+  <div class="etiquette" style="margin-bottom:8px">Derniers drops</div>
+  <div id="fil"><div class="vide">Rien pour l'instant.</div></div>
+</div>
+
 <div class="panneau">
   <table>
     <thead>
@@ -157,6 +189,62 @@ function duree(secondes) {
   const h = String(Math.floor(s / 3600)).padStart(2, "0");
   const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
   return `${h}:${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// Clés des drops déjà affichés, pour n'animer que ce qui vient d'arriver.
+// Sans ça, chaque rafraîchissement rejouerait l'animation sur toute la liste,
+// une fois par seconde, ce qui rendrait la fenêtre insupportable en farm.
+let dejaVus = new Set();
+
+function rendreLeFil(drops) {
+  const fil = $("fil");
+  if (!drops.length) {
+    dejaVus = new Set();
+    fil.innerHTML = "";
+    const vide = document.createElement("div");
+    vide.className = "vide";
+    vide.textContent = "Rien pour l'instant.";
+    fil.appendChild(vide);
+    return;
+  }
+
+  const vues = new Set();
+  fil.innerHTML = "";
+  for (const drop of drops) {
+    const cle = drop.item_id + ":" + drop.il_y_a_s + ":" + drop.quantite;
+    vues.add(cle);
+
+    const ligne = document.createElement("div");
+    ligne.className = "drop" + (dejaVus.size && !dejaVus.has(cle) ? " neuf" : "");
+
+    const quand = document.createElement("span");
+    quand.className = "quand";
+    quand.textContent = ilYA(drop.il_y_a_s);
+
+    const nom = document.createElement("span");
+    // textContent : un nom d'objet vient d'une source externe, l'injecter en
+    // HTML ouvrirait une porte pour rien.
+    nom.className = "rarete-" + (drop.rarete || 0);
+    nom.textContent = drop.nom;
+
+    const qte = document.createElement("span");
+    qte.className = "qte";
+    qte.textContent = "x" + drop.quantite;
+
+    const valeur = document.createElement("span");
+    valeur.className = "valeur";
+    valeur.textContent = drop.valeur ? nombre(drop.valeur) : "—";
+
+    ligne.append(quand, nom, qte, valeur);
+    fil.appendChild(ligne);
+  }
+  dejaVus = vues;
+}
+
+function ilYA(secondes) {
+  if (secondes < 60) return "il y a " + Math.round(secondes) + " s";
+  if (secondes < 3600) return "il y a " + Math.round(secondes / 60) + " min";
+  return "il y a " + Math.round(secondes / 3600) + " h";
 }
 
 async function poster(chemin, corps) {
@@ -238,6 +326,8 @@ function afficher(etat) {
   $("etat-calibrage").textContent = calibrage
     ? "Zone calibrée : " + calibrage
     : "Zone non calibrée — la capture ne peut pas démarrer.";
+
+  rendreLeFil(etat.derniers || []);
 
   const corps = $("butin");
   corps.innerHTML = "";

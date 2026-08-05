@@ -256,6 +256,35 @@ class SessionStore:
             ).fetchall()
         return {(int(ligne["item_id"]), int(ligne["sid"])): int(ligne["total"]) for ligne in lignes}
 
+    def recent_loot(self, session_id: int, *, limit: int = 40) -> list[LootRow]:
+        """Les derniers drops enregistrés, du plus récent au plus ancien.
+
+        Sert au fil qui s'écrit pendant qu'on farme. Volontairement distinct de
+        `quantities`, qui cumule : un joueur veut voir **ce qui vient de
+        tomber**, et un total qui grandit ne le lui montre pas. Les deux
+        répondent à des questions différentes et coexistent à l'écran.
+
+        Le tri est fait en SQL et borné : une session de plusieurs heures
+        contient des milliers de lignes, et la fenêtre n'en montre qu'une
+        vingtaine. Tout rapatrier pour en jeter 99 % serait payé à chaque
+        rafraîchissement, c'est-à-dire chaque seconde.
+        """
+        with self._reading() as connection:
+            lignes = connection.execute(
+                "SELECT item_id, sid, qty, at FROM loot WHERE session_id = ? "
+                "ORDER BY at DESC, id DESC LIMIT ?",
+                (session_id, max(1, limit)),
+            ).fetchall()
+        return [
+            LootRow(
+                item_id=int(ligne["item_id"]),
+                qty=int(ligne["qty"]),
+                at=float(ligne["at"]),
+                sid=int(ligne["sid"]),
+            )
+            for ligne in lignes
+        ]
+
     def loot_count(self, session_id: int) -> int:
         with self._reading() as connection:
             ligne = connection.execute(
