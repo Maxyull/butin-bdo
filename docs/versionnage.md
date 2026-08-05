@@ -83,10 +83,11 @@ Les différences qui comptent :
 | version candidate | `1.0.0-rc.1` | `1.0.0rc1` |
 | en développement | pas de notion | `1.0.0.dev0` |
 
-**La version actuelle est `0.1.0.dev0`**, et le suffixe est délibéré. `0.1.0`
-tout court signifierait que la version 0.1.0 est publiée, ce qui est faux :
-aucune version ne l'est. `.dev0` se trie avant `0.1.0` et rend cette confusion
-impossible. Il tombera au moment de la première publication.
+**La version actuelle est `0.1.0`**, publiée le 06/08/2026 : c'est la première.
+Avant cette date, le suffixe était `0.1.0.dev0`, délibérément : `0.1.0` tout
+court aurait signifié que cette version était publiée, ce qui était faux.
+`.dev0` se trie avant `0.1.0` et rendait cette confusion impossible. Le même
+suffixe reviendra au prochain cycle de développement, sur le numéro suivant.
 
 ## Keep a Changelog
 

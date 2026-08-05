@@ -9,10 +9,13 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
-Rien n'a encore été publié. Butin est en `0.y.z`, ce qui veut dire, au sens de
+## [0.1.0] - 2026-08-06
+
+Première version publiée. Butin reste en `0.y.z`, ce qui veut dire, au sens de
 Semantic Versioning, que **rien n'est stable et que tout peut changer à tout
-moment**. Les critères à remplir pour publier la première version sont listés
-dans [docs/versionnage.md](docs/versionnage.md).
+moment** : les critères pour passer en `1.0.0` sont listés dans
+[docs/versionnage.md](docs/versionnage.md), et ne sont pas encore tous
+remplis.
 
 ### Ajouté
 
@@ -150,16 +153,23 @@ dans [docs/versionnage.md](docs/versionnage.md).
   reconnu **par accident**, avec un seul point de marge, et aurait désigné le
   mauvais objet si la fusion s'était faite dans l'autre sens.
 
-- **Distribution autonome** (`installeur/butin.spec`, PyInstaller) : un dossier
-  à copier, `dist/butin/`, qui n'a besoin ni de Python ni de `pip`. Jusqu'ici
-  utiliser Butin demandait de cloner le dépôt. Vérifié pour de vrai et pas
-  seulement « ça compile » : la fenêtre s'ouvre, sert la page, et le moteur de
-  reconnaissance (le morceau le plus à risque, 15 Mo de modèles `.onnx`
-  qu'aucun hook PyInstaller standard ne rapatrie tout seul) lit une vraie
-  capture et rend le bon texte une fois figé. ⚠️ Ce n'est encore qu'un dossier,
-  pas un installeur Windows au sens habituel : ni menu Démarrer, ni
-  désinstallation, ni mise à jour. Voir `installeur/LISEZ-MOI.md` pour ce qui
-  reste.
+- **Application de bureau**, à deux fenêtres, lancée par `butin-app` : une
+  fenêtre principale (Réglages + Historique) et un panneau **translucide posé
+  par-dessus le jeu** pendant le grind, sans cadre, toujours au-dessus, qui
+  montre le récap cumulé du butin. Jusqu'ici Butin était une page à ouvrir
+  dans un navigateur ; ce n'était pas encore un logiciel qu'on lance.
+- **Mettre la session en pause**, avec le temps de pause déduit de la durée
+  affichée dans le panneau et dans la fenêtre principale.
+- **Un installeur Windows** (`installeur/butin.iss`, Inno Setup), à partir de
+  la distribution autonome PyInstaller (`installeur/butin.spec`) : menu
+  Démarrer, désinstallation propre, icône dédiée. Installation **par
+  utilisateur, sans droits administrateur**, cohérente avec un logiciel qui
+  n'écrit déjà que dans `Documents\BDO Tracker`. Vérifié pour de vrai : cycle
+  install/lancement/désinstallation, et l'historique de farm de l'utilisateur
+  reste intact après désinstallation.
+- **Vérification de mise à jour au lancement.** Un bandeau prévient si une
+  version plus récente est publiée sur GitHub Releases, avec un lien.
+  Notification seule : Butin ne télécharge ni n'installe rien tout seul.
 
 ### Sécurité
 
@@ -283,12 +293,17 @@ dans [docs/versionnage.md](docs/versionnage.md).
   session automatiquement, et elles sont encore **en anglais**.
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- **Le compteur est juste sur les 30 secondes de farm mesurées** : 47 drops sur
-  47, quantité cumulée exacte, 45 lignes de silver sur 45, montant du silver à
-  −1,5 %. ⚠️ Une seule rafale, un seul endroit de farm, une seule configuration
-  d'écran, et des réglages balayés contre cette même rafale : ce qu'on peut
-  annoncer et ce qu'on ne peut pas est écrit en partie 6 de
-  [docs/banc-essai.md](docs/banc-essai.md).
+- **Le banc d'essai est juste sur les 30 secondes de farm mesurées** : 47 drops
+  sur 47, quantité cumulée exacte, 45 lignes de silver sur 45, montant du
+  silver à −1,5 %. ⚠️ Une seule rafale, un seul endroit de farm, une seule
+  configuration d'écran, et des réglages balayés contre cette même rafale : ce
+  qu'on peut annoncer et ce qu'on ne peut pas est écrit en partie 6 de
+  [docs/banc-essai.md](docs/banc-essai.md). **Sur deux vraies sessions de farm
+  complètes** (05/08/2026, Thornwood Forest), en revanche, aucun objet n'a été
+  inventé : la première a trouvé un sur-comptage de +15 % sur le drop
+  fréquent, cause corrigée (le journal déjà à l'écran au démarrage était
+  compté), la seconde l'a confirmé sur neuf objets comparés à l'inventaire
+  réel.
 - La reconnaissance de texte coûte 336 ms par image sur une zone de 520 x 385,
   et **1 100 ms** sur une zone de 780 x 575. Le découplage de la boucle absorbe
   le premier chiffre, pas le second.
@@ -305,14 +320,14 @@ dans [docs/versionnage.md](docs/versionnage.md).
   elle ne tourne qu'une fois par seconde. Le résultat du banc est un plafond,
   pas une promesse. Découpler les deux fils est faisable et mérite d'être mesuré
   en conditions réelles avant d'être décidé.
-- **Le produit n'a jamais tourné devant le jeu de bout en bout.** Tout est
-  mesuré au banc et vérifié fenêtre par fenêtre ; personne ne l'a encore utilisé
-  en farmant.
-- Le taux de taxe de l'hôtel des ventes est calculé correctement mais **n'est
-  pas réglable depuis l'interface**.
-- Il faut encore cloner le dépôt et lancer `pip` : **aucun installeur**.
 - Le calibrage ne suit pas un déplacement de la fenêtre de chat en cours de
-  session. La bouger en jeu demande de relancer `butin calibrer`.
+  session. La bouger en jeu demande de recalibrer.
+- L'installeur n'a été vérifié que sur la machine de développement, où Python
+  et Visual C++ Redistributable sont déjà présents. Rien n'indique qu'il
+  manque une dépendance native sur une machine vierge, mais rien ne l'a testé
+  non plus.
+- La vérification de mise à jour ne sert encore à rien tant qu'aucune version
+  n'est publiée sur GitHub Releases.
 - La reconnaissance n'est lancée que 22 fois sur 300 images, faute de pouvoir
   aller plus vite. Sans conséquence sur la rafale mesurée, mais sans marge non
   plus si un journal défilait deux fois plus vite.

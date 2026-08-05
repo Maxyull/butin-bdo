@@ -89,11 +89,11 @@ l'installeur lui-même (`SetupIconFile` dans `butin.iss`).
    `pyproject.toml` sont trois gestes manuels. Un script ou une étape
    d'intégration continue viendra une fois le format de distribution
    éprouvé sur plusieurs publications réelles.
-3. **Vérification de mise à jour au lancement.** Demandé par Maxime le
-   06/08/2026 : Butin doit signaler une nouvelle version disponible (pas la
-   télécharger ni l'installer seul, décidé explicitement avec lui). Suppose
-   qu'une première version soit publiée sur GitHub Releases, ce qui n'est pas
-   encore le cas (`0.1.0.dev0`, voir `docs/versionnage.md`).
+La vérification de mise à jour au lancement (`src/butin/update.py`) est faite,
+demandée par Maxime le 06/08/2026 : Butin signale une nouvelle version
+disponible par un bandeau, sans jamais la télécharger ni l'installer seul.
+Depuis la publication de `0.1.0` le même jour, elle a quelque chose à
+comparer.
 
 ## Fichiers de ce dossier
 
