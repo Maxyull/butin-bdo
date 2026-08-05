@@ -143,22 +143,25 @@ def run(
     state: AppState | None = None,
     window: Any = None,
     preload: Callable[[], object] | None = None,
+    check_update: Callable[[], object] | None = None,
 ) -> int:
     """Ouvre la fenêtre et ne rend la main qu'à sa fermeture.
 
-    `window`, `state` et `preload` existent pour les tests, et pour la même
-    raison : ouvrir une vraie fenêtre demande une session graphique, faire
-    tourner une vraie capture demande un écran et le moteur de reconnaissance,
-    et précharger les images demande le réseau. L'intégration continue n'a rien
-    de tout ça. `window` reçoit l'adresse locale et doit bloquer jusqu'à la
-    fermeture, exactement comme le fait la vraie.
+    `window`, `state`, `preload` et `check_update` existent pour les tests, et
+    pour la même raison : ouvrir une vraie fenêtre demande une session
+    graphique, faire tourner une vraie capture demande un écran et le moteur
+    de reconnaissance, précharger les images et vérifier une mise à jour
+    demandent tous les deux le réseau. L'intégration continue n'a rien de tout
+    ça. `window` reçoit l'adresse locale et doit bloquer jusqu'à la fermeture,
+    exactement comme le fait la vraie.
 
-    ⚠️ `preload` est injectable et pas seulement désactivable, parce que le
-    problème n'est pas qu'il coûte cher : c'est qu'il tourne dans un **fil de
-    fond qui survit à cet appel**. Dans l'application c'est sans conséquence,
-    le fil est démon et meurt avec le processus. Dans une suite de tests, le
-    processus continue : le fil écrivait alors sur le disque pendant un autre
-    test, qui échouait sur un dossier qu'il n'avait pas créé.
+    ⚠️ `preload` et `check_update` sont injectables et pas seulement
+    désactivables, parce que le problème n'est pas qu'ils coûtent cher : c'est
+    qu'ils tournent dans un **fil de fond qui survit à cet appel**. Dans
+    l'application c'est sans conséquence, le fil est démon et meurt avec le
+    processus. Dans une suite de tests, le processus continue : le fil
+    écrivait alors sur le disque pendant un autre test, qui échouait sur un
+    dossier qu'il n'avait pas créé.
     """
     state = state or build_state(store)
     serveur = build_server(state, port=port)
@@ -178,6 +181,12 @@ def run(
     # cosmétique. Le fil est démon, donc il ne retient jamais la fermeture.
     threading.Thread(
         target=preload or state.preload_icons, daemon=True, name="butin-icones"
+    ).start()
+    # ⚠️ Même raison : un aller-retour réseau, jamais devant. Une notification
+    # de mise à jour en retard d'une minute ne coûte rien ; retarder
+    # l'ouverture de la fenêtre pour l'attendre coûterait tout.
+    threading.Thread(
+        target=check_update or state.check_update, daemon=True, name="butin-maj"
     ).start()
     try:
         (window or _open_window)(adresse)

@@ -40,13 +40,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Protocol
 
-from .. import paths
+from .. import __version__, paths
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
 from ..catalog.icons import TYPES_MIME
 from ..market import PriceBook
 from ..store import SessionStore, Settings, compute
+from ..update import UpdateInfo, check_for_update
 
 _log = logging.getLogger(__name__)
 
@@ -112,6 +113,12 @@ class AppState:
         """Images des objets. Toujours présent, parce qu'il ne fait jamais
         échouer quoi que ce soit : sans réseau il rend simplement None, et la
         page se passe de l'image."""
+        self.update_info: UpdateInfo | None = None
+        """Résultat de la dernière vérification de mise à jour, ou None tant
+        qu'aucune n'a eu lieu ou qu'elle a échoué. Rempli en fond par
+        `check_update()`, jamais sur le fil qui répond aux requêtes : voir
+        `update.py` pour pourquoi un problème réseau ici ne doit jamais
+        retarder l'ouverture de la fenêtre."""
         self.lock = threading.Lock()
         self.settings = Settings.load()
         """Langue, région et profil de taxe, relus au lancement.
@@ -145,6 +152,15 @@ class AppState:
             },
         }
 
+    def _update_dict(self) -> dict[str, Any] | None:
+        """`None` tant que la vérification n'a pas encore répondu ou a
+        échoué : la page ne montre alors rien, elle n'affiche pas un
+        bandeau vide. Voir `update.py`."""
+        info = self.update_info
+        if info is None:
+            return None
+        return {"disponible": info.disponible, "version": info.version, "url": info.url}
+
     def snapshot(self, *, now: float | None = None) -> dict[str, Any]:
         maintenant = time.time() if now is None else now
         with self.lock:
@@ -174,6 +190,7 @@ class AppState:
                 "butin": [],
                 "derniers": [],
                 "capture": capture,
+                "maj": self._update_dict(),
             }
 
         session = self.store.get_session(session_id)
@@ -185,6 +202,7 @@ class AppState:
                 "butin": [],
                 "derniers": [],
                 "capture": capture,
+                "maj": self._update_dict(),
             }
 
         quantites = self.store.quantities(session_id)
@@ -220,6 +238,7 @@ class AppState:
             "butin": self._loot_rows(quantites, maintenant, langue),
             "derniers": self._recent_rows(session_id, maintenant, langue),
             "capture": capture,
+            "maj": self._update_dict(),
         }
 
     def icon(self, item_id: int) -> Path | None:
@@ -253,6 +272,18 @@ class AppState:
             if item is not None and item.icon:
                 entrees[item_id] = item.icon
         return self.icons.preload(entrees)
+
+    def check_update(self) -> UpdateInfo | None:
+        """Interroge GitHub une fois et retient le résultat. Voir `update.py`
+        pour pourquoi c'est une simple notification, jamais un remplacement
+        automatique, et pourquoi un échec ne doit rien empêcher.
+
+        ⚠️ À appeler dans un fil de fond, comme `preload_icons` : c'est un
+        aller-retour réseau, et le faire au premier plan retarderait
+        l'ouverture de la fenêtre d'autant.
+        """
+        self.update_info = check_for_update(__version__)
+        return self.update_info
 
     def history(self, *, limit: int = 30) -> list[dict[str, Any]]:
         """Les sessions passées, avec ce qu'elles ont rapporté.
