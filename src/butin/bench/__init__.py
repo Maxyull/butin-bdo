@@ -44,7 +44,7 @@ suite du projet.
 from .assembly import AssembledLine, Assembly, assemble, canon
 from .fingerprints import Fingerprints, silver_fingerprints
 from .pixels import PixelScroll, measure_scroll
-from .replay import Replay, replay
+from .replay import Replay, replay, replay_realtime
 from .report import BenchReport, Tally, build_report, tally_events, tally_lines
 from .transcript import BenchFrame, Transcript
 
@@ -63,6 +63,7 @@ __all__ = [
     "canon",
     "measure_scroll",
     "replay",
+    "replay_realtime",
     "silver_fingerprints",
     "tally_events",
     "tally_lines",

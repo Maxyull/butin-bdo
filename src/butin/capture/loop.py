@@ -1,4 +1,4 @@
-"""Boucle de capture, avec l'OCR découplé du reste.
+"""Boucle de capture, à deux vitesses.
 
 Pourquoi découpler
 ------------------
@@ -11,7 +11,7 @@ que la machine ne tient pas dès que la zone du chat est grande. Faire
 tourner toute la chaîne au rythme de l'OCR reviendrait à mesurer le défilement
 trois fois moins souvent que nécessaire, pour rien.
 
-La boucle tourne donc à deux vitesses :
+La boucle vise donc deux vitesses :
 
 * **toutes les 100 ms** : capture, mesure du défilement, accumulation ;
 * **quand il y a quelque chose à lire** : reconnaissance de texte, alignement,
@@ -21,6 +21,19 @@ Le défilement accumulé entre deux passages d'OCR est exactement ce que
 `tracking/alignment.py` attend comme `expected_new`. Le découplage n'est donc
 pas seulement moins coûteux, il rend la prédiction **plus fine** : un défilement
 rapide qui aurait été vu d'un bloc à 350 ms est vu en trois mesures à 100 ms.
+
+⚠️ **« Vise » et non « fait », par défaut.** Tant que `LoopConfig.async_ocr` vaut
+`False` (le défaut), les deux vitesses restent conceptuelles : `tick()` capture,
+mesure le défilement, PUIS attend l'OCR en bloquant le même fil avant de rendre
+la main. C'est mesuré et documenté depuis le 05/08 : en conditions réelles, le
+défilement n'est alors mesuré qu'une fois par seconde environ au lieu de dix.
+
+Un vrai découplage — un fil à part pour la reconnaissance — existe derrière
+`async_ocr=True`, et il a été mesuré en temps réel sur une vraie rafale : il
+lit MOINS souvent que le mode synchrone (32 lectures sur 600 images contre 52)
+et compte moins bien (−8,8 % contre +2,0 %). Contre-intuitif, réfléchi, mesuré
+deux fois, et laissé à `False` en conséquence. Voir la docstring du réglage
+pour le détail et ce qui reste à comprendre.
 
 La règle de mesure : la colonne du texte, sur un masque de pixels clairs
 ------------------------------------------------------------------------
@@ -54,6 +67,8 @@ n'a pas ce défaut.
 
 from __future__ import annotations
 
+import logging
+import threading
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
@@ -77,6 +92,16 @@ from ..tracking.staging import LootStager
 from .calibrate import Calibration
 from .lines import DEFAULT_FORMAT, ChatLineFormat, ParsedLine, is_stale, parse_frame
 from .screen import GrayImage, Region
+
+_log = logging.getLogger(__name__)
+
+
+_FLUSH_OCR_TIMEOUT_S = 5.0
+"""Attente maximale d'un travail de reconnaissance encore en vol à l'arrêt.
+
+Le même ordre de grandeur que `CaptureWorker.stop`'s délai par défaut, et pour
+la même raison : au-delà, le fil est probablement bloqué ailleurs, et attendre
+indéfiniment retiendrait le bouton Arrêter pour une seule lecture perdue."""
 
 
 class FrameSource(Protocol):
@@ -189,6 +214,49 @@ class LoopConfig:
     sens d'erreur : il sous-compte le silver là où 3 le sur-compte.
     """
 
+    async_ocr: bool = False
+    """Fait tourner la reconnaissance sur un fil à part, sans bloquer le fil qui
+    mesure le défilement.
+
+    ⛔ **Faux par défaut, et MESURÉ PIRE que le mode synchrone le 05/08/2026.**
+    Ce n'est pas une prudence en attendant une mesure : la mesure a eu lieu,
+    **deux fois**, en temps réel sur la vraie rafale de Thornwood Forest
+    (`scripts/banc_essai.py --rafale _farmzone-20260805-171935 --async-ocr`,
+    `bench/replay.py::replay_realtime`) :
+
+    | | images vraiment lues | drops / référence | quantité / référence |
+    | --- | --- | --- | --- |
+    | synchrone (comme aujourd'hui) | 52 / 600 | 104 / 102 (+2,0 %) | 305 / 291 (+4,8 %) |
+    | **asynchrone** | **32 / 600** | **93 / 102 (−8,8 %)** | **246 / 291 (−15,5 %)** |
+
+    Contre-intuitif, et c'est justement pour ça qu'il fallait mesurer plutôt
+    que de faire confiance au mécanisme : découpler LIT MOINS SOUVENT, pas
+    plus. Deux hypothèses ont été essayées pour expliquer pourquoi, l'une
+    réfutée, l'autre non encore confirmée :
+
+    1. **Contention du GIL entre les deux fils, réfutée.** Un test isolé (le
+       fil de fond fait tourner `estimate_text_scroll_px` toutes les 100 ms
+       pendant qu'on chronomètre l'OCR sur l'autre) ne montre AUCUN
+       ralentissement mesurable : ~500-600 ms avec ou sans le fil concurrent.
+       Ce n'est donc pas ça.
+    2. **`_should_read` gate la resoumission sur `pending_shift_px > 0`, retombé
+       à zéro à chaque soumission.** Une seconde mesure, en supprimant tout
+       `ocr_min_interval_s` (`--ocr-ms 1`), donne EXACTEMENT le même nombre
+       d'images lues (32/600) — ce paramètre n'était donc pas non plus la
+       cause. Reste l'hypothèse, non confirmée par une mesure isolée : quand
+       rien n'a défilé pendant le temps qu'un travail met à revenir, la
+       prochaine soumission attend `ocr_max_idle_s` (2 s) au lieu de repartir
+       aussitôt, ce qui n'arrive presque jamais en mode synchrone puisque ses
+       lectures s'enchaînent sans le moindre répit entre elles.
+
+    **Le code reste, correct et testé** (`TestModeAsynchrone`, zéro régression
+    sur le chemin synchrone, aucun événement inventé sur la vraie rafale). Ce
+    qui manque n'est pas une preuve de sécurité, c'est une preuve de gain — et
+    tant qu'elle n'existe pas, l'allumer par défaut inventerait une amélioration
+    au lieu de la mesurer, ce que ce projet refuse pour la même raison qu'il
+    refuse d'inventer un drop.
+    """
+
 
 def config_from_calibration(calibration: Calibration, base: LoopConfig | None = None) -> LoopConfig:
     """Applique un calibrage à un réglage de boucle.
@@ -210,6 +278,30 @@ def config_from_calibration(calibration: Calibration, base: LoopConfig | None = 
         ruler_left_ratio=calibration.ruler_left_ratio,
         ruler_right_ratio=calibration.ruler_right_ratio,
     )
+
+
+@dataclass(slots=True)
+class _OcrJob:
+    """Une reconnaissance en cours sur le fil de fond, ou son résultat en
+    attente d'être traité par le fil principal.
+
+    Trois champs sont écrits UNIQUEMENT par `_run_ocr`, sur le fil de fond :
+    `lines`, `error`, `done`. Les trois autres sont écrits UNE FOIS à la
+    création, sur le fil principal, et ne bougent plus ensuite : c'est cette
+    séparation qui rend l'objet sûr à partager entre les deux fils sans verrou.
+    """
+
+    started_at: float
+    """`now` au moment où l'IMAGE a été capturée, pas au moment où son résultat
+    sera traité. C'est cet écart entre deux images comparées, et non le temps
+    que l'OCR a mis à répondre, qui borne le nombre de lignes plausibles."""
+
+    pending_shift_px: float
+    shift_trustworthy: bool
+
+    done: threading.Event = field(default_factory=threading.Event)
+    lines: list[str] | None = None
+    error: BaseException | None = None
 
 
 @dataclass(slots=True)
@@ -279,6 +371,9 @@ class CaptureLoop:
         self._last_ocr_at: float | None = None
         self._consecutive_skips = 0
         self._seeded = False
+        self._ocr_job: _OcrJob | None = None
+        """Le travail de reconnaissance en cours, mode asynchrone seulement.
+        `None` tout le temps en mode synchrone : rien de ce qui suit n'existe."""
 
     # -- boucle rapide ---------------------------------------------------
 
@@ -290,6 +385,9 @@ class CaptureLoop:
         """
         image = self.source.grab(self.region)
         self._accumulate_scroll(image)
+
+        if self.config.async_ocr:
+            return self._tick_async(image, now)
 
         if not self._should_read(now):
             return TickResult(pending_shift_px=self._pending_shift_px)
@@ -358,10 +456,23 @@ class CaptureLoop:
         )
         current = [ligne.observed for ligne in parsed]
 
-        expected = self._expected_new(len(current))
+        expected = self._expected_new(len(current), self._pending_shift_px, self._shift_trustworthy)
         self._pending_shift_px = 0.0
         self._shift_trustworthy = True
 
+        return self._align_and_stage(current, expected, depuis)
+
+    def _align_and_stage(
+        self, current: list[ObservedLine], expected: int | None, elapsed_s: float
+    ) -> TickResult:
+        """La part commune aux deux modes : amorce, alignement, vote.
+
+        Extraite pour que les modes synchrone et asynchrone passent
+        **exactement** par le même chemin une fois l'OCR obtenu. Diverger ici
+        entre les deux reviendrait à maintenir deux compteurs différents sous le
+        même nom, ce que ce projet ne peut pas se permettre sur le chemin qui
+        décide d'un drop.
+        """
         if not self._seeded:
             # Le butin déjà à l'écran appartient au passé et ne doit pas être
             # compté. Sans cette amorce, lancer le suivi crediterait d'un coup
@@ -373,7 +484,7 @@ class CaptureLoop:
 
         result = align(self._previous_lines, current, cfg=self.config.match, expected_new=expected)
 
-        motif = self._rejection_reason(result, expected, depuis)
+        motif = self._rejection_reason(result, expected, elapsed_s)
         if motif:
             self._consecutive_skips += 1
             return TickResult(ocr_ran=True, expected_new=expected, skipped_reason=motif)
@@ -398,6 +509,84 @@ class CaptureLoop:
         self.total_silver += silver
         return TickResult(ocr_ran=True, events=evenements, silver=silver, expected_new=expected)
 
+    # -- mode asynchrone ---------------------------------------------------
+
+    def _tick_async(self, image: GrayImage, now: float) -> TickResult:
+        """Équivalent de `tick` quand `LoopConfig.async_ocr` est vrai.
+
+        `_accumulate_scroll` a déjà tourné sur CETTE image dans `tick()`, avant
+        qu'on sache s'il y a un travail en cours : c'est précisément ce qui
+        manque au mode synchrone, où rien ne mesure le défilement tant que
+        l'OCR n'a pas rendu la main.
+        """
+        if self._ocr_job is not None:
+            return self._poll_ocr_job()
+
+        if not self._should_read(now):
+            return TickResult(pending_shift_px=self._pending_shift_px)
+
+        # Le défilement accumulé JUSQU'ICI part avec le travail : ce qui
+        # s'accumulera pendant que l'OCR tourne appartient à la PROCHAINE
+        # lecture, pas à celle-ci, qui porte sur l'image capturée maintenant.
+        job = _OcrJob(
+            started_at=now,
+            pending_shift_px=self._pending_shift_px,
+            shift_trustworthy=self._shift_trustworthy,
+        )
+        self._pending_shift_px = 0.0
+        self._shift_trustworthy = True
+        self._ocr_job = job
+        threading.Thread(
+            target=self._run_ocr, args=(job, image), daemon=True, name="butin-ocr"
+        ).start()
+        return TickResult(ocr_ran=True, pending_shift_px=0.0)
+
+    def _run_ocr(self, job: _OcrJob, image: GrayImage) -> None:
+        """Tourne sur un fil à part. Ne touche à AUCUN état partagé de la boucle.
+
+        Seuls `job.lines`/`job.error` sont écrits ici, et `job.done` les publie.
+        L'alignement, le vote et `_previous_lines` restent entièrement sur le
+        fil appelant de `tick()` : c'est cette séparation, et elle seule, qui
+        rend le découplage sûr sans le moindre verrou sur `LootStager`.
+        """
+        try:
+            job.lines = self.reader.read_text(image)
+        except Exception as exc:  # repris et exposé sur le fil principal, voir _consume_ocr_job
+            job.error = exc
+        finally:
+            job.done.set()
+
+    def _poll_ocr_job(self) -> TickResult:
+        job = self._ocr_job
+        if job is None or not job.done.is_set():
+            return TickResult(pending_shift_px=self._pending_shift_px)
+        self._ocr_job = None
+        return self._consume_ocr_job(job)
+
+    def _consume_ocr_job(self, job: _OcrJob) -> TickResult:
+        """Traite le résultat d'un travail terminé, sur le fil appelant.
+
+        ⚠️ Si la reconnaissance a levé, l'exception est RELEVÉE ici, sur le fil
+        de capture, exactement comme elle l'aurait fait en mode synchrone : un
+        fil qui avale ses erreurs est le pire des cas (`capture/worker.py`), et
+        le découplage ne doit pas devenir un moyen de les perdre en route.
+        """
+        if job.error is not None:
+            raise job.error
+
+        # Écart entre les deux IMAGES comparées, pas entre leurs traitements :
+        # l'OCR peut avoir pris deux secondes, ça ne change rien au nombre de
+        # lignes qui ont pu apparaître entre les deux captures.
+        depuis = job.started_at - self._last_ocr_at if self._last_ocr_at is not None else 0.0
+        self._last_ocr_at = job.started_at
+
+        parsed = self._sans_le_vieux_journal(
+            parse_frame(job.lines or [], self.matcher, fmt=self.fmt, scope=self.scope)
+        )
+        current = [ligne.observed for ligne in parsed]
+        expected = self._expected_new(len(current), job.pending_shift_px, job.shift_trustworthy)
+        return self._align_and_stage(current, expected, depuis)
+
     def _sans_le_vieux_journal(self, lignes: list[ParsedLine]) -> list[ParsedLine]:
         """Retire les lignes datées d'avant le début de la session.
 
@@ -414,20 +603,26 @@ class CaptureLoop:
             return lignes
         return [ligne for ligne in lignes if not is_stale(ligne.stamp, self.session_start_min)]
 
-    def _expected_new(self, visible: int) -> int | None:
-        """Convertit le défilement accumulé en nombre de lignes attendues.
+    def _expected_new(
+        self, visible: int, pending_shift_px: float, shift_trustworthy: bool
+    ) -> int | None:
+        """Convertit un défilement accumulé en nombre de lignes attendues.
 
         None dès qu'il y a le moindre doute : l'alignement travaille alors sur
         le texte seul, ce qui reste correct. Une prédiction fausse serait pire
         que pas de prédiction, puisqu'elle écarterait le bon recouvrement.
+
+        ⚠️ Prend le défilement en PARAMÈTRE et ne lit plus `self._pending_shift_px`
+        directement. En mode asynchrone, la lecture qu'on traite peut dater de
+        plusieurs tours : ce n'est pas le défilement accumulé maintenant qu'il
+        faut convertir, c'est celui qui avait été accumulé au moment où l'image
+        de CETTE lecture a été capturée, capturé dans le travail de fond avant
+        qu'il ne reparte de zéro pour la lecture suivante.
         """
-        if not self._shift_trustworthy or self._pending_shift_px <= 0:
+        if not shift_trustworthy or pending_shift_px <= 0:
             return None
         mesure = ScrollResult(
-            shift_px=round(self._pending_shift_px),
-            score=0.0,
-            baseline_score=0.0,
-            confident=True,
+            shift_px=round(pending_shift_px), score=0.0, baseline_score=0.0, confident=True
         )
         return expected_new_lines(mesure, self.config.row_height_px, max(visible, 1))
 
@@ -452,7 +647,38 @@ class CaptureLoop:
         Le silver en attente est crédité au passage. Sans ça, faire voter les
         montants ferait perdre toutes les lignes de pièces encore à l'écran au
         moment de l'arrêt, c'est-à-dire une fenêtre entière.
+
+        ⚠️ En mode asynchrone, une reconnaissance encore en vol est ATTENDUE
+        avant de fermer, bornée à `_FLUSH_OCR_TIMEOUT_S`. En mode synchrone,
+        arrêter la session attend déjà la fin du tour en cours
+        (`CaptureWorker.stop` rejoint le fil de capture) : ce n'est pas une
+        raison de perdre cette garantie parce que le fil, lui, ne bloque plus.
+        Sans cette attente, le tout dernier passage de l'OCR — potentiellement
+        le seul témoin d'un drop qui vient de tomber — serait perdu en silence.
         """
-        evenements = self.stager.flush()
+        evenements = self._await_pending_ocr()
+        evenements += self.stager.flush()
         self.total_silver += self.stager.drain_silver()
         return evenements
+
+    def _await_pending_ocr(self) -> list[LootEvent]:
+        job = self._ocr_job
+        if job is None:
+            return []
+        self._ocr_job = None
+        if not job.done.wait(_FLUSH_OCR_TIMEOUT_S):
+            # Le même choix qu'à l'arrêt du fil de capture : au-delà d'un délai
+            # raisonnable, mieux vaut perdre cette dernière lecture que bloquer
+            # l'arrêt indéfiniment. Voir `CaptureWorker.stop`.
+            _log.warning(
+                "reconnaissance encore en cours après %.0f s à l'arrêt, dernière lecture perdue",
+                _FLUSH_OCR_TIMEOUT_S,
+            )
+            return []
+        if job.error is not None:
+            # Ne PAS relever ici. `flush` est appelé depuis l'arrêt, sans le
+            # filet d'exception qui entoure `tick()` dans le fil de capture : la
+            # relever ferait planter le bouton Arrêter au pire moment possible.
+            _log.warning("la dernière reconnaissance a échoué à l'arrêt : %s", job.error)
+            return []
+        return self._consume_ocr_job(job).events

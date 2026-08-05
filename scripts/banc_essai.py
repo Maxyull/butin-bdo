@@ -28,12 +28,20 @@ import argparse
 import statistics
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-from butin.bench import assemble, build_report, measure_scroll, replay, silver_fingerprints
+from butin.bench import (
+    assemble,
+    build_report,
+    measure_scroll,
+    replay,
+    replay_realtime,
+    silver_fingerprints,
+)
 from butin.bench.transcript import Transcript
 from butin.capture.loop import LoopConfig
 from butin.capture.ocr import TextReader
@@ -104,6 +112,19 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="coût d'une reconnaissance, en ms ; par défaut celui mesuré à la transcription",
     )
+    parseur.add_argument(
+        "--async-ocr",
+        action="store_true",
+        help=(
+            "rejoue en TEMPS RÉEL, reconnaissance sur un fil à part "
+            "(LoopConfig.async_ocr). Paie le vrai coût de l'OCR à chaque lecture "
+            "et dure donc au moins la durée réelle de la rafale (une minute pour "
+            "600 images à 100 ms), contre quelques secondes pour le rejeu simulé. "
+            "Sert à mesurer si le découplage aide, ce qu'aucun rejeu simulé ne "
+            "peut faire : lui n'attend jamais en vrai, donc rien n'y sépare "
+            "les deux modes."
+        ),
+    )
     args = parseur.parse_args(argv)
 
     _, images = charger_images(args.dossier, args.rafale)
@@ -133,8 +154,24 @@ def main(argv: list[str] | None = None) -> int:
         reglage = LoopConfig(ocr_min_interval_s=cout_ms / 1000.0)
         print(f"Cadence de lecture : {cout_ms:.0f} ms par image", file=sys.stderr)
 
+    if args.async_ocr:
+        reglage = replace(reglage, async_ocr=True)
+        duree_min = len(images) * args.pas
+        print(
+            f"Mode asynchrone : rejeu en TEMPS RÉEL, au moins {duree_min:.0f} s "
+            "(le vrai coût de l'OCR, pas une transcription rejouée)…",
+            file=sys.stderr,
+        )
+        lecteur_reel = TextReader()
+        lecteur_reel.warmup()
+        resultat_replay = replay_realtime(
+            frames, matcher, lecteur_reel, config=reglage, interval_s=args.pas
+        )
+    else:
+        resultat_replay = replay(frames, matcher, config=reglage, interval_s=args.pas)
+
     rapport = build_report(
-        replay(frames, matcher, config=reglage, interval_s=args.pas),
+        resultat_replay,
         assemble([frame.lines for frame in frames]),
         measure_scroll(
             images,

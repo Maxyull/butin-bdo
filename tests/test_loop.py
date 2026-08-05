@@ -8,6 +8,9 @@ rendre une suite de tests inutile.
 
 from __future__ import annotations
 
+import threading
+import time
+
 import numpy as np
 import pytest
 
@@ -607,3 +610,260 @@ class TestImagesEcartees:
         assert resultat.ocr_ran
         assert resultat.skipped_reason
         assert resultat.events == []
+
+
+class LecteurControlable:
+    """Lecteur de texte piloté par le test, bloqué jusqu'à ce qu'on le libère.
+
+    Sert à observer, de façon déterministe, ce qui se passe PENDANT qu'une
+    reconnaissance est en vol sur le fil de fond, sans dépendre d'un vrai délai
+    d'OCR, ce qui rendrait le test lent et instable selon la charge de la
+    machine.
+    """
+
+    def __init__(self, fenetres: list[list[str]]) -> None:
+        self.fenetres = fenetres
+        self.appels = 0
+        self._porte = threading.Event()
+        self.entree = threading.Event()
+        """Se lève dès qu'un appel est ENTRÉ dans read_text, avant même qu'il
+        attende la porte. C'est ce que le test attend pour savoir que le fil de
+        fond a bien démarré, et pas seulement que tick() a rendu la main."""
+
+    def read_text(self, image: object) -> list[str]:
+        fenetre = self.fenetres[min(self.appels, len(self.fenetres) - 1)]
+        self.appels += 1
+        self.entree.set()
+        self._porte.wait(timeout=3.0)
+        self._porte.clear()
+        self.entree.clear()
+        return list(fenetre)
+
+    def liberer(self) -> None:
+        self._porte.set()
+
+
+def construire_controlable(fenetres: list[list[str]], matcher: ItemMatcher, **reglages: object):
+    """Comme `construire`, avec un lecteur qu'on peut retenir depuis le test."""
+    source = SourceFactice()
+    lecteur = LecteurControlable(fenetres)
+    config = LoopConfig(**{"min_sightings": 2, "async_ocr": True, **reglages})  # type: ignore[arg-type]
+    return source, lecteur, CaptureLoop(source, lecteur, matcher, REGION, config=config)
+
+
+def _attendre(condition, *, limite: float = 3.0) -> bool:
+    """Attend qu'une condition devienne vraie, sans figer le test si elle ne
+    l'est jamais. Le même motif que test_worker.py, pour la même raison : c'est
+    un vrai fil qu'on observe, pas une horloge simulée."""
+    fin = time.monotonic() + limite
+    while time.monotonic() < fin:
+        if condition():
+            return True
+        time.sleep(0.005)
+    return False
+
+
+def _tick_jusqua(
+    boucle, condition, *, depart: float, pas: float = 0.02, limite: float = 3.0
+) -> bool:
+    """Rappelle `tick()` avec un `now` croissant jusqu'à ce que la condition
+    devienne vraie.
+
+    ⚠️ Rien ne tourne tout seul entre deux appels à `tick()` : c'est
+    `CaptureWorker`, en vrai, qui le rappelle en boucle. Ici c'est le test qui
+    joue ce rôle, pour observer ce qui se passe une fois qu'un travail de fond
+    s'est terminé sans que le test ait à connaître le mécanisme interne.
+    """
+    fin = time.monotonic() + limite
+    now = depart
+    while time.monotonic() < fin:
+        boucle.tick(now=now)
+        if condition():
+            return True
+        now += pas
+        time.sleep(0.005)
+    return False
+
+
+class TestModeAsynchrone:
+    """Le vrai découplage : la reconnaissance sur un fil à part, sans bloquer le
+    fil qui mesure le défilement.
+
+    ⛔ LoopConfig.async_ocr vaut False par défaut, et ces tests ne changent pas
+    ça. Ils prouvent que le mode existe et se comporte comme annoncé ; le faire
+    tourner en vrai reste soumis à une mesure en conditions réelles, pas à ces
+    tests. Voir la docstring du réglage.
+
+    Comportement observé de l'extérieur, jamais l'état interne : ces tests
+    attendent des conditions avec un délai réel borné, comme test_worker.py le
+    fait déjà pour le fil de capture. C'est un vrai fil qu'on regarde
+    travailler, pas une horloge simulée qu'on peut avancer à la main.
+    """
+
+    def test_le_defilement_continue_pendant_la_reconnaissance(self, matcher: ItemMatcher) -> None:
+        """⭐ LE gain du découplage.
+
+        En mode synchrone, rien ne mesure le défilement tant que l'OCR n'a pas
+        rendu la main : c'est documenté depuis le 05/08 comme la cause du
+        passage d'une lecture toutes les 100 ms à une par seconde en vrai.
+        """
+        source, lecteur, boucle = construire_controlable(
+            [
+                [gain("Pierre noire (arme)")],
+                [gain("Pierre noire (arme)"), gain("Trace de sauvagerie")],
+            ],
+            matcher,
+        )
+
+        premier = boucle.tick(now=0.0)
+        assert premier.ocr_ran is True
+        assert _attendre(lambda: lecteur.entree.is_set()), "le fil de fond n'a jamais démarré"
+
+        # Pendant que le fil de fond reste bloqué dans read_text, plusieurs
+        # tours passent : aucun ne doit soumettre un second travail, et aucun
+        # ne doit se bloquer en attendant le premier.
+        source.decalage = 1
+        for pas in range(1, 6):
+            resultat = boucle.tick(now=pas * 0.10)
+            assert resultat.ocr_ran is False
+        assert lecteur.appels == 1, (
+            "un second travail est parti alors que le premier tournait encore"
+        )
+
+        lecteur.liberer()
+        # Le premier travail traité, la boucle en soumet un second : la preuve
+        # comportementale qu'il a bien été consommé, sans exposer l'état interne.
+        assert _tick_jusqua(boucle, lambda: lecteur.appels >= 2, depart=0.6), (
+            "aucun second travail n'a suivi la fin du premier"
+        )
+
+    def test_un_seul_travail_a_la_fois(self, matcher: ItemMatcher) -> None:
+        """Régression : deux travaux en vol liraient la même fenêtre deux fois,
+        ou pire, mélangeraient deux images sur le même _previous_lines."""
+        _, lecteur, boucle = construire_controlable([[gain("Pierre noire (arme)")]] * 3, matcher)
+
+        boucle.tick(now=0.0)
+        assert _attendre(lambda: lecteur.entree.is_set())
+
+        for pas in range(1, 20):
+            boucle.tick(now=pas * 0.01)
+
+        assert lecteur.appels == 1
+
+    def test_meme_resultat_qu_en_mode_synchrone(self, matcher: ItemMatcher) -> None:
+        """⭐ Le test qui compte : les deux modes doivent compter PAREIL.
+
+        `_align_and_stage` est le même code appelé des deux côtés ; ce test
+        vérifie que le chemin qui y mène ne change rien au résultat, sur un
+        scénario qui passe par l'amorce, un drop confirmé et une fin de
+        session.
+        """
+        fenetres = [
+            [gain("Pierre noire (arme)")],
+            [gain("Pierre noire (arme)"), gain("Trace de sauvagerie")],
+            [gain("Pierre noire (arme)"), gain("Trace de sauvagerie")],
+        ]
+
+        _, _, synchrone = construire(fenetres, matcher, async_ocr=False)
+        evenements_sync: list[str] = []
+        for pas in range(6):
+            evenements_sync += [e.item.name("fr") for e in synchrone.tick(now=pas * 0.5).events]
+        evenements_sync += [e.item.name("fr") for e in synchrone.flush()]
+
+        _, lecteur_async, asynchrone = construire(fenetres, matcher, async_ocr=True)
+        evenements_async: list[str] = []
+        pas = 0
+        # `LecteurFactice` répond quasi instantanément : rappeler tick() suffit
+        # à laisser chaque travail se terminer et à le voir consommé, sans rien
+        # connaître du mécanisme interne. Une marge de tours après le dernier
+        # appel laisse le tout dernier travail, encore en vol, se terminer.
+        while pas < 200 and (lecteur_async.appels < len(fenetres) or pas < 40):
+            resultat = asynchrone.tick(now=pas * 0.02)
+            evenements_async += [e.item.name("fr") for e in resultat.events]
+            pas += 1
+            time.sleep(0.005)
+        evenements_async += [e.item.name("fr") for e in asynchrone.flush()]
+
+        assert sorted(evenements_sync) == sorted(evenements_async)
+
+    def test_une_erreur_du_fil_de_fond_est_relevee_sur_tick(self, matcher: ItemMatcher) -> None:
+        """⚠️ Un fil qui avale ses erreurs est le pire des cas.
+
+        L'exception doit ressortir de tick(), exactement comme en mode
+        synchrone, pour que CaptureWorker la retienne et l'expose au lieu de
+        laisser le compteur stagner sans explication.
+        """
+
+        class LecteurQuiCasse:
+            def read_text(self, image: object) -> list[str]:
+                raise RuntimeError("modèle de reconnaissance introuvable")
+
+        source = SourceFactice()
+        boucle = CaptureLoop(
+            source,
+            LecteurQuiCasse(),
+            matcher,
+            REGION,
+            config=LoopConfig(async_ocr=True, capture_interval_s=0.01, ocr_max_idle_s=0.0),
+        )
+
+        boucle.tick(now=0.0)
+
+        with pytest.raises(RuntimeError, match="modèle de reconnaissance introuvable"):
+            assert _attendre(lambda: _leve_au_prochain_tick(boucle))
+
+    def test_le_flush_attend_un_travail_en_vol(self, matcher: ItemMatcher) -> None:
+        """Sans cette attente, la toute dernière lecture avant l'arrêt serait
+        perdue en silence : en mode synchrone, arrêter la session attend déjà
+        la fin du tour en cours (CaptureWorker.stop rejoint le fil)."""
+        source, lecteur, boucle = construire_controlable(
+            [
+                [gain("Pierre noire (arme)")],
+                [gain("Pierre noire (arme)"), gain("Trace de sauvagerie")],
+            ],
+            matcher,
+        )
+        boucle.tick(now=0.0)
+        assert _attendre(lambda: lecteur.entree.is_set())
+
+        source.decalage = 1
+        boucle.tick(now=0.1)
+        boucle.tick(now=0.2)
+        lecteur.liberer()
+
+        # flush() doit attendre ce travail-là, encore en vol à cet instant précis.
+        boucle.flush()
+
+        assert lecteur.appels >= 1
+
+    def test_le_flush_n_attend_pas_indefiniment(
+        self, matcher: ItemMatcher, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Le même choix qu'à l'arrêt du fil de capture : au-delà d'un délai
+        raisonnable, mieux vaut perdre cette dernière lecture que bloquer
+        l'arrêt indéfiniment."""
+        import butin.capture.loop as loop_module
+
+        monkeypatch.setattr(loop_module, "_FLUSH_OCR_TIMEOUT_S", 0.05)
+        _, lecteur, boucle = construire_controlable([[gain("Pierre noire (arme)")]], matcher)
+        boucle.tick(now=0.0)
+        assert _attendre(lambda: lecteur.entree.is_set())
+        # Ne JAMAIS libérer : le travail reste en vol pour de bon.
+
+        debut = time.monotonic()
+        evenements = boucle.flush()
+        duree = time.monotonic() - debut
+
+        assert evenements == []
+        assert duree < 1.0, "flush() a attendu bien plus que le délai réduit"
+
+
+def _leve_au_prochain_tick(boucle: CaptureLoop) -> bool:
+    """Vrai dès que boucle.tick lève, faux tant qu'elle ne fait qu'attendre.
+
+    Utilisé pour transformer l'attente bornée de _attendre en un point où
+    pytest.raises peut observer l'exception, sans dupliquer la logique de
+    scrutation à chaque appel.
+    """
+    boucle.tick(now=0.05)
+    return False
