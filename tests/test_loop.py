@@ -225,6 +225,54 @@ class TestComptage:
         assert resultat.silver == 1000
         assert boucle.total_silver == 1000
 
+    def test_le_silver_n_est_compte_que_sur_les_lignes_nouvelles(
+        self, matcher: ItemMatcher
+    ) -> None:
+        """Une ligne de silver relue six fois ne vaut pas six fois son montant.
+
+        Une ligne reste affichée une dizaine de secondes, donc se retrouve dans
+        toutes les lectures de cet intervalle. Seule sa première apparition est
+        un gain ; les suivantes sont la même ligne, toujours là.
+        """
+        avant = [gain("Pierre noire (arme)")]
+        apres = [gain("Pierre noire (arme)"), "Système Vous avez obtenu : [Pièces] x1,000 (21:54)"]
+        _, _, boucle = construire([avant] + [apres] * 6, matcher, ocr_max_idle_s=0.1)
+
+        totaux = [boucle.tick(now=pas * 0.4).silver for pas in range(1, 8)]
+
+        assert boucle.total_silver == 1000
+        assert sum(totaux) == 1000
+
+    def test_le_silver_ne_recompte_pas_la_fenetre_entiere(self, matcher: ItemMatcher) -> None:
+        """Régression : le silver était cumulé sur toute la fenêtre à chaque lecture.
+
+        Trouvé par le banc d'essai le 05/08/2026 sur 300 images de vrai farm.
+        `CaptureLoop._read` additionnait `sum(ligne.silver for ligne in parsed)`,
+        où `parsed` est la fenêtre entière et non les lignes nouvelles. Mesuré :
+        **123 409 silver comptés pour 93 161 réels, soit +32,5 %**, et encore,
+        avec seulement 6 lectures exploitées sur 300 images. C'était le seul
+        défaut du lot qui fasse **inventer** du gain plutôt qu'en rater.
+
+        Le motif reproduit ici est celui de la vraie rafale : le journal alterne
+        une ligne de silver et une ligne d'objet, et la fenêtre en contient donc
+        plusieurs en permanence.
+        """
+        montants = (1845, 2146, 2009, 1825)
+        pieces = [
+            f"Système Vous avez obtenu : [Pièces] x{montant:,} (21:54)" for montant in montants
+        ]
+        depart = [pieces[0], gain("Pierre noire (arme)"), pieces[1]]
+        suite = [*depart, pieces[2], pieces[3]]
+        _, _, boucle = construire([depart] + [suite] * 5, matcher, ocr_max_idle_s=0.1)
+
+        for pas in range(1, 7):
+            boucle.tick(now=pas * 0.4)
+
+        # Seuls les deux montants apparus après l'amorce sont des gains. Avant
+        # correction, la boucle rendait 1845 + 2146 + 2009 + 1825 par lecture
+        # retenue, soit plus de sept fois ce total.
+        assert boucle.total_silver == montants[2] + montants[3]
+
 
 class TestImagesEcartees:
     def test_une_image_aberrante_est_ecartee_avec_son_motif(self, matcher: ItemMatcher) -> None:

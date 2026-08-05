@@ -105,6 +105,13 @@ dans [docs/versionnage.md](docs/versionnage.md).
   continue et arrêtait l'analyse sur une erreur de syntaxe dans une dépendance.
 - `pip-audit --strict` échouait sur le paquet du projet lui-même, absent de
   PyPI.
+- **Le silver était compté sur toute la fenêtre du journal à chaque lecture**,
+  au lieu des seules lignes nouvelles. Une ligne restant affichée une dizaine de
+  secondes, son montant était additionné autant de fois qu'elle était relue.
+  Mesuré par le banc d'essai : **123 409 silver comptés pour 93 161 réels, soit
+  +32,5 %**, et avec seulement 6 lectures exploitées sur 300 images. C'était le
+  seul défaut connu qui fasse **inventer** du gain plutôt qu'en rater. Après
+  correction, l'écart est de −25,9 %, donc du bon côté.
 
 ### Connu et non résolu
 
@@ -115,11 +122,11 @@ dans [docs/versionnage.md](docs/versionnage.md).
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- ⛔ **Le compteur perd 74,5 % des drops et sur-compte le silver de 32,5 %.**
-  Mesuré par le banc d'essai sur 30 secondes de farm réel : 12 drops
-  enregistrés sur 47, et 123 409 silver comptés pour 93 161 réels. **Rien ne
-  peut être publié en l'état.** Les quatre causes sont identifiées, chiffrées et
-  aucune n'est dans l'anti-double-comptage lui-même :
+- ⛔ **Le compteur perd 74,5 % des drops et 25,9 % du silver.** Mesuré par le
+  banc d'essai sur 30 secondes de farm réel : 12 drops enregistrés sur 47, et
+  68 996 silver comptés pour 93 161 réels. **Rien ne peut être publié en
+  l'état.** Les causes restantes sont identifiées, chiffrées et aucune n'est
+  dans l'anti-double-comptage lui-même :
   [docs/banc-essai.md](docs/banc-essai.md).
 - La reconnaissance de texte coûte 336 ms par image sur une zone de 520 x 385,
   et **1 100 ms** sur une zone de 780 x 575. Le découplage de la boucle absorbe
