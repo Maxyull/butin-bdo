@@ -243,6 +243,91 @@ class TestFilDesDrops:
         assert state.snapshot()["derniers"] == []
 
 
+class TestPageHistorique:
+    """La seconde page. Sans elle, une session fermée disparaissait pour de bon.
+
+    Le butin était enregistré, la durée aussi, et rien ne les montrait jamais :
+    on farmait, on fermait, et on ne pouvait plus savoir ce qu'on avait fait.
+    """
+
+    def _session_close(self, store: SessionStore, spot: str, debut: float, fin: float) -> int:
+        session = store.start_session(started_at=debut, spot=spot, region="eu")
+        store.add_loot(session.id, [LootRow(item_id=43984, qty=4, at=debut + 10)])
+        store.end_session(session.id, ended_at=fin)
+        return session.id
+
+    def test_les_sessions_passees_sont_listees_de_la_plus_recente(self, app) -> None:
+        state, _ = app
+        self._session_close(state.store, "Aakman", 0.0, 3600.0)
+        self._session_close(state.store, "Gyfin", 7200.0, 10800.0)
+
+        historique = state.history()
+
+        assert [ligne["spot"] for ligne in historique] == ["Gyfin", "Aakman"]
+        assert historique[0]["duree_s"] == pytest.approx(3600.0)
+        assert historique[0]["objets"] == 4
+
+    def test_la_valeur_de_la_session_est_calculee(self, app) -> None:
+        """Le tableau ne sert à rien s'il n'affiche que des durées."""
+        state, _ = app
+        self._session_close(state.store, "Gyfin", 0.0, 3600.0)
+
+        ligne = state.history()[0]
+
+        assert ligne["total"] > 0
+        assert ligne["par_heure"] > 0
+
+    def test_une_session_en_cours_est_signalee(self, app) -> None:
+        """Sa durée grandit encore : la confondre avec une session finie
+        laisserait croire à un silver par heure figé."""
+        state, _ = app
+        state.start("Gyfin")
+
+        assert state.history()[0]["en_cours"] is True
+
+    def test_le_detail_rend_le_butin_de_la_session(self, app) -> None:
+        state, _ = app
+        session_id = self._session_close(state.store, "Gyfin", 0.0, 3600.0)
+
+        detail = state.session_detail(session_id)
+
+        assert detail is not None
+        assert detail["spot"] == "Gyfin"
+        assert [ligne["quantite"] for ligne in detail["butin"]] == [4]
+
+    def test_une_session_inconnue_rend_none_et_non_un_detail_vide(self, app) -> None:
+        """« Cette session n'existe pas » et « cette session n'a rien rapporté »
+        sont deux réponses différentes.
+
+        Les confondre ferait passer une erreur d'adressage pour une soirée sans
+        butin, ce qui est exactement le genre de silence que ce projet refuse.
+        """
+        state, _ = app
+
+        assert state.session_detail(9999) is None
+
+
+class TestRoutesHistorique:
+    def test_un_identifiant_inconnu_rend_404(self, app) -> None:
+        _, base = app
+
+        with pytest.raises(urllib.error.HTTPError) as echec:
+            urllib.request.urlopen(f"{base}/api/historique/9999")  # noqa: S310
+
+        assert echec.value.code == 404
+
+    def test_un_identifiant_qui_n_en_est_pas_un_rend_400(self, app) -> None:
+        """Le chemin vient du réseau : le convertir sans vérifier laisserait
+        remonter une erreur serveur là où la bonne réponse est « cette adresse
+        n'existe pas »."""
+        _, base = app
+
+        with pytest.raises(urllib.error.HTTPError) as echec:
+            urllib.request.urlopen(f"{base}/api/historique/abc")  # noqa: S310
+
+        assert echec.value.code == 400
+
+
 class TestCapture:
     """La capture, vue depuis l'interface. Le dernier maillon du produit."""
 

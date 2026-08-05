@@ -171,6 +171,69 @@ class AppState:
             "capture": capture,
         }
 
+    def history(self, *, limit: int = 30) -> list[dict[str, Any]]:
+        """Les sessions passées, avec ce qu'elles ont rapporté.
+
+        ⚠️ Hors de `snapshot`, et c'est délibéré. La page principale se
+        rafraîchit chaque seconde ; recalculer les statistiques de trente
+        sessions à ce rythme coûterait trente requêtes de cumul par seconde pour
+        un écran que personne ne regarde pendant qu'il farme. L'historique est
+        donc chargé quand on l'ouvre, et seulement là.
+        """
+        maintenant = time.time()
+        with self.lock:
+            taux, langue = self.market_rate, self.language
+
+        lignes: list[dict[str, Any]] = []
+        for session in self.store.sessions(limit=limit):
+            quantites = self.store.quantities(session.id)
+            stats = compute(
+                quantites,
+                self.book,
+                duration_s=session.duration_s(maintenant),
+                silver_direct=session.silver_direct,
+                market_rate=taux,
+                now=maintenant,
+            )
+            lignes.append(
+                {
+                    "id": session.id,
+                    "spot": session.spot,
+                    "debut": session.started_at,
+                    "duree_s": session.duration_s(maintenant),
+                    "en_cours": session.is_open,
+                    "total": stats.total,
+                    "par_heure": round(stats.per_hour),
+                    "objets": sum(quantites.values()),
+                    "complet": stats.is_complete,
+                }
+            )
+        _ = langue
+        return lignes
+
+    def session_detail(self, session_id: int) -> dict[str, Any] | None:
+        """Le butin d'une session passée, comme la page principale l'affiche.
+
+        Rend None sur un identifiant inconnu plutôt qu'un dictionnaire vide :
+        « cette session n'existe pas » et « cette session n'a rien rapporté »
+        sont deux réponses différentes, et les confondre ferait passer une
+        erreur d'adressage pour une soirée sans butin.
+        """
+        session = self.store.get_session(session_id)
+        if session is None:
+            return None
+        maintenant = time.time()
+        with self.lock:
+            langue = self.language
+        quantites = self.store.quantities(session_id)
+        return {
+            "id": session.id,
+            "spot": session.spot,
+            "debut": session.started_at,
+            "duree_s": session.duration_s(maintenant),
+            "butin": self._loot_rows(quantites, maintenant, langue),
+        }
+
     def _recent_rows(self, session_id: int, maintenant: float, langue: str) -> list[dict[str, Any]]:
         """Les derniers drops, tels qu'ils sont tombés.
 
@@ -357,6 +420,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(corps)
 
+    def _send_detail(self, brut: str) -> None:
+        """Sert le détail d'une session, en refusant un identifiant qui n'en est pas un.
+
+        Le chemin vient du réseau : le convertir sans vérifier laisserait
+        remonter une `ValueError` jusqu'au gestionnaire, qui rendrait une erreur
+        serveur là où la bonne réponse est « cette adresse n'existe pas ».
+        """
+        try:
+            session_id = int(brut)
+        except ValueError:
+            self._send_json({"erreur": "identifiant de session invalide"}, status=400)
+            return
+        detail = self.state.session_detail(session_id)
+        if detail is None:
+            self._send_json({"erreur": "session introuvable"}, status=404)
+            return
+        self._send_json(detail)
+
     def _send_file(self, name: str) -> None:
         chemin = (STATIC / name).resolve()
         # Garde-fou de traversée : sans lui, une requête « /../../secrets » se
@@ -393,6 +474,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_file("index.html")
         elif self.path == "/api/etat":
             self._send_json(self.state.snapshot())
+        elif self.path == "/api/historique":
+            self._send_json({"sessions": self.state.history()})
+        elif self.path.startswith("/api/historique/"):
+            self._send_detail(self.path.removeprefix("/api/historique/"))
         else:
             self._send_json({"erreur": "introuvable"}, status=404)
 
