@@ -17,6 +17,8 @@ français, et les noms d'objets sont réels avec leurs vrais identifiants.
 
 from __future__ import annotations
 
+import time
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +35,7 @@ from butin.bench import (
     canon,
     measure_scroll,
     replay,
+    replay_realtime,
     silver_fingerprints,
     tally_lines,
 )
@@ -392,6 +395,122 @@ def test_le_rejeu_fait_lire_une_image_sur_quatre_a_la_vraie_cadence(
 def test_le_rejeu_refuse_une_rafale_vide(matcher: ItemMatcher) -> None:
     with pytest.raises(ValueError, match="rafale vide"):
         replay((), matcher)
+
+
+# -- rejeu en temps réel, pour LoopConfig.async_ocr -----------------------
+
+
+class _LecteurLent:
+    """Lit la rafale, avec un coût artificiel mais réel.
+
+    `replay()` rejoue une transcription instantanée : un fil de fond y termine
+    en un instant quel que soit `now`, donc il ne prouve rien sur le
+    découplage. Ce lecteur coûte du VRAI temps (quelques millisecondes, pas la
+    seconde d'un vrai OCR) pour que `replay_realtime` ait quelque chose à
+    découpler, sans pour autant rendre les tests lents.
+
+    ⚠️ Répond à partir de l'IMAGE reçue, pas d'un compteur d'appels. En mode
+    asynchrone, `grab()` tourne à chaque tour alors que `read_text` n'est
+    appelé que de temps en temps : un compteur d'appels désignerait la fenêtre
+    d'une lecture précédente, plusieurs images en retard sur celle qu'on vient
+    réellement de recevoir. Un vrai lecteur ne fait pas cette erreur, il lit ce
+    qu'on lui donne ; ce double ne doit pas en faire une non plus.
+    """
+
+    def __init__(self, frames: Sequence[BenchFrame], cout_s: float) -> None:
+        self._par_id = {id(frame.image): frame.lines for frame in frames}
+        self._cout_s = cout_s
+        self.appels = 0
+
+    def read_text(self, image: GrayImage) -> list[str]:
+        time.sleep(self._cout_s)
+        self.appels += 1
+        return list(self._par_id[id(image)])
+
+
+def test_replay_realtime_refuse_une_rafale_vide(matcher: ItemMatcher) -> None:
+    with pytest.raises(ValueError, match="rafale vide"):
+        replay_realtime((), matcher, _LecteurLent((), 0.0))
+
+
+def test_replay_realtime_dure_reellement_la_duree_de_la_rafale(
+    matcher: ItemMatcher,
+) -> None:
+    """⚠️ C'est la propriété qui rend la mesure honnête, et son prix.
+
+    Une rafale de 20 images à 20 ms d'intervalle dure 400 ms de vraie horloge,
+    pas moins : c'est ce qui donne au fil de fond du temps réel pour travailler
+    pendant que la boucle continue de tiquer, exactement comme en jeu.
+    """
+    rafale = _rafale(_flux_pierres(30), fenetre=10)
+    lecteur = _LecteurLent(rafale.frames, cout_s=0.0)
+    pas = 0.02
+
+    debut = time.monotonic()
+    replay_realtime(rafale.frames, matcher, lecteur, config=TOUT_LIRE, interval_s=pas)
+    duree = time.monotonic() - debut
+
+    assert duree >= len(rafale.frames) * pas * 0.9  # 10 % de marge sur l'horloge système
+
+
+def test_replay_realtime_asynchrone_compte_la_meme_verite_que_le_rejeu_simule(
+    matcher: ItemMatcher,
+) -> None:
+    """⭐ Le test qui valide le harnais lui-même : il ne doit RIEN inventer.
+
+    En mode asynchrone, avec un lecteur assez rapide pour lire chaque image,
+    `replay_realtime` doit retrouver ce que `replay()` (rejeu simulé, référence
+    déjà éprouvée) trouve sur la même vérité connue d'avance.
+
+    ⚠️ **Une seule ligne peut manquer, jamais en trop.** Si un travail de fond
+    est encore en vol au TOUT DERNIER tour de la rafale, cette fenêtre-là n'a
+    jamais été soumise à l'OCR : rien ne l'a lue. En vrai jeu, le farm continue
+    au-delà de la coupure, une lecture suivante la rattrape ; ici, la rafale
+    s'arrête net. Ce n'est pas une perte de production, c'est un effet de bord
+    d'une rafale FINIE — mais ça borne le test à « au plus une ligne manquante »
+    plutôt qu'à une égalité stricte.
+    """
+    rafale = _rafale(_flux_pierres(30), fenetre=10)
+
+    reference = replay(rafale.frames, matcher, config=TOUT_LIRE)
+
+    lecteur = _LecteurLent(rafale.frames, cout_s=0.005)
+    config_async = LoopConfig(
+        ocr_min_interval_s=0.0, ocr_max_idle_s=0.0, min_sightings=2, async_ocr=True
+    )
+    resultat = replay_realtime(
+        rafale.frames, matcher, lecteur, config=config_async, interval_s=0.02
+    )
+
+    def cle(event):
+        return (event.item.item_id, event.qty)
+
+    reference_comptee = Counter(cle(e) for e in reference.events)
+    resultat_compte = Counter(cle(e) for e in resultat.events)
+
+    assert resultat_compte - reference_comptee == Counter(), (
+        "le mode asynchrone a inventé un événement absent de la référence"
+    )
+    manquants = reference_comptee - resultat_compte
+    assert sum(manquants.values()) <= 1, f"plus d'une ligne manque : {manquants}"
+
+
+def test_replay_realtime_synchrone_egale_le_rejeu_simule_a_cout_nul(
+    matcher: ItemMatcher,
+) -> None:
+    """Sans découplage et sans coût, le harnais en temps réel doit converger
+    vers le même résultat que le rejeu simulé : c'est le même code, `align_and_stage`
+    compris, seule la source du texte change."""
+    rafale = _rafale(_flux_pierres(30), fenetre=10)
+
+    reference = replay(rafale.frames, matcher, config=TOUT_LIRE)
+
+    lecteur = _LecteurLent(rafale.frames, cout_s=0.0)
+    resultat = replay_realtime(rafale.frames, matcher, lecteur, config=TOUT_LIRE, interval_s=0.01)
+
+    assert sorted((e.item.item_id, e.qty) for e in resultat.events) == sorted(
+        (e.item.item_id, e.qty) for e in reference.events
+    )
 
 
 # -- le rapport et ce qu'il autorise à dire -------------------------------
