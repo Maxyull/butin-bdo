@@ -59,10 +59,42 @@ GLITCH_MAX_SKIPS = 3
 # de journal, donc perdre le recouvrement n'a rien d'anormal.
 GLITCH_MIN_BASELINE = 3
 
-# Au-delà de ce nombre de nouvelles lignes entre deux captures, l'estimation du
-# recouvrement est presque sûrement fausse. Le journal ne défile pas de dix
-# lignes en un dixième de seconde.
+# Plancher du nombre de nouvelles lignes qu'on accepte sans discuter entre deux
+# lectures. Au-delà, l'appelant est censé fournir un plafond calculé sur le
+# temps réellement écoulé : ce nombre-ci ne vaut que pour deux captures
+# rapprochées.
 PLAUSIBLE_MAX_NEW = 10
+
+# Débit de lignes au-dessus duquel une estimation de recouvrement est presque
+# sûrement fausse, quel que soit l'intervalle.
+#
+# 20 et non 3, qui est le débit mesuré sur une vraie session : ce plafond n'est
+# pas là pour décrire le jeu, il est là pour attraper une estimation aberrante.
+# Le calcul de marge de la boucle place la limite de bon fonctionnement à 16
+# lignes par seconde ; un garde-fou doit se poser au-dessus de la limite qu'il
+# protège, sans quoi il rejette du travail correct.
+PLAUSIBLE_LINES_PER_SECOND = 20.0
+
+
+def plausible_max_new(elapsed_s: float) -> int:
+    """Nombre de nouvelles lignes acceptable après `elapsed_s` secondes.
+
+    ⚠️ Exister est le correctif. `PLAUSIBLE_MAX_NEW` était appliqué tel quel,
+    avec pour justification écrite que « le journal ne défile pas de dix lignes
+    en un dixième de seconde ». C'était vrai de la cadence de **capture**, pas
+    de celle de **lecture** : la reconnaissance ne tourne qu'une fois par
+    seconde au mieux, et jusqu'à une fois toutes les deux secondes quand rien ne
+    déclenche de lecture anticipée. En deux secondes, quatorze lignes nouvelles
+    ne sont pas invraisemblables, elles sont ordinaires.
+
+    Mesuré par le banc d'essai le 05/08/2026 : une lecture portant **14 lignes
+    réellement nouvelles** était rejetée comme un saut invraisemblable, donc
+    quatorze lignes de journal perdues d'un coup.
+
+    Le plancher garantit que le plafond ne devient jamais plus sévère qu'avant
+    sur un intervalle court.
+    """
+    return max(PLAUSIBLE_MAX_NEW, int(elapsed_s * PLAUSIBLE_LINES_PER_SECOND))
 
 
 @dataclass(slots=True)
@@ -98,23 +130,42 @@ def _overlap_score(
     current: Sequence[ObservedLine],
     k: int,
     cfg: MatchConfig,
-) -> float | None:
-    """Similarité moyenne si les `k` paires passent le seuil, sinon None.
+) -> tuple[float, int] | None:
+    """(similarité moyenne, paires en désaccord) si `k` tient, sinon None.
 
     Les paires pour un recouvrement `k` sont `previous[lp - k + j]` contre
     `current[j]`, pour j de 0 à k exclu.
+
+    ⚠️ Un recouvrement est retenu quand une **part** suffisante de ses paires
+    s'accordent, pas quand elles s'accordent toutes. La règle du tout ou rien
+    laissait une seule ligne mal lue annuler un recouvrement de vingt : plus
+    aucun `k` n'était valide, l'appelant concluait que rien ne se recouvrait, et
+    `is_glitch_frame` jetait l'image entière. Mesuré par le banc d'essai sur 300
+    images de vrai farm, **8 lectures sur 15 partaient ainsi à la poubelle**,
+    alors qu'elles portaient chacune une vingtaine de lignes parfaitement
+    lisibles.
+
+    La moyenne rendue porte sur **toutes** les paires, y compris celles qui
+    n'ont pas franchi le seuil. C'est ce qui fait de la confiance une mesure
+    honnête du recouvrement retenu, et non de sa meilleure moitié.
+
+    Le seuil et les deux populations qui le justifient sont documentés sur
+    `MatchConfig.overlap_accept`.
     """
     if k == 0:
         # Vide de sens mais toujours valide : aucune paire à contredire.
-        return 1.0
+        return (1.0, 0)
     lp = len(previous)
     total = 0.0
+    accords = 0
     for j in range(k):
         similarity = line_similarity(previous[lp - k + j], current[j], cfg)
-        if similarity < cfg.line_accept:
-            return None
         total += similarity
-    return total / k
+        if similarity >= cfg.line_accept:
+            accords += 1
+    if accords / k < cfg.overlap_accept:
+        return None
+    return (total / k, k - accords)
 
 
 def align(
@@ -138,10 +189,11 @@ def align(
     max_k = min(lp, lc)
 
     scores: dict[int, float] = {}
+    mismatches: dict[int, int] = {}
     for k in range(max_k, -1, -1):
         score = _overlap_score(previous, current, k, cfg)
         if score is not None:
-            scores[k] = score
+            scores[k], mismatches[k] = score
 
     positive = [k for k in scores if k > 0]
     largest_valid = max(positive) if positive else 0
@@ -154,6 +206,7 @@ def align(
         "expected_new": expected_new,
         "target_overlap": None,
         "disagreement": False,
+        "mismatched_pairs": 0,
     }
 
     if expected_new is None:
@@ -167,6 +220,10 @@ def align(
         diagnostics["disagreement"] = chosen != largest_valid
 
     confidence = scores[chosen] if chosen > 0 else 0.0
+    # Combien de paires du recouvrement retenu ne se ressemblaient pas. Une
+    # valeur haute sur un comptage faux dit tout de suite où chercher : la
+    # tolérance a laissé passer un recouvrement qu'elle n'aurait pas dû.
+    diagnostics["mismatched_pairs"] = mismatches.get(chosen, 0)
     zero_overlap = chosen == 0 and lp > 0 and lc > 0
     if zero_overlap:
         diagnostics["reason"] = (
@@ -215,10 +272,14 @@ def is_implausible_jump(
 ) -> bool:
     """Vrai si une image annonce plus de nouvelles lignes que physiquement possible.
 
-    Deux captures sont espacées d'environ un dixième de seconde. Il en tombe au
-    plus quelques lignes. Un nombre bien supérieur signifie que le recouvrement
-    a été mal estimé, ce qui est précisément la façon dont des doublons se
-    glissent dans le total.
+    Un nombre bien supérieur à ce que l'intervalle autorise signifie que le
+    recouvrement a été mal estimé, ce qui est précisément la façon dont des
+    doublons se glissent dans le total.
+
+    ⚠️ `max_new` doit venir de `plausible_max_new(temps écoulé)`, pas de la
+    valeur par défaut. Celle-ci ne vaut que pour deux lectures rapprochées, et
+    l'appliquer à un intervalle de deux secondes fait rejeter des lectures
+    parfaitement normales.
 
     Une confirmation par les pixels (`expected_new`) lève le plafond : deux
     signaux indépendants qui disent la même chose valent mieux que notre
