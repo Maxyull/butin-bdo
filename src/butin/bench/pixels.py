@@ -6,40 +6,35 @@ sans partager avec lui la moindre étape : pas d'OCR, pas de catalogue, pas de
 découpage de ligne. Deux mesures indépendantes qui tombent d'accord valent une
 preuve ; la même mesure faite deux fois n'en vaut aucune.
 
-⚠️ Ce que le banc a mesuré le 05/08/2026 : cette règle ne fonctionne pas
-------------------------------------------------------------------------
+La règle de mesure, et comment elle a été trouvée
+--------------------------------------------------
 
-La règle retenue jusque-là était la **colonne des pastilles de canal**, choisie
-parce qu'elle est opaque là où le fond du journal est transparent sur le monde
-du jeu. Elle avait été validée sur deux captures de scènes **différentes**, ce
-qui mélangeait le bruit du décor et un vrai changement de contenu. La rafale de
-300 images permet enfin de la vérifier sur un vrai défilement, et le résultat
-est net :
+La première règle était la **colonne des pastilles de canal**, choisie parce
+qu'elle est opaque là où le fond du journal est transparent sur le monde du jeu.
+Elle avait été validée sur deux captures de scènes **différentes**, ce qui
+mélangeait le bruit du décor et un vrai changement de contenu. La rafale de 300
+images a permis de la vérifier sur un vrai défilement, et le verdict est sans
+appel : **0 détection juste sur 37**, la pire des bandes essayées.
 
-| Bande mesurée | Détections sûres | Décalage juste à ±3 px |
+La raison est structurelle : les pastilles `Système` sont toutes identiques et
+espacées d'exactement un pas de ligne. Un défilement d'une ligne superpose la
+pastille `n` sur la pastille `n+1` et ne change donc rien. C'est justement la
+colonne aveugle à ce qu'on lui demande de voir.
+
+La règle qui marche est la **colonne du texte, comparée sur un masque de pixels
+clairs**. Le texte du journal est peint en clair, le monde du jeu est sombre
+(médiane 21 sur 255 sur ces captures) : le masque le fait disparaître, et il ne
+reste que les lettres, qui elles défilent.
+
+| Mesure | Détections justes | Fausses détections |
 | --- | --- | --- |
-| pastilles, 0 à 90 px | 0 / 20 | **0 / 20** |
-| une seule pastille, 10 à 45 px | 0 / 20 | 0 / 20 |
-| colonne du texte, 170 à 710 px | 0 / 20 | 9 / 20 |
-| zone entière | 0 / 20 | 5 / 20 |
+| gris, colonne des pastilles | **0 / 37** | 0 / 262 |
+| gris, colonne du texte | 17 / 37 | 0 / 262 |
+| **masque clair, colonne du texte** | **32 / 37** | **0 / 262** |
 
-**Zéro détection sûre sur les 299 transitions**, et la colonne des pastilles est
-la pire des quatre. La raison est structurelle, et évidente une fois vue : les
-pastilles sont **toutes identiques et régulièrement espacées de 21 px**. Un
-défilement d'exactement une ligne superpose la pastille `n` sur la pastille
-`n+1`, donc ne change rien. Cette colonne est justement celle qui ne peut pas
-voir le défilement d'une ligne.
-
-Les colonnes du texte, elles, voient le bon décalage une fois sur deux, mais
-jamais assez nettement pour franchir le critère de sûreté : le décor transparent
-qui bouge derrière pèse plus lourd que les lettres.
-
-Conséquence pour le compteur, et elle est lourde : `expected_new` reste toujours
-à `None`, l'alignement travaille sur le texte seul, et surtout la boucle ne
-déclenche plus l'OCR que sur son minuteur de repli de 2 secondes. Le module est
-gardé, il mesure ce qu'il peut et **compte ses non-détections** ; c'est
-`fingerprints.py` qui corrobore la référence en attendant une règle de mesure
-qui marche.
+Sur les 5 transitions qu'elle rate, elle rend **0 et non un mauvais décalage** :
+juste ou muette, jamais trompeuse. Une prédiction fausse ferait recompter du
+butin, une absence de prédiction fait seulement retomber sur le texte seul.
 
 Ce que la mesure ne sait pas faire, et qui est assumé :
 
@@ -59,7 +54,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ..capture.screen import GrayImage
-from ..tracking.scroll import estimate_scroll_px, rows_scrolled
+from ..tracking.scroll import BRIGHT_THRESHOLD, estimate_text_scroll_px, rows_scrolled
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,11 +98,13 @@ class PixelScroll:
 def measure_scroll(
     images: Sequence[GrayImage],
     *,
-    ruler_left: int = 0,
-    ruler_width: int = 90,
-    row_height_px: float = 21.0,
+    ruler_left_ratio: float = 0.19,
+    ruler_right_ratio: float = 0.92,
+    row_height_px: float = 21.6,
+    max_scroll_lines: int = 8,
+    bright_threshold: int = BRIGHT_THRESHOLD,
 ) -> PixelScroll:
-    """Cumule le défilement image par image sur la colonne des pastilles.
+    """Cumule le défilement image par image sur la colonne du texte.
 
     Les valeurs par défaut sont celles de `capture.loop.LoopConfig`, et c'est
     voulu : le banc doit mesurer la géométrie que la boucle utilise vraiment,
@@ -116,16 +113,22 @@ def measure_scroll(
     decalages: list[int] = []
     non_sures: list[int] = []
     total = 0
+    max_shift = max(1, round(max_scroll_lines * row_height_px))
 
     precedente: GrayImage | None = None
     for index, image in enumerate(images):
-        regle: GrayImage = image[:, ruler_left : ruler_left + ruler_width]
+        largeur = image.shape[1]
+        gauche = max(0, min(largeur - 1, round(largeur * ruler_left_ratio)))
+        droite = max(gauche + 1, min(largeur, round(largeur * ruler_right_ratio)))
+        regle: GrayImage = image[:, gauche:droite]
         if precedente is None:
             # Première image : rien à comparer, et surtout pas un zéro qui
             # entrerait dans le taux de couverture comme une mesure réussie.
             decalages.append(0)
         else:
-            mesure = estimate_scroll_px(precedente, regle)
+            mesure = estimate_text_scroll_px(
+                precedente, regle, max_shift=max_shift, threshold=bright_threshold
+            )
             if mesure.confident:
                 total += mesure.shift_px
                 decalages.append(mesure.shift_px)

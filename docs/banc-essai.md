@@ -10,12 +10,12 @@ Le code du banc est dans `src/butin/bench/`, ses tests dans
 
 ## 1. Le résultat, en une ligne
 
-> Sur 30 secondes de farm réel, le compteur enregistre **41 drops sur 47**, soit
-> une perte de **12,8 %** (**8,5 %** en quantité cumulée), et **71 910 silver
-> sur 93 161**, soit **−22,8 %**.
+> Sur 30 secondes de farm réel, le compteur enregistre **46 drops sur 47**, soit
+> une perte de **2,1 %** (**1,6 %** en quantité cumulée), et **70 714 silver sur
+> 93 161**, soit **−24,1 %**.
 
-Toujours pas publiable, mais plus pour la même raison : le compteur ne se trompe
-plus, il **manque d'images**. Les deux causes qui restent sont en amont de lui.
+Le comptage des objets est bon. Ce qui reste est un défaut **du silver**, et il
+a sa propre cause, chiffrée en partie 4 E.
 
 ### Historique des mesures
 
@@ -23,19 +23,22 @@ plus, il **manque d'images**. Les deux causes qui restent sont en amont de lui.
 | --- | --- | --- | --- | --- |
 | 05/08, mesure initiale | 12 / 47 | −70,5 % | **+32,5 %** | — |
 | 05/08, cause D corrigée | 12 / 47 | −70,5 % | **−25,9 %** | le silver ne compte que les lignes nouvelles |
-| 05/08, cause C corrigée | **41 / 47** | **−8,5 %** | −22,8 % | les garde-fous ne jettent plus les lectures valides |
+| 05/08, cause C corrigée | 41 / 47 | −8,5 % | −22,8 % | les garde-fous ne jettent plus les lectures valides |
+| 05/08, cause B corrigée | **46 / 47** | **−1,6 %** | −24,1 % | la mesure de défilement fonctionne enfin |
 
-Deux façons de lire ce tableau, et les deux comptent :
+Trois façons de lire ce tableau, et les trois comptent :
 
 * la correction de la cause D **n'améliore pas le total, elle en inverse le
   signe**. Le compteur cesse d'inventer du gain et se contente d'en rater, ce
   qui est le seul comportement acceptable ici ;
-* la correction de la cause C fait passer la perte de **74,5 % à 12,8 %**, et
-  ramène les images jetées de 9 à **0** et le butin reconnu puis perdu de 21 à
-  **1**. C'était bien le plus gros levier du lot.
+* la cause C fait passer la perte de **74,5 % à 12,8 %**, et ramène les images
+  jetées de 9 à **0**. C'était bien le plus gros levier du lot ;
+* la cause B la ramène à **2,1 %**, et fait passer les images lues de 15 à 22.
+  Elle ajoute surtout une **troisième mesure indépendante** au banc, qui était
+  muette jusque-là.
 
-Les causes restantes sont en partie 4. Aucune n'a jamais été dans la logique
-d'anti-double-comptage elle-même.
+Aucune de ces causes n'a jamais été dans la logique d'anti-double-comptage
+elle-même.
 
 ## 2. Les données
 
@@ -138,37 +141,66 @@ Conséquence directe : la boucle ne peut lire qu'environ **une image sur onze**,
 et `LoopConfig.ocr_min_interval_s`, réglé à 0,35 s, promet une cadence que la
 machine ne sait pas tenir.
 
-### B. La mesure de défilement en pixels ne détecte rien
+### B. La mesure de défilement en pixels ne détectait rien — CORRIGÉ
 
-Zéro détection sûre sur les 299 transitions. Testé sur quatre bandes, contre les
-92 lignes que la référence sait passées :
+Zéro détection sûre sur les 299 transitions, et zéro décalage juste sur les 37
+transitions où une ligne est réellement apparue.
 
-| Bande mesurée | Détections sûres | Décalage juste à ±3 px |
+**La colonne des pastilles était la pire des bandes essayées**, et la raison est
+structurelle : les pastilles `Système` sont toutes identiques et espacées
+d'exactement un pas de ligne. Un défilement d'une ligne superpose la pastille
+`n` sur la pastille `n+1` et ne change donc rien. C'est précisément la colonne
+aveugle à ce qu'on lui demandait de voir. Le chiffre de 3,9 contre 11,3 qui
+l'avait fait retenir comparait deux captures de scènes **différentes** : il
+mesurait le bruit du décor, pas un défilement.
+
+Cette cause en entraînait une autre, plus coûteuse encore. La boucle ne
+déclenche la reconnaissance que si un défilement a été détecté, ou à défaut au
+bout de son minuteur de repli de 2 secondes. Sans détection, c'était toujours le
+repli : **15 images lues sur 300**.
+
+**Ce qui marche.** Deux changements, et le second est celui qui compte.
+
+*La bande.* La colonne du **texte** au lieu de celle des pastilles, parce que
+deux lignes du journal ne portent jamais les mêmes lettres aux mêmes endroits.
+
+*La comparaison.* Un **masque de pixels clairs** au lieu des niveaux de gris.
+Le texte du journal est peint en clair, le monde du jeu est sombre : sur ces
+captures, la médiane de la zone est à **21 sur 255**. En niveaux de gris, le
+décor occupe toute la surface et pèse donc plus lourd que les lettres ; le
+masque le fait disparaître, et il ne reste que ce qui défile.
+
+| Mesure | Décalages justes | Fausses détections |
 | --- | --- | --- |
-| pastilles de canal, 0 à 90 px | 0 / 20 | **0 / 20** |
-| une seule pastille, 10 à 45 px | 0 / 20 | 0 / 20 |
-| colonne du texte, 170 à 710 px | 0 / 20 | 9 / 20 |
-| zone entière | 0 / 20 | 5 / 20 |
+| gris, colonne des pastilles | **0 / 37** | 0 / 262 |
+| gris, colonne du texte | 17 / 37 | 0 / 262 |
+| **masque clair, colonne du texte** | **32 / 37** | **0 / 262** |
 
-**La colonne des pastilles est la pire des quatre**, et la raison est
-structurelle : les pastilles `Système` sont toutes identiques et espacées de
-21 px. Un défilement d'exactement une ligne superpose la pastille `n` sur la
-pastille `n+1` et ne change donc rien. C'est précisément la colonne qui ne peut
-pas voir un défilement d'une ligne.
+Sur les 5 transitions qu'elle rate, la nouvelle mesure rend **0 et non un
+mauvais décalage** : juste ou muette, jamais trompeuse. C'est la propriété qui
+compte, parce qu'une prédiction fausse ferait recompter du butin alors qu'une
+absence de prédiction fait seulement retomber sur le texte seul.
 
-Les colonnes de texte voient le bon décalage une fois sur deux, mais jamais
-assez nettement pour franchir le critère de sûreté : le décor transparent qui
-bouge derrière pèse plus lourd que les lettres.
+**Deux critères de sûreté, tous deux nécessaires**, et le second a été ajouté
+après qu'un test l'a mis en défaut :
 
-Le chiffre de 3,9 contre 11,3 qui avait fait retenir cette colonne comparait
-deux captures de scènes **différentes** : il mesurait le bruit du décor, pas un
-défilement.
+* le décalage doit expliquer une **part** du désaccord restant. Mesuré : les 32
+  décalages justes expliquent 0,030 au minimum, les 262 transitions sans
+  défilement 0, et une image de bruit uniforme 0,006. Le seuil est à 0,02 ;
+* le recouvrement obtenu doit atteindre un **plancher absolu**. Sans lui, deux
+  contenus sans aucun rapport passaient : sur des pixels étrangers l'un à
+  l'autre, il existe toujours un décalage qui gagne un peu par hasard. Mesuré :
+  les décalages justes atteignent 0,433 au minimum, deux contenus sans rapport
+  plafonnent vers 0,1. Le seuil est à 0,30.
 
-Cette cause en entraîne une autre, plus coûteuse encore. La boucle ne déclenche
-la reconnaissance que si un défilement a été détecté, ou à défaut au bout de son
-minuteur de repli de 2 secondes. Sans détection, c'est toujours le repli qui
-s'applique : **15 images lues sur 300**, soit une par 2 secondes, là où la seule
-contrainte machine en autoriserait 27.
+**Et le pas vertical n'est pas 21 px, il est 21,6.** Les décalages réellement
+observés sont 22, 43, 65, 86 et 108 px pour une à cinq lignes, parfaitement
+linéaires. La valeur de 21 relevée à l'œil sur les pastilles était basse de 3 %.
+
+**Après correction :** 22 images lues au lieu de 15, et le banc gagne sa
+troisième mesure indépendante. Elle compte **70 lignes** passées là où le
+recalage du texte en compte 92 : l'écart tient aux 5 transitions manquées, qui
+sont justement les plus grosses.
 
 ### C. Huit des quinze lectures étaient jetées — CORRIGÉ
 
@@ -234,6 +266,27 @@ imputable au silver : c'est la même perte que sur les objets, causes B et C.
 Deux tests de régression le figent dans `tests/test_loop.py`, tous deux vérifiés
 en échec sans le correctif.
 
+### E. Le silver ne passe pas par le vote multi-images
+
+Trouvé en cherchant pourquoi l'écart sur le silver reste à −24,1 % quand celui
+sur les objets est tombé à −2,1 %.
+
+Un objet est tranché au **vote sur toutes les lectures** de sa ligne, par
+`tracking/staging.py`. Le silver, lui, est lu une fois : à la première
+apparition de la ligne, et jamais revu. Or le montant est un nombre à quatre
+chiffres que l'OCR rate souvent.
+
+Mesuré sur la rafale : **13,6 % des lectures de lignes de silver ont un montant
+illisible** (470 sur 3 456). Le découpage rend alors la quantité 1 avec un
+doute, ce qui est le bon choix pour un objet mais coûte environ deux mille
+silver pour une ligne de pièces. La référence, qui tranche chaque position au
+vote sur des dizaines de lectures, n'a le même problème que sur **4 lignes sur
+45**.
+
+Le sens de l'erreur reste le bon : on sous-compte. Mais c'est une perte
+évitable, et elle a la même forme que celles déjà corrigées, un mécanisme
+existant qui n'est pas branché là où il faudrait.
+
 ## 5. Ce que ça commande pour la suite
 
 Dans cet ordre, et parce que le banc le montre :
@@ -242,21 +295,17 @@ Dans cet ordre, et parce que le banc le montre :
    +32,5 % à −25,9 %, donc du mauvais côté au bon.
 2. ~~**Ne plus jeter les lectures valides** (cause C).~~ **Fait.** La perte est
    passée de 74,5 % à 12,8 %, et les images jetées de 9 à 0.
-3. **Trouver une règle de mesure du défilement qui marche** (cause B), ou
-   assumer de s'en passer et régler la cadence autrement. Le calibrage de la
-   zone, déjà prévu, devra de toute façon trancher où mesurer.
-4. **Recaler le budget d'OCR sur la taille réelle de la zone** (cause A).
+3. ~~**Trouver une règle de mesure du défilement qui marche** (cause B).~~
+   **Fait.** La perte est passée à 2,1 %, et le banc a gagné sa troisième
+   mesure indépendante.
+4. **Faire passer le silver par le vote multi-images** (cause E). C'est tout ce
+   qui reste d'écart mesurable, et le mécanisme existe déjà pour les objets.
+5. **Recaler le budget d'OCR sur la taille réelle de la zone** (cause A). Non
+   bloquant : la boucle lit maintenant assez d'images pour ne perdre que 2 %.
 
-Les deux qui restent sont la **même** question posée deux fois : la boucle ne
-lit que 15 images sur 300. Sans mesure de défilement elle retombe sur son
-minuteur de repli de 2 secondes ; avec une reconnaissance à 1 100 ms elle ne
-pourrait de toute façon pas dépasser 27 lectures. Ce qui reste de perte n'est
-plus un défaut de comptage, c'est un manque d'images.
-
-L'écart sur le silver (−22,8 %) est plus grand que sur les drops (−12,8 %) pour
-la même raison : une ligne de silver n'est comptée qu'à sa première apparition,
-alors qu'un objet est tranché au vote sur plusieurs lectures. Avec 15 lectures
-pour 92 lignes, le vote rattrape ce que la première apparition rate.
+Reste ensuite le **calibrage de la zone**, qui n'est pas une cause du banc mais
+la condition pour qu'un utilisateur autre que nous puisse s'en servir. Les
+bandes et le pas vertical sont mesurés sur une seule configuration d'écran.
 
 Le banc se relance après chaque correction et rend le même rapport : c'est
 exactement ce pour quoi il a été écrit.

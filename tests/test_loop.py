@@ -17,23 +17,35 @@ from butin.catalog import ItemCatalog, ItemMatcher
 
 ROW = 21
 WIDTH = 300
-RULER = 90
+RULER = 60
+TEXTE = 90
 ROWS = 12
 
 REGION = Region(left=0, top=0, width=WIDTH, height=ROW * ROWS)
 
 
 def rendu(decalage_lignes: int) -> np.ndarray:
-    """Fabrique une image dont la colonne de pastilles a défilé.
+    """Fabrique une image du journal telle que la boucle la reçoit.
 
-    Seule la colonne de gauche porte un motif contrasté, comme les vraies
-    pastilles de canal. Le reste imite le fond transparent : du bruit qui
-    n'aide en rien.
+    Trois éléments, et chacun a son rôle dans ce que la mesure de défilement
+    doit savoir faire :
+
+    * un **décor sombre** sur toute la largeur, parce que le fond du chat est
+      transparent sur le monde du jeu ;
+    * une **pastille de canal** à gauche, identique sur toutes les rangées.
+      C'est ce qui la rend inutilisable comme règle de mesure : un défilement
+      d'une ligne la superpose à sa voisine et n'y change rien ;
+    * des **marques claires propres à chaque ligne** dans la colonne du texte,
+      qui sont le seul signal où un défilement se voit.
     """
-    image = np.zeros((ROW * ROWS, WIDTH), dtype=np.uint8)
+    image = np.full((ROW * ROWS, WIDTH), 20, dtype=np.uint8)
     for index in range(ROWS):
-        valeur = (index + decalage_lignes) * 17 % 200 + 40
-        image[index * ROW : index * ROW + 16, 0:RULER] = valeur
+        haut = index * ROW
+        image[haut + 3 : haut + 17, 5:RULER] = 200
+        colonnes = np.random.default_rng(index + decalage_lignes).choice(
+            WIDTH - TEXTE, size=(WIDTH - TEXTE) // 6, replace=False
+        )
+        image[haut + 4 : haut + 16, TEXTE + colonnes] = 230
     return image
 
 
@@ -175,6 +187,32 @@ class TestDefilementAccumule:
         resultat = boucle.tick(now=0.20)
 
         assert resultat.pending_shift_px == pytest.approx(2 * ROW, abs=2)
+
+    def test_le_defilement_mesure_devient_une_prediction(self, matcher: ItemMatcher) -> None:
+        """Régression : la mesure ne détectait plus rien, donc ne prédisait rien.
+
+        La règle de mesure était la colonne des pastilles de canal. Mesuré par
+        le banc d'essai le 05/08/2026 sur 300 images de vrai farm : **zéro
+        détection sûre sur 299 transitions**. `expected_new` valait donc
+        toujours None, l'alignement travaillait sur le texte seul, et la boucle
+        ne déclenchait plus la reconnaissance que sur son minuteur de repli de
+        deux secondes, soit 15 images lues sur 300.
+
+        La règle est maintenant la colonne du **texte**, comparée sur un masque
+        de pixels clairs : 32 détections justes sur 37, et 22 images lues.
+        """
+        # Une fenêtre de plusieurs lignes : la prédiction est bornée par le
+        # nombre de lignes visibles, et deux lignes nouvelles dans une fenêtre
+        # d'une seule n'a pas de sens.
+        fenetre = [gain("Pierre noire (arme)", qty) for qty in range(1, 5)]
+        source, _, boucle = construire([fenetre] * 3, matcher)
+        boucle.tick(now=0.0)
+
+        source.decalage = 2
+        boucle.tick(now=0.10)
+        resultat = boucle.tick(now=0.50)
+
+        assert resultat.expected_new == 2
 
     def test_une_mesure_non_sure_annule_la_prediction(self, matcher: ItemMatcher) -> None:
         """Régression : mieux vaut aucune prédiction qu'une fausse.

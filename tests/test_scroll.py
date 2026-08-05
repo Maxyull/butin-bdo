@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from butin.tracking import StabilityGate, estimate_scroll_px, expected_new_lines
-from butin.tracking.scroll import rows_scrolled
+from butin.tracking.scroll import estimate_text_scroll_px, rows_scrolled
 from butin.tracking.stability import frame_difference
 
 ROW_HEIGHT = 20
@@ -102,6 +102,152 @@ class TestDetectionDeDefilement:
         colour = np.zeros((40, WIDTH, 3), dtype=np.float32)
         result = estimate_scroll_px(colour, colour)
         assert not result.confident
+
+
+ENCRE = 230
+"""Niveau du texte du journal, peint en clair."""
+
+
+def render_texte(lignes: list[int], *, decor: int = 0, pas: int = ROW_HEIGHT) -> np.ndarray:
+    """Fabrique un journal : un décor sombre, et des marques claires par ligne.
+
+    C'est la forme que le journal a vraiment. Son fond est **transparent sur le
+    monde du jeu**, donc le décor derrière change tout le temps et pour des
+    raisons qui n'ont rien à voir avec le défilement, tandis que le texte, lui,
+    est peint en clair et défile avec les lignes.
+
+    `decor` déplace le fond sans toucher au texte, ce qui est exactement la
+    situation que la mesure doit traverser sans broncher.
+    """
+    image = np.zeros((len(lignes) * pas, WIDTH), dtype=np.uint8)
+    for index, graine in enumerate(lignes):
+        haut = index * pas
+        # Un fond sombre mais pas uniforme, sous le seuil de clarté.
+        fond = (np.arange(WIDTH, dtype=np.int64) * 3 + decor * 7) % 100
+        image[haut : haut + pas, :] = fond.astype(np.uint8)
+        # Des marques claires, à des colonnes propres à la ligne : deux lignes
+        # du journal ne portent jamais les mêmes lettres aux mêmes endroits.
+        colonnes = np.random.default_rng(graine).choice(WIDTH, size=WIDTH // 6, replace=False)
+        image[haut + 4 : haut + pas - 4, colonnes] = ENCRE
+    return image
+
+
+class TestDefilementDuTexte:
+    def test_defilement_d_une_ligne(self) -> None:
+        previous = render_texte([1, 2, 3, 4, 5, 6])
+        current = render_texte([2, 3, 4, 5, 6, 7])
+
+        result = estimate_text_scroll_px(previous, current)
+
+        assert result.shift_px == ROW_HEIGHT
+        assert result.confident
+
+    def test_le_decor_qui_bouge_derriere_ne_fausse_pas_la_mesure(self) -> None:
+        """Régression : c'est tout le problème du journal, et il est mesuré.
+
+        Le fond du chat est transparent sur le monde du jeu. En niveaux de gris,
+        ce décor occupe toute la surface et pèse donc plus lourd que les
+        lettres : la mesure suit le monde qui bouge au lieu du texte qui défile.
+
+        Mesuré par le banc d'essai le 05/08/2026 sur 300 images de vrai farm :
+        **0 détection juste sur 37** avec la colonne des pastilles en niveaux de
+        gris, 17 sur 37 avec la colonne du texte en niveaux de gris, et
+        **32 sur 37** avec le masque de pixels clairs. Le masque fait disparaître
+        le décor, et il ne reste que les lettres.
+
+        Ici le texte défile d'une ligne pendant que le décor change dessous.
+        """
+        previous = render_texte([1, 2, 3, 4, 5, 6], decor=0)
+        current = render_texte([2, 3, 4, 5, 6, 7], decor=9)
+
+        clair = estimate_text_scroll_px(previous, current)
+        gris = estimate_scroll_px(previous, current)
+
+        assert clair.shift_px == ROW_HEIGHT
+        assert clair.confident
+        # La mesure en gris peut tomber sur le bon décalage, mais le décor
+        # l'empêche de franchir son critère de sûreté : elle ne rend donc
+        # aucune prédiction. C'est exactement ce que le banc a observé, avec
+        # zéro détection sûre sur les 299 transitions de la rafale réelle.
+        assert not gris.confident
+
+    def test_des_lignes_toutes_identiques_sont_invisibles(self) -> None:
+        """⛔ Pourquoi la colonne des pastilles de canal ne peut pas servir.
+
+        Les pastilles `Système` sont toutes identiques et espacées d'exactement
+        un pas de ligne. Un défilement d'une ligne superpose donc la pastille
+        `n` sur la pastille `n+1` et ne change **rien** à l'image. C'est
+        précisément la colonne aveugle à ce qu'on lui demanderait de voir.
+
+        Ce n'est pas un défaut de la mesure, c'est une propriété de ce qu'on lui
+        donne à mesurer : aucune méthode ne peut détecter le décalage d'un motif
+        strictement périodique. La règle est donc la colonne du texte, où deux
+        lignes ne se ressemblent jamais.
+        """
+        motif = [7, 7, 7, 7, 7, 7]
+        previous = render_texte(motif)
+        current = render_texte(motif)
+
+        result = estimate_text_scroll_px(previous, current)
+
+        assert result.shift_px == 0
+
+    def test_deux_contenus_sans_rapport_ne_donnent_aucun_decalage(self) -> None:
+        """Régression : un gain relatif seul laissait passer n'importe quoi.
+
+        Sur deux contenus sans rapport, il existe toujours un décalage qui
+        améliore un peu le recouvrement par pur hasard. Le premier critère ne
+        regardait que ce gain, et déclarait donc un défilement entre deux images
+        étrangères l'une à l'autre. Une prédiction fausse est pire que pas de
+        prédiction : elle ferait écarter le bon recouvrement au profit d'un faux.
+
+        Le recouvrement absolu tranche : les 32 décalages justes de la rafale
+        réelle atteignent 0,433 au minimum, deux contenus sans rapport plafonnent
+        autour de 0,1.
+        """
+        previous = render_texte([1, 2, 3, 4, 5, 6])
+        current = render_texte([50, 51, 52, 53, 54, 55])
+
+        result = estimate_text_scroll_px(previous, current)
+
+        assert not result.confident
+
+    def test_images_identiques_aucun_defilement(self) -> None:
+        """Régression : « rien n'a bougé » doit être une réponse, pas un doute.
+
+        C'est le cas le plus fréquent en jeu : la capture tourne dix fois par
+        seconde et le journal reçoit trois lignes par seconde. Si l'absence de
+        défilement était rendue comme une incertitude, chaque tour immobile
+        marquerait l'accumulation comme non fiable et la boucle ne prédirait
+        plus jamais rien.
+        """
+        frame = render_texte([1, 2, 3, 4, 5])
+        result = estimate_text_scroll_px(frame, frame)
+
+        assert result.shift_px == 0
+        assert result.confident
+
+    def test_images_de_tailles_differentes(self) -> None:
+        """Un redimensionnement de la fenêtre du jeu produit exactement ce cas."""
+        result = estimate_text_scroll_px(render_texte([1, 2]), render_texte([1, 2, 3]))
+
+        assert result.shift_px == 0
+        assert not result.confident
+
+    def test_image_non_bidimensionnelle(self) -> None:
+        """Une image couleur passée par erreur ne doit pas planter le suivi."""
+        couleur = np.zeros((40, WIDTH, 3), dtype=np.uint8)
+        result = estimate_text_scroll_px(couleur, couleur)
+        assert not result.confident
+
+    def test_le_defilement_alimente_la_prediction_de_lignes(self) -> None:
+        """Le seul usage de cette mesure : dire combien de lignes sont nouvelles."""
+        previous = render_texte([1, 2, 3, 4, 5, 6])
+        current = render_texte([3, 4, 5, 6, 7, 8])
+
+        result = estimate_text_scroll_px(previous, current)
+
+        assert expected_new_lines(result, ROW_HEIGHT, max_lines=10) == 2
 
 
 class TestConversionEnLignes:

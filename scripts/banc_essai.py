@@ -138,9 +138,11 @@ def main(argv: list[str] | None = None) -> int:
         assemble([frame.lines for frame in frames]),
         measure_scroll(
             images,
-            ruler_left=reglage.ruler_left,
-            ruler_width=reglage.ruler_width,
+            ruler_left_ratio=reglage.ruler_left_ratio,
+            ruler_right_ratio=reglage.ruler_right_ratio,
             row_height_px=reglage.row_height_px,
+            max_scroll_lines=reglage.max_scroll_lines,
+            bright_threshold=reglage.bright_threshold,
         ),
         silver_fingerprints([frame.lines for frame in frames]),
         matcher,
