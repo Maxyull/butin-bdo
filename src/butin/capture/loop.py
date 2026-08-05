@@ -54,7 +54,7 @@ n'a pas ce défaut.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from ..catalog.matcher import ItemMatcher, Scope
@@ -74,6 +74,7 @@ from ..tracking.scroll import (
 )
 from ..tracking.similarity import MatchConfig
 from ..tracking.staging import LootStager
+from .calibrate import Calibration
 from .lines import DEFAULT_FORMAT, ChatLineFormat, parse_frame
 from .screen import GrayImage, Region
 
@@ -187,6 +188,28 @@ class LoopConfig:
     qui en fait un choix mesuré et non un point de chance. Il a aussi le bon
     sens d'erreur : il sous-compte le silver là où 3 le sur-compte.
     """
+
+
+def config_from_calibration(calibration: Calibration, base: LoopConfig | None = None) -> LoopConfig:
+    """Applique un calibrage à un réglage de boucle.
+
+    Trois valeurs sur quatre viennent de l'écran de la personne et non d'une
+    constante : le pas de ligne, et la bande où mesurer le défilement. Les
+    laisser codées en dur, comme elles l'étaient, rendait le produit
+    inutilisable par quelqu'un d'autre **sans qu'aucune erreur ne le dise** : la
+    zone tombait à côté, le journal ressortait vide, et le compteur affichait
+    zéro drop comme s'il n'y avait rien eu à compter.
+
+    La région, elle, ne vit pas ici : c'est un argument de `CaptureLoop`, parce
+    qu'elle dit *où capturer* et non *comment interpréter*.
+    """
+    reglage = base or LoopConfig()
+    return replace(
+        reglage,
+        row_height_px=calibration.row_height_px,
+        ruler_left_ratio=calibration.ruler_left_ratio,
+        ruler_right_ratio=calibration.ruler_right_ratio,
+    )
 
 
 @dataclass(slots=True)

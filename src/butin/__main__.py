@@ -41,6 +41,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="force le retéléchargement même si le cache est valide",
     )
 
+    calibrer = commandes.add_parser(
+        "calibrer", help="trouve la fenêtre de chat sur l'écran et enregistre la zone"
+    )
+    calibrer.add_argument(
+        "--delai",
+        type=float,
+        default=5.0,
+        help="secondes avant la capture, le temps de revenir dans le jeu",
+    )
+    calibrer.add_argument("--ecran", type=int, default=1, help="écran à examiner, 1 = principal")
+    calibrer.add_argument(
+        "--sans-ocr",
+        action="store_true",
+        help="ne mesure pas la largeur utile du texte, plus rapide mais zone trop large",
+    )
+
     interface = commandes.add_parser("interface", help="lance l'interface web locale")
     interface.add_argument(
         "--port", type=int, default=8771, help="port d'écoute sur la boucle locale"
@@ -80,6 +96,52 @@ def _commande_catalogue(rafraichir: bool) -> int:
     return 0
 
 
+def _commande_calibrer(delai: float, ecran: int, sans_ocr: bool) -> int:
+    """Cherche le chat sur l'écran et enregistre ce qu'il faut pour le lire.
+
+    Le délai n'est pas un confort : le calibrage doit voir le **jeu**, avec son
+    journal d'acquisition affiché. Lancé sans délai depuis un terminal, il
+    photographie le terminal.
+    """
+    import time
+
+    from .capture.calibrate import CalibrationError, find_chat, measure_width
+    from .capture.screen import ScreenCapture
+
+    print(f"Capture dans {delai:.0f} s. Reviens dans le jeu, journal d'acquisition visible.")
+    time.sleep(delai)
+
+    with ScreenCapture(monitor=ecran) as capture:
+        zone = capture.target_monitor()
+        image = capture.grab(zone)
+
+    try:
+        calibrage = find_chat(image, origin=(zone.left, zone.top))
+    except CalibrationError as exc:
+        print(f"Échec du calibrage : {exc}", file=sys.stderr)
+        return 1
+
+    if not sans_ocr:
+        from .capture.ocr import TextReader
+
+        print("Mesure de la largeur utile du texte…")
+        calibrage = measure_width(image, calibrage, TextReader())
+
+    chemin = calibrage.save()
+    print(f"Zone du chat : {calibrage.describe()}")
+    print(f"Enregistré dans {chemin}")
+
+    # Un calibrage vrai mais fragile doit se voir : sur peu de rangées, la
+    # géométrie est juste et la largeur utile ne veut pas dire grand-chose.
+    if calibrage.rows < 10:
+        print(
+            f"\nAttention : seulement {calibrage.rows} rangées visibles. "
+            "Recalibrer avec un journal plus rempli donnerait une zone plus sûre.",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def _commande_reconnaitre(texte: str) -> int:
     catalogue = _charger()
     match = ItemMatcher(catalogue).resolve(texte)
@@ -109,6 +171,8 @@ def main(argv: list[str] | None = None) -> int:
 
             serve(port=args.port)
             return 0
+        if args.commande == "calibrer":
+            return _commande_calibrer(args.delai, args.ecran, args.sans_ocr)
         if args.commande == "reconnaitre":
             return _commande_reconnaitre(args.texte)
     except CatalogError as exc:
