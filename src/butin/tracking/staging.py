@@ -53,6 +53,33 @@ class Slot:
         """Vrai si au moins une observation a été résolue à un objet connu."""
         return any(s.resolved for s in self.sightings)
 
+    @property
+    def is_silver(self) -> bool:
+        """Vrai si cette ligne annonce du silver plutôt qu'un objet."""
+        return any(s.silver for s in self.sightings)
+
+    def vote_silver(self) -> int:
+        """Montant tranché au vote sur toutes les lectures de la ligne.
+
+        ⚠️ C'est le correctif, et il tient à ce que le montant est un **nombre
+        à quatre chiffres**, donc bien plus fragile à l'OCR qu'un nom d'objet
+        que la reconnaissance floue rattrape. Mesuré par le banc d'essai le
+        05/08/2026 sur 300 images de vrai farm : **13,6 % des lectures de
+        lignes de silver ont un montant illisible**, contre 4 lignes sur 45
+        dans une référence qui tranche chaque position au vote.
+
+        Le montant était jusque-là lu **une seule fois**, à la première
+        apparition de la ligne, alors que les objets bénéficiaient déjà du
+        vote. Une lecture ratée coûtait donc environ deux mille silver, sans
+        aucun rattrapage possible.
+
+        Le vote est le même que pour les quantités d'objets, pondération des
+        lectures douteuses comprise : une lecture dont le marqueur était
+        illisible atteste la présence de la ligne mais ne doit pas peser autant
+        qu'une lecture nette au moment de choisir le montant.
+        """
+        return _vote_quantity([s for s in self.sightings if s.silver])
+
     def best_raw(self) -> str:
         """Texte brut le plus représentatif, pour le diagnostic.
 
@@ -152,7 +179,10 @@ class LootStager:
         self._slots: list[Slot] = []
         self._dropped_unconfirmed = 0
         self._lost_resolved = 0
+        self._lost_silver = 0
         self._unresolved_finalized = 0
+        self._silver_ready = 0
+        self._silver_lines = 0
         self._dropped_records: list[tuple[str, bool]] = []
 
     # -- état ------------------------------------------------------------
@@ -177,15 +207,50 @@ class LootStager:
         return self._lost_resolved
 
     @property
+    def lost_silver(self) -> int:
+        """Montant des lignes de silver sorties de l'écran sans validation.
+
+        Compté à part de `lost_resolved`, qui ne parle que d'objets. C'est le
+        prix payé pour faire voter les montants : une ligne de silver doit
+        maintenant être vue plusieurs fois avant d'être créditée, alors qu'elle
+        l'était dès sa première apparition. Sans ce compteur, l'échange serait
+        invérifiable.
+        """
+        return self._lost_silver
+
+    @property
+    def silver_lines(self) -> int:
+        """Nombre de LIGNES de silver validées, distinct du montant cumulé.
+
+        C'est ce nombre que le banc d'essai compare aux empreintes de montants,
+        qui les comptent sans jamais recaler quoi que ce soit. Sans lui, un
+        écart sur le total ne dit pas s'il vient de lignes manquées ou de
+        montants mal lus, et les deux ne se corrigent pas au même endroit.
+        """
+        return self._silver_lines
+
+    @property
     def unresolved_finalized(self) -> int:
         """Emplacements confirmés comme persistants, mais jamais reconnus."""
         return self._unresolved_finalized
+
+    def drain_silver(self) -> int:
+        """Rend et remet à zéro le silver validé depuis le dernier appel.
+
+        Un incrément, jamais un cumul : l'appelant l'additionne à son total.
+        Même forme que `drain_dropped`, pour la même raison.
+        """
+        montant, self._silver_ready = self._silver_ready, 0
+        return montant
 
     def reset(self) -> None:
         self._slots = []
         self._dropped_unconfirmed = 0
         self._lost_resolved = 0
+        self._lost_silver = 0
         self._unresolved_finalized = 0
+        self._silver_ready = 0
+        self._silver_lines = 0
         self._dropped_records = []
 
     def seed(self, lines: list[ObservedLine]) -> None:
@@ -224,6 +289,8 @@ class LootStager:
             was_resolved = slot.resolved
             if was_resolved:
                 self._lost_resolved += 1
+            elif slot.is_silver:
+                self._lost_silver += slot.vote_silver()
             self._dropped_records.append((slot.best_raw(), was_resolved))
 
         carried = self._slots[scrolled_off:]
@@ -250,9 +317,7 @@ class LootStager:
             if slot.committed:
                 continue
             slot.committed = True
-            event = slot.vote()
-            if event is not None:
-                events.append(event)
+            self._valider(slot, events, compter_inconnu=False)
         return events
 
     def _commit_ready(self) -> list[LootEvent]:
@@ -263,10 +328,24 @@ class LootStager:
             # Marqué validé quoi qu'il arrive : un emplacement jamais reconnu
             # ne doit pas être réexaminé à chaque image jusqu'à sa sortie.
             slot.committed = True
-            event = slot.vote()
-            if event is not None:
-                events.append(event)
-            else:
-                self._unresolved_finalized += 1
-                self._dropped_records.append((slot.best_raw(), False))
+            self._valider(slot, events, compter_inconnu=True)
         return events
+
+    def _valider(self, slot: Slot, events: list[LootEvent], *, compter_inconnu: bool) -> None:
+        """Transforme un emplacement validé en drop, en silver, ou en rien.
+
+        Les trois cas sont exclusifs et il faut les distinguer : une ligne de
+        silver n'est pas une ligne non reconnue, même si toutes deux n'ont pas
+        d'objet. Les confondre ferait passer chaque gain de pièces pour un trou
+        de couverture du catalogue.
+        """
+        if slot.is_silver:
+            self._silver_ready += slot.vote_silver()
+            self._silver_lines += 1
+            return
+        event = slot.vote()
+        if event is not None:
+            events.append(event)
+        elif compter_inconnu:
+            self._unresolved_finalized += 1
+            self._dropped_records.append((slot.best_raw(), False))

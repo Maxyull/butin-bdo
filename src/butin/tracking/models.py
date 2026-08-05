@@ -46,6 +46,16 @@ class ObservedLine:
     au moment du vote, le second est un drop unitaire parfaitement normal.
     """
 
+    silver: bool = False
+    """Vrai quand la ligne annonce du silver, `qty` portant alors le montant.
+
+    Indispensable pour distinguer deux cas que `item is None` confond : une
+    ligne de silver, qui est un gain parfaitement connu, et une ligne dont
+    l'objet n'a pas été reconnu, qui ne deviendra jamais un drop. Sans cette
+    distinction, la couche de suivi ne peut pas faire voter les montants comme
+    elle fait voter les quantités.
+    """
+
     @property
     def item_id(self) -> int | None:
         return self.item.item_id if self.item is not None else None

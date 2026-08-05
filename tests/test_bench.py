@@ -417,7 +417,11 @@ def test_le_rapport_corrobore_le_recalage_par_les_empreintes(matcher: ItemMatche
     C'est cet accord, et lui seul, qui rend la référence croyable : sans lui,
     rien ne dirait laquelle des deux se trompe.
     """
-    rafale = _rafale(_flux_observe(24), fenetre=12)
+    # Trois images par ligne : une empreinte n'est retenue qu'après avoir été
+    # vue plusieurs fois, ce qui est le cas normal en jeu où une ligne reste
+    # affichée plusieurs secondes. À une image par ligne, les dernières du flux
+    # n'auraient pas le temps d'être revues.
+    rafale = _rafale(_flux_observe(24), fenetre=12, images_par_ligne=3)
 
     rapport = _rapport(rafale, matcher, TOUT_LIRE)
 
@@ -480,7 +484,10 @@ def test_le_rapport_mesure_la_perte_quand_la_cadence_ne_suit_pas(
     d'inventer. Mais une perte non mesurée reste une perte, et c'est
     exactement le nombre que le banc existe pour produire.
     """
-    rafale = _rafale(_flux_pierres(60), fenetre=8)
+    # Une fenêtre courte et un journal rapide : une ligne sort de l'écran avant
+    # que la boucle, qui ne lit qu'une image sur quatre, ait pu la voir deux
+    # fois. C'est exactement la panne que le banc doit chiffrer.
+    rafale = _rafale(_flux_pierres(60), fenetre=4)
 
     rapport = _rapport(rafale, matcher, LoopConfig())
 

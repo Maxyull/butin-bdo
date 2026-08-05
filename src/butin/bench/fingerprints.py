@@ -74,6 +74,24 @@ class Fingerprints:
     """Écart entre le plus grand et le plus petit montant observé. Avec le
     nombre de lignes, c'est de quoi estimer les collisions attendues."""
 
+    total: int = 0
+    """Somme des montants retenus. Estimation du silver gagné, indépendante du
+    compteur ET du recalage du texte.
+
+    ⚠️ C'est la mesure qui tranche sur les MONTANTS, là où le recalage ne le
+    peut pas. Mesuré : le recalage rend 4 de ses 45 lignes avec un montant
+    illisible, donc comptées 1 au lieu de deux mille. Sur le nombre de lignes il
+    fait autorité, sur les montants il ne vaut pas mieux que le compteur, et
+    comparer deux mesures de qualité égale n'apprend rien.
+    """
+
+    kept: int = 0
+    """Montants retenus, c'est-à-dire vus au moins `min_support` fois."""
+
+    dropped: int = 0
+    """Montants écartés faute de support. Ce sont des lectures ratées, pas des
+    lignes : les compter gonflerait le total de valeurs qui n'ont jamais existé."""
+
     @property
     def expected_collisions(self) -> float:
         """Collisions attendues si les montants étaient tirés uniformément.
@@ -87,8 +105,33 @@ class Fingerprints:
         return lignes * (lignes - 1) / (2.0 * self.span)
 
 
+MIN_SUPPORT = 3
+"""Lectures minimales pour qu'un montant soit tenu pour une vraie ligne.
+
+Mesuré sur la rafale du 05/08/2026, les 48 montants apparus après la première
+image ont pour supports :
+
+    1, 1, 2, 2, 7, 13, 15, 19, 24, 24, 31, 32, ... jusqu'à 106
+
+Le trou entre 2 et 7 est net, et il sépare deux choses différentes : une ligne
+réelle reste affichée des secondes et se relit des dizaines de fois, une lecture
+ratée produit une valeur qu'on ne reverra jamais. Retenir tout donnerait un
+total de 149 339 pour 98 157 en écartant les quatre intrus, soit **52 % de
+trop** à cause de quatre valeurs qui n'ont jamais existé.
+
+⚠️ Le prix de ce seuil est un effet de bord en fin de rafale : une ligne
+apparue dans les toutes dernières images n'a pas le temps d'être revue trois
+fois et sort du total. À 100 ms et une ligne qui reste affichée huit secondes,
+cela concerne moins d'une ligne sur la rafale mesurée, mais il faut le savoir
+avant de comparer deux rafales de durées différentes.
+"""
+
+
 def silver_fingerprints(
-    frames: Sequence[Sequence[str]], *, fmt: ChatLineFormat = DEFAULT_FORMAT
+    frames: Sequence[Sequence[str]],
+    *,
+    fmt: ChatLineFormat = DEFAULT_FORMAT,
+    min_support: int = MIN_SUPPORT,
 ) -> Fingerprints:
     """Relève les montants de silver de toutes les images.
 
@@ -113,7 +156,8 @@ def silver_fingerprints(
             if index == 0:
                 premiere.add(parts.qty)
 
-    apres = set(vus) - premiere
+    apres = {montant: n for montant, n in vus.items() if montant not in premiere}
+    solides = {montant: n for montant, n in apres.items() if n >= min_support}
     montants = sorted(vus)
     return Fingerprints(
         distinct=len(apres),
@@ -121,4 +165,7 @@ def silver_fingerprints(
         occurrences=sum(vus.values()),
         median_support=statistics.median(vus.values()) if vus else 0.0,
         span=(montants[-1] - montants[0]) if montants else 0,
+        total=sum(solides),
+        kept=len(solides),
+        dropped=len(apres) - len(solides),
     )
