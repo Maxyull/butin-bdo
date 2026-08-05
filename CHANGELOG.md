@@ -127,6 +127,16 @@ dans [docs/versionnage.md](docs/versionnage.md).
   un plancher qui garantit qu'il ne devient jamais plus sévère qu'avant.
   Mesuré : ces deux corrections ramènent les images jetées de 9 à **0**, le
   butin reconnu puis perdu de 21 à **1**, et la perte de **74,5 % à 12,8 %**.
+- ⛔ **La mesure de défilement en pixels ne détectait rien.** Elle prenait pour
+  règle la colonne des pastilles de canal, qui sont toutes identiques et
+  espacées d'exactement un pas de ligne : un défilement d'une ligne superpose
+  une pastille sur sa voisine et n'y change rien. Zéro décalage juste sur les 37
+  transitions réelles. Elle compare désormais la colonne du **texte** sur un
+  **masque de pixels clairs**, qui fait disparaître le décor du jeu visible à
+  travers le fond transparent : **32 décalages justes sur 37**, aucune fausse
+  détection sur 262 transitions immobiles, et jamais de décalage faux (elle est
+  juste ou muette). Le pas vertical, mesuré au passage, est de **21,6 px** et
+  non 21. La perte tombe de 12,8 % à **2,1 %**.
 
 ### Connu et non résolu
 
@@ -137,12 +147,13 @@ dans [docs/versionnage.md](docs/versionnage.md).
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- ⛔ **Le compteur perd 12,8 % des drops et 22,8 % du silver.** Mesuré par le
-  banc d'essai sur 30 secondes de farm réel : 41 drops enregistrés sur 47, et
-  71 910 silver comptés pour 93 161 réels. **Rien ne peut être publié en
-  l'état**, mais la cause n'est plus le comptage : la boucle ne lit que 15
-  images sur 300, faute de mesure de défilement et à cause du coût de la
-  reconnaissance. [docs/banc-essai.md](docs/banc-essai.md).
+- **Le compteur perd 2,1 % des drops et 24,1 % du silver.** Mesuré par le banc
+  d'essai sur 30 secondes de farm réel : 46 drops enregistrés sur 47, et 70 714
+  silver comptés pour 93 161 réels. Le comptage des objets est bon ; l'écart
+  restant est un défaut **du silver**, qui ne passe pas par le vote
+  multi-images dont bénéficient les objets. Mesuré : 13,6 % des lectures de
+  lignes de silver ont un montant illisible.
+  [docs/banc-essai.md](docs/banc-essai.md).
 - La reconnaissance de texte coûte 336 ms par image sur une zone de 520 x 385,
   et **1 100 ms** sur une zone de 780 x 575. Le découplage de la boucle absorbe
   le premier chiffre, pas le second.
@@ -150,10 +161,6 @@ dans [docs/versionnage.md](docs/versionnage.md).
   fixe, alors que le journal est transparent sur un monde qui bouge en
   permanence. La défense contre une lecture prise en pleine animation repose
   donc entièrement sur le vote multi-images.
-- ⛔ **La colonne de pastilles servant de règle de mesure ne fonctionne pas.**
-  Vérifiée enfin sur un vrai défilement : zéro détection sûre sur 299
-  transitions, et c'est la pire des quatre bandes testées. Les pastilles sont
-  identiques et espacées de 21 px, donc un défilement d'une ligne les superpose
-  et ne change rien. Le chiffre qui l'avait fait retenir comparait deux scènes
-  différentes.
-- Aucune interface, et aucun calibrage automatique de la zone.
+- Aucune interface, et aucun calibrage automatique de la zone. Les bandes de
+  mesure et le pas vertical de 21,6 px sont relevés sur une seule configuration
+  d'écran.

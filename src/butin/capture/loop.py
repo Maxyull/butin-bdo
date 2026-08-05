@@ -70,7 +70,12 @@ from ..tracking.alignment import (
     plausible_max_new,
 )
 from ..tracking.models import LootEvent, ObservedLine
-from ..tracking.scroll import ScrollResult, estimate_scroll_px, expected_new_lines
+from ..tracking.scroll import (
+    BRIGHT_THRESHOLD,
+    ScrollResult,
+    estimate_text_scroll_px,
+    expected_new_lines,
+)
 from ..tracking.staging import LootStager
 from .lines import DEFAULT_FORMAT, ChatLineFormat, parse_frame
 from .screen import GrayImage, Region
@@ -111,15 +116,45 @@ class LoopConfig:
     ce filet, ces premières lignes ne seraient jamais lues.
     """
 
-    ruler_left: int = 0
-    ruler_width: int = 90
-    """Colonne servant de règle de mesure, en pixels depuis le bord gauche de la
-    zone capturée. Doit couvrir les pastilles de canal et rien d'autre : y
-    inclure du texte transparent réintroduirait le bruit du décor."""
+    ruler_left_ratio: float = 0.19
+    ruler_right_ratio: float = 0.92
+    """Bande servant de règle de mesure, en fraction de la largeur de la zone.
 
-    row_height_px: float = 21.0
-    """Pas vertical entre deux lignes. Mesuré à 21 px en 2560 x 1440, à
-    recalibrer par résolution et par échelle d'interface."""
+    ⚠️ C'est la colonne du **texte**, pas celle des pastilles de canal. Les
+    pastilles sont toutes identiques et espacées d'exactement un pas de ligne :
+    un défilement d'une ligne superpose la pastille `n` sur la `n+1` et n'y
+    change rien. Mesuré par le banc : 0 détection juste sur 37 avec les
+    pastilles, 32 sur 37 avec le texte.
+
+    En fraction et non en pixels, pour que la valeur par défaut tienne quelle
+    que soit la largeur du chat. La gauche écarte la colonne des pastilles, la
+    droite écarte le bord de la fenêtre. Le calibrage de la zone affinera.
+    """
+
+    row_height_px: float = 21.6
+    """Pas vertical entre deux lignes.
+
+    Mesuré à **21,6 px** en 2560 x 1440 par le banc d'essai, sur les décalages
+    réellement observés : 22, 43, 65, 86 et 108 px pour une à cinq lignes,
+    parfaitement linéaires. La valeur de 21 relevée à l'œil sur les pastilles
+    était basse de 3 %. À recalibrer par résolution et par échelle d'interface.
+    """
+
+    bright_threshold: int = BRIGHT_THRESHOLD
+    """Niveau au-dessus duquel un pixel est tenu pour du texte du journal.
+
+    C'est ce masque qui fait disparaître le décor du jeu, visible à travers le
+    fond transparent. Voir `tracking/scroll.py` pour la mesure.
+    """
+
+    max_scroll_lines: int = 8
+    """Défilement maximal cherché entre deux captures, en lignes.
+
+    Borne la recherche de décalage, qui coûte proportionnellement au nombre de
+    positions essayées. Huit lignes en 100 ms, soit 80 par seconde, est très
+    au-dessus de tout ce qu'un journal produit : mesuré 3 lignes par seconde en
+    farm actif. Au-delà, la mesure se tait et l'alignement textuel reprend seul.
+    """
 
     min_sightings: int = 3
     """Observations concordantes avant de valider un drop. Ne pas augmenter
@@ -209,15 +244,22 @@ class CaptureLoop:
         if previous is None:
             return
 
-        scroll = estimate_scroll_px(previous, ruler)
+        scroll = estimate_text_scroll_px(
+            previous, ruler, max_shift=self._max_shift_px, threshold=self.config.bright_threshold
+        )
         if scroll.confident:
             self._pending_shift_px += scroll.shift_px
         else:
             self._shift_trustworthy = False
 
+    @property
+    def _max_shift_px(self) -> int:
+        return max(1, round(self.config.max_scroll_lines * self.config.row_height_px))
+
     def _ruler(self, image: GrayImage) -> GrayImage:
-        gauche = self.config.ruler_left
-        droite = gauche + self.config.ruler_width
+        largeur = image.shape[1]
+        gauche = max(0, min(largeur - 1, round(largeur * self.config.ruler_left_ratio)))
+        droite = max(gauche + 1, min(largeur, round(largeur * self.config.ruler_right_ratio)))
         decoupe: GrayImage = image[:, gauche:droite]
         return decoupe
 

@@ -49,15 +49,33 @@ HAUTEUR_LIGNE = 21
 en pixels se convertisse en lignes avec la même arithmétique qu'en vrai."""
 
 
-def _bande(ligne: int) -> GrayImage:
-    """Texture propre à une ligne physique, reproductible d'un test à l'autre.
+FOND = 20
+"""Niveau du décor du jeu vu à travers le fond transparent du chat. La médiane
+mesurée sur les vraies captures est de 21 sur 255."""
 
-    Une texture aléatoire et non un aplat : la mesure de défilement cherche le
-    décalage qui explique le mieux la différence entre deux images, et des
-    aplats identiques rendraient tous les décalages équivalents.
+ENCRE = 230
+"""Niveau du texte du journal, peint en clair."""
+
+
+def _bande(ligne: int, *, encre: int = ENCRE) -> GrayImage:
+    """Une rangée du journal : un fond sombre et quelques marques claires.
+
+    ⚠️ La fidélité de cette image compte plus qu'il n'y paraît. Une première
+    version tirait chaque pixel au hasard sur toute l'échelle de gris, ce qui
+    donnait **55 % de pixels clairs** là où une vraie capture du chat en a
+    **8 %**. La mesure de défilement travaille sur un masque de pixels clairs :
+    sur une image à moitié allumée, il existe toujours un décalage qui améliore
+    un peu le recouvrement par pur hasard, et le test « mesurait » un
+    comportement que le code ne rencontre jamais.
+
+    Le motif de colonnes est propre à la ligne, comme l'est un vrai texte : deux
+    lignes du journal ne portent jamais les mêmes lettres aux mêmes endroits.
     """
-    tirage = np.random.default_rng(ligne).integers(0, 256, size=(HAUTEUR_LIGNE, LARGEUR))
-    return np.asarray(tirage, dtype=np.uint8)
+    bande = np.full((HAUTEUR_LIGNE, LARGEUR), FOND, dtype=np.uint8)
+    tirage = np.random.default_rng(ligne)
+    colonnes = tirage.choice(LARGEUR, size=LARGEUR // 6, replace=False)
+    bande[4:15, colonnes] = encre
+    return bande
 
 
 def _image(fenetre: Sequence[int]) -> GrayImage:
@@ -313,12 +331,14 @@ def test_defilement_pixels_ecarte_une_mesure_non_sure() -> None:
     """
     rafale = _rafale(_flux_pierres(30), fenetre=10)
     images = list(rafale.images)
-    brouillage = np.random.default_rng(999).integers(0, 256, size=images[0].shape)
-    images[15] = np.asarray(brouillage, dtype=np.uint8)
+    # Une image qui n'a rien à voir : d'autres marques, aux mêmes proportions
+    # qu'une vraie capture. Un aplat de bruit ne testerait rien de réel.
+    images[15] = np.vstack([_bande(1000 + index) for index in range(10)])
 
     defilement = measure_scroll(images, row_height_px=HAUTEUR_LIGNE)
 
     assert 15 in defilement.unsure
+    assert 16 in defilement.unsure
     assert defilement.coverage < 1.0
 
 
