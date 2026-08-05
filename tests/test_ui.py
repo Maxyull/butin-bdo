@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from butin.capture.worker import CaptureStatus, CaptureUnavailable
 from butin.market import PriceBook, PriceCache
 from butin.store import LootRow, SessionStore
 from butin.ui.server import HOST, AppState, build_server
@@ -26,6 +28,11 @@ from butin.ui.server import HOST, AppState, build_server
 # pas un défaut du code testé, et il n'existe que parce que ces tests lancent
 # un serveur réel plutôt que de le simuler, ce qui reste le bon choix.
 pytestmark = pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+
+
+@pytest.fixture
+def store(tmp_path: Path) -> SessionStore:
+    return SessionStore(tmp_path / "sessions.sqlite3")
 
 
 @pytest.fixture
@@ -170,6 +177,122 @@ class TestSession:
     def test_arreter_sans_session_ne_plante_pas(self, app) -> None:
         _, base = app
         assert post(base, "/api/session/arreter")["session"] is None
+
+
+class TestCapture:
+    """La capture, vue depuis l'interface. Le dernier maillon du produit."""
+
+    class _Travailleur:
+        """Faux fil de capture, piloté par le test."""
+
+        def __init__(self, *, refuse: str = "") -> None:
+            self.refuse = refuse
+            self.demarre: list[int] = []
+            self.arrets = 0
+
+        def start(self, session_id: int) -> None:
+            if self.refuse:
+                raise CaptureUnavailable(self.refuse)
+            self.demarre.append(session_id)
+
+        def stop(self, *, timeout: float = 5.0) -> int:
+            self.arrets += 1
+            return 0
+
+        def status(self) -> CaptureStatus:
+            return CaptureStatus(
+                running=bool(self.demarre) and not self.arrets,
+                ticks=12,
+                ocr_reads=3,
+                skipped_frames=0,
+                lost_resolved=0,
+                recorded_events=2,
+                recorded_silver=500,
+            )
+
+    def test_demarrer_lance_la_capture(self, store: SessionStore) -> None:
+        """Régression : le bouton ouvrait une session que RIEN n'alimentait.
+
+        La chaîne était complète sauf ce maillon. Le compteur restait à zéro,
+        ce qui est impossible à distinguer d'une session sans butin.
+        """
+        travailleur = self._Travailleur()
+        etat = AppState(store, PriceBook(), None, travailleur)
+
+        session_id = etat.start("Gyfin")
+
+        assert travailleur.demarre == [session_id]
+        assert etat.snapshot()["capture"]["en_cours"] is True
+
+    def test_un_refus_de_capture_ne_laisse_pas_de_session_ouverte(
+        self, store: SessionStore
+    ) -> None:
+        """⭐ Le test qui compte. Une session vide ressemble à une vraie.
+
+        Si la capture refuse de démarrer, typiquement faute de calibrage, et
+        qu'on laisse la session ouverte, l'utilisateur voit une session en cours
+        dont le total n'augmente jamais. C'est exactement le mode de défaillance
+        que ce projet refuse, et le laisser ici l'introduirait à l'endroit le
+        plus visible du produit.
+        """
+        travailleur = self._Travailleur(refuse="zone du chat non calibrée")
+        etat = AppState(store, PriceBook(), None, travailleur)
+
+        with pytest.raises(CaptureUnavailable):
+            etat.start("Gyfin")
+
+        assert etat.session_id is None
+        assert etat.snapshot()["session"] is None
+        ouvertes = [session for session in store.sessions() if session.is_open]
+        assert ouvertes == [], "une session ouverte que rien n'alimente reste dans la base"
+
+    def test_l_arret_precede_la_fermeture_de_la_session(self, store: SessionStore) -> None:
+        """Dans cet ordre : l'arrêt enregistre le butin encore en attente.
+
+        L'écrire après la fermeture le rattacherait à une session dont la durée
+        est déjà figée.
+        """
+        travailleur = self._Travailleur()
+        etat = AppState(store, PriceBook(), None, travailleur)
+        etat.start("Gyfin")
+
+        etat.stop()
+
+        assert travailleur.arrets == 1
+        assert etat.session_id is None
+
+    def test_le_refus_est_rendu_en_409_avec_son_motif(self, store: SessionStore) -> None:
+        """409 et non 500 : l'utilisateur peut lever la condition lui-même.
+
+        Encore faut-il qu'il sache laquelle, donc le message passe entier.
+        """
+        travailleur = self._Travailleur(refuse="zone du chat non calibrée")
+        serveur = build_server(AppState(store, PriceBook(), None, travailleur), port=0)
+        fil = threading.Thread(target=serveur.serve_forever, daemon=True)
+        fil.start()
+        try:
+            port = serveur.server_address[1]
+            requete = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/session/demarrer",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with pytest.raises(urllib.error.HTTPError) as echec:
+                urllib.request.urlopen(requete)  # noqa: S310
+            assert echec.value.code == 409
+            assert "calibr" in json.loads(echec.value.read())["erreur"]
+        finally:
+            serveur.shutdown()
+            serveur.server_close()
+
+    def test_sans_travailleur_l_interface_reste_consultable(self, store: SessionStore) -> None:
+        """Une machine sans écran doit pouvoir relire ses sessions passées."""
+        etat = AppState(store, PriceBook(), None, None)
+
+        etat.start("Gyfin")
+
+        assert etat.snapshot()["capture"] is None
 
 
 class TestButin:

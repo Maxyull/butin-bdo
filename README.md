@@ -101,21 +101,71 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
+## Utilisation
+
+Trois commandes, dans cet ordre.
+
+```bash
+butin catalogue
+```
+
+Télécharge et vérifie le catalogue d'objets français. À faire une fois.
+
+```bash
+butin calibrer
+```
+
+Trouve la fenêtre de chat sur votre écran, le pas vertical entre deux lignes et
+la bande où mesurer le défilement. Lancez-la, revenez dans le jeu, laissez le
+journal d'acquisition visible : la capture arrive cinq secondes plus tard.
+
+Si le chat n'est pas trouvé, la commande le dit et n'enregistre rien, plutôt que
+de retenir une zone au hasard qui donnerait un journal vide.
+
+```bash
+butin interface
+```
+
+Ouvre l'interface locale sur `http://127.0.0.1:8771`. Le bouton **Démarrer une
+session** lance la capture ; la page affiche ce qu'elle compte, et ce qu'elle
+rate.
+
 ## État d'avancement
 
 | Brique | État | Détail |
 | --- | --- | --- |
 | Normalisation française | ✅ fait | accents, ligatures, apostrophes, tirets |
-| Catalogue d'objets par identifiant | ✅ fait | 8344 objets, noms FR, mise en cache sécurisée |
+| Catalogue d'objets par identifiant | ✅ fait | 68 714 objets bdocodex, noms FR, cache sécurisé |
 | Reconnaissance floue + contrôle d'ambiguïté | ✅ fait | seuil, marge, restriction par spot |
-| Noms vérifiés à la main | ⚙️ mécanisme prêt | recoupement bdocodex/garmoth à faire, objet par objet |
 | Anti-double-comptage entre images | ✅ fait | alignement, défilement, validation multi-images |
-| Capture d'écran et OCR | ⛔ à faire | |
-| Prix du marché central | ⛔ à faire | |
-| Sessions et silver/heure | ⛔ à faire | |
-| Interface | ⛔ à faire | |
+| Capture d'écran et OCR | ✅ fait | rapidocr, aucun binaire système à installer |
+| Calibrage automatique de la zone | ✅ fait | trouve le chat, le pas de ligne, la règle de mesure |
+| Prix du marché central | ✅ fait | arsha.io, cache local principal, repli marchand |
+| Sessions et silver/heure | ✅ fait | SQLite local, taxe sur le vendable seulement |
+| Interface web locale | ✅ fait | FR/EN, EU/NA, démarrage de la capture |
+| Banc d'essai sur données réelles | ✅ fait | mesure la justesse du compteur |
+| Noms vérifiés à la main | ⚙️ mécanisme prêt | recoupement bdocodex/garmoth, objet par objet |
+| Installeur | ⛔ à faire | il faut cloner et lancer `pip` |
 
-194 tests automatisés couvrent les briques marquées comme faites.
+486 tests automatisés.
+
+### Ce que le compteur vaut sur du vrai farm
+
+Un banc d'essai mesure la justesse du compteur sur 300 captures d'une vraie
+session, par **trois méthodes indépendantes** : la boucle telle qu'elle tourne,
+un recalage du texte qui ignore les pixels et les garde-fous, et un comptage des
+montants de silver qui n'utilise aucune notion de position.
+
+Sur ces 30 secondes de farm : **47 drops comptés sur 47**, quantité cumulée
+exacte, montant du silver à 1,5 % près.
+
+⚠️ Une seule rafale, un seul endroit de farm, une seule configuration d'écran.
+Ce qu'on peut en conclure, et ce qu'on ne peut pas, est écrit en partie 6 de
+[docs/banc-essai.md](docs/banc-essai.md).
+
+Le chemin pour y arriver vaut d'être lu : le premier passage du banc comptait
+**12 drops sur 47**. Cinq défauts, tous mesurés puis corrigés, dont un qui
+faisait *inventer* du silver et un autre qui jetait 9 lectures valides sur 15.
 
 ### Ce que mesure la simulation de bout en bout
 
@@ -130,9 +180,9 @@ Deux résultats de cette simulation méritent d'être connus :
   C'est le bon sens de l'erreur.
 - **Attendre plus d'images avant de valider un drop dégrade le résultat.** Le
   réglage qu'on serait tenté d'augmenter par prudence fait perdre du butin : la
-  ligne sort de l'écran avant d'atteindre le seuil. Mesuré, en passant de 3 à 7
-  observations exigées, les pertes passent de 0 à 24 drops sur la même session.
-  Un test empêche que ce réglage soit relevé sans le voir.
+  ligne sort de l'écran avant d'atteindre le seuil. Confirmé sur données réelles
+  à quatre cadences de lecture différentes. Un test empêche que ce réglage soit
+  relevé sans le voir.
 
 ## Versions
 

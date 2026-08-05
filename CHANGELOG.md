@@ -53,6 +53,15 @@ dans [docs/versionnage.md](docs/versionnage.md).
   l'hôtel des ventes ne s'applique qu'aux objets vendables, jamais au butin
   vendu au marchand ni au silver ramassé. Les objets non valorisés et les prix
   périmés sont comptés et affichés à part.
+- **Le bouton qui lance la capture.** L'interface ouvrait une session dans la
+  base et **rien ne l'alimentait** : le compteur restait à zéro, ce qui est
+  impossible à distinguer d'une session sans butin. La boucle tourne désormais
+  dans un fil de fond, et l'interface affiche ce qu'elle compte comme ce qu'elle
+  rate. Deux règles y sont tenues : un démarrage refusé, typiquement faute de
+  calibrage, **referme la session** au lieu d'en laisser une vide qui ressemble
+  à une vraie ; et toute exception du fil est **retenue et affichée**, parce
+  qu'un fil mort en silence laisserait un total qui n'augmente plus sans rien
+  pour distinguer la panne du farm calme.
 - **Interface web locale** (`butin interface`), avec les deux sélecteurs
   demandés : langue FR/EN pour les noms d'objets, région EU/NA pour les prix.
   Servie par la bibliothèque standard, sur la boucle locale uniquement, sans

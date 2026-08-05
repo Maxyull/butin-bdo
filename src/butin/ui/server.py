@@ -40,7 +40,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from ..catalog import ItemCatalog
+from ..capture.worker import CaptureUnavailable, CaptureWorker
+from ..catalog import ItemCatalog, ItemMatcher
 from ..market import PriceBook, Region
 from ..store import SessionStore, compute
 from ..store.stats import MARKET_RATE_BASE
@@ -68,10 +69,18 @@ class AppState:
     """
 
     def __init__(
-        self, store: SessionStore, book: PriceBook, catalog: ItemCatalog | None = None
+        self,
+        store: SessionStore,
+        book: PriceBook,
+        catalog: ItemCatalog | None = None,
+        worker: CaptureWorker | None = None,
     ) -> None:
         self.store = store
         self.book = book
+        self.worker = worker
+        """Ce qui fait tourner la capture. Optionnel pour que l'interface reste
+        consultable sans écran ni moteur de reconnaissance, ce dont les tests et
+        une machine sans affichage profitent."""
         self.catalog = catalog
         """Sert à nommer les objets. C'est tout l'objet du sélecteur de langue :
         sans lui, il ne changerait rien de visible."""
@@ -95,12 +104,26 @@ class AppState:
             taux = self.market_rate
             langue = self.language
 
+        capture = self.worker.status().to_dict() if self.worker is not None else None
+
         if session_id is None:
-            return {"reglages": reglages, "session": None, "stats": None, "butin": []}
+            return {
+                "reglages": reglages,
+                "session": None,
+                "stats": None,
+                "butin": [],
+                "capture": capture,
+            }
 
         session = self.store.get_session(session_id)
         if session is None:
-            return {"reglages": reglages, "session": None, "stats": None, "butin": []}
+            return {
+                "reglages": reglages,
+                "session": None,
+                "stats": None,
+                "butin": [],
+                "capture": capture,
+            }
 
         quantites = self.store.quantities(session_id)
         stats = compute(
@@ -132,6 +155,7 @@ class AppState:
                 "complet": stats.is_complete,
             },
             "butin": self._loot_rows(quantites, maintenant, langue),
+            "capture": capture,
         }
 
     def _name(self, item_id: int, langue: str) -> str:
@@ -184,6 +208,14 @@ class AppState:
                 self.market_rate = float(taux)
 
     def start(self, spot: str, *, now: float | None = None) -> int:
+        """Ouvre une session et lance la capture. Rien de tout ça sans l'autre.
+
+        ⚠️ Si la capture refuse de démarrer, la session est **refermée** avant de
+        propager l'erreur. Une session ouverte que rien n'alimente ressemble à
+        une session normale dont le farm n'aurait rien donné : c'est le mode de
+        défaillance que ce projet refuse, et le laisser ici l'introduirait à
+        l'endroit le plus visible du produit.
+        """
         maintenant = time.time() if now is None else now
         with self.lock:
             if self.session_id is not None:
@@ -193,14 +225,28 @@ class AppState:
             session = self.store.start_session(
                 started_at=maintenant, spot=spot, region=self.region.value
             )
+            if self.worker is not None:
+                try:
+                    self.worker.start(session.id)
+                except Exception:
+                    self.store.end_session(session.id, ended_at=maintenant)
+                    raise
             self.session_id = session.id
             return session.id
 
     def stop(self, *, now: float | None = None) -> None:
+        """Arrête la capture PUIS ferme la session.
+
+        Dans cet ordre : `CaptureWorker.stop` enregistre le butin encore en
+        attente, et l'écrire après la fermeture le rattacherait à une session
+        dont la durée est déjà figée.
+        """
         maintenant = time.time() if now is None else now
         with self.lock:
             if self.session_id is None:
                 return
+            if self.worker is not None:
+                self.worker.stop()
             self.store.end_session(self.session_id, ended_at=maintenant)
             self.session_id = None
 
@@ -273,7 +319,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(self.state.snapshot())
         elif self.path == "/api/session/demarrer":
             spot = str(self._read_json().get("spot") or "")
-            self.state.start(spot)
+            try:
+                self.state.start(spot)
+            except CaptureUnavailable as exc:
+                # 409 et non 500 : ce n'est pas une panne du serveur, c'est une
+                # condition que l'utilisateur peut lever lui-même, et le message
+                # dit laquelle.
+                self._send_json({"erreur": str(exc)}, status=409)
+                return
             self._send_json(self.state.snapshot())
         elif self.path == "/api/session/arreter":
             self.state.stop()
@@ -297,7 +350,17 @@ def serve(*, port: int = DEFAULT_PORT, store: SessionStore | None = None) -> Non
         # dégrade l'affichage, elle ne doit pas empêcher de lancer l'interface.
         _log.warning("catalogue indisponible, les objets seront affichés par identifiant : %s", exc)
         catalog = None
-    state = AppState(store or SessionStore(), PriceBook(), catalog)
+    magasin = store or SessionStore()
+    matcher = ItemMatcher(catalog) if catalog is not None else None
+    state = AppState(
+        magasin,
+        PriceBook(),
+        catalog,
+        # Le catalogue sert à NOMMER les objets pour l'affichage ; ici il sert à
+        # les RECONNAÎTRE. Sans lui la capture ne peut rien compter, donc elle
+        # refusera de démarrer plutôt que d'ouvrir une session vide.
+        CaptureWorker(magasin, matcher=matcher),
+    )
     serveur = build_server(state, port)
     print(f"Butin : interface sur http://{HOST}:{port}")
     try:
