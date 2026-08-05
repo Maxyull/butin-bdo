@@ -27,7 +27,7 @@
 ; (voir docs/versionnage.md, étape 3 de la procédure de publication).
 
 #define MyAppName "Butin"
-#define MyAppVersion "0.1.0.dev0"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "Maxyull"
 #define MyAppURL "https://github.com/Maxyull/butin-bdo"
 #define MyAppExeName "butin.exe"

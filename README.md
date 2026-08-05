@@ -217,10 +217,9 @@ Butin suit [Semantic Versioning](https://semver.org/), et son journal des
 modifications suit [Keep a Changelog](https://keepachangelog.com/) :
 [CHANGELOG.md](CHANGELOG.md).
 
-La version actuelle est `0.1.0.dev0`. Le `0.` du début a un sens précis et n'est
-pas de la modestie : **rien n'est stable, tout peut changer d'une version à
-l'autre**, y compris le format de la base de sessions. Le `.dev0` dit qu'aucune
-version n'est encore publiée.
+La version actuelle est `0.1.0`. Le `0.` du début a un sens précis et n'est pas
+de la modestie : **rien n'est stable, tout peut changer d'une version à
+l'autre**, y compris le format de la base de sessions.
 
 Ce que Butin s'engage à ne pas casser, les critères à remplir pour passer en
 1.0.0, et pourquoi la convention Conventional Commits a été **écartée** : voir

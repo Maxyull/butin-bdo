@@ -76,13 +76,15 @@ class TestCheckForUpdate:
         assert info.disponible is False
 
     def test_dev_local_contre_la_premiere_version_publiee(self) -> None:
-        """Régression : c'est la situation réelle de Butin aujourd'hui.
+        """Régression : c'était la situation réelle de Butin avant le 06/08/2026.
 
-        La version locale est `0.1.0.dev0` (aucune version n'est publiée,
-        voir docs/versionnage.md) et la première Release publiée sera
-        `0.1.0` tout court. `.dev0` doit trier AVANT la version publiée du
-        même numéro, sinon le bandeau ne s'affiche jamais sur la version qui
-        en a le plus besoin : celle qui précède la toute première publication.
+        Avant la publication de `0.1.0`, la version locale était `0.1.0.dev0`
+        (voir docs/versionnage.md) et la Release à venir serait `0.1.0` tout
+        court. `.dev0` doit trier AVANT la version publiée du même numéro,
+        sinon le bandeau ne se serait jamais affiché sur la version qui en
+        avait le plus besoin : celle qui précédait la toute première
+        publication. Le même cas se reproduira au prochain cycle de
+        développement.
         """
         reponse = ReponseFactice(
             json.dumps(
