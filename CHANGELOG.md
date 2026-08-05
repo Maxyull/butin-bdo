@@ -178,11 +178,8 @@ dans [docs/versionnage.md](docs/versionnage.md).
 
 ### Connu et non résolu
 
-- Le catalogue du marché ne reconnaît qu'un objet sur huit du butin réel.
-  **Résolu par bdocodex** (98 % de jointure contre 5 %), mais la bascule du
-  moteur de reconnaissance vers cette source n'est pas encore faite : pour
-  l'instant `data/butin-connu.json` existe sans être branché. Voir
-  [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
+- `data/butin-connu.json` porte les **zones de farm** qui servent à nommer une
+  session automatiquement, et elles sont encore **en anglais**.
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
 - **Le compteur est juste sur les 30 secondes de farm mesurées** : 47 drops sur
@@ -198,10 +195,21 @@ dans [docs/versionnage.md](docs/versionnage.md).
   fixe, alors que le journal est transparent sur un monde qui bouge en
   permanence. La défense contre une lecture prise en pleine animation repose
   donc entièrement sur le vote multi-images.
-- Aucune interface graphique. **Le calibrage de la zone, lui, est fait**, mais
-  n'a été vérifié que sur une seule résolution et une seule échelle
-  d'interface : rien dans l'algorithme n'en dépend, tout y est mesuré plutôt que
-  fixé, mais ce n'est pas la même chose que l'avoir vérifié.
+- Le calibrage n'a été vérifié que sur **une seule résolution et une seule
+  échelle d'interface**. Rien dans l'algorithme n'en dépend, tout y est mesuré
+  plutôt que fixé, mais ce n'est pas la même chose que l'avoir vérifié.
+- ⚠️ **Le direct sera moins précis que le banc, et on sait pourquoi.** Le banc
+  rejoue 300 images où la mesure de défilement tourne toutes les 100 ms ; en
+  vrai, la reconnaissance de texte bloque le même fil pendant une seconde, donc
+  elle ne tourne qu'une fois par seconde. Le résultat du banc est un plafond,
+  pas une promesse. Découpler les deux fils est faisable et mérite d'être mesuré
+  en conditions réelles avant d'être décidé.
+- **Le produit n'a jamais tourné devant le jeu de bout en bout.** Tout est
+  mesuré au banc et vérifié fenêtre par fenêtre ; personne ne l'a encore utilisé
+  en farmant.
+- Le taux de taxe de l'hôtel des ventes est calculé correctement mais **n'est
+  pas réglable depuis l'interface**.
+- Il faut encore cloner le dépôt et lancer `pip` : **aucun installeur**.
 - Le calibrage ne suit pas un déplacement de la fenêtre de chat en cours de
   session. La bouger en jeu demande de relancer `butin calibrer`.
 - La reconnaissance n'est lancée que 22 fois sur 300 images, faute de pouvoir
