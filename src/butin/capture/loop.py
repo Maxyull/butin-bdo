@@ -126,7 +126,15 @@ class TickResult:
 
     ocr_ran: bool = False
     events: list[LootEvent] = field(default_factory=list)
+
     silver: int = 0
+    """Silver des lignes NOUVELLES de ce tour, pas de la fenêtre entière.
+
+    C'est bien un incrément, jamais un état : l'appelant l'additionne, donc y
+    mettre le contenu de la fenêtre recompterait chaque gain autant de fois
+    qu'il reste affiché.
+    """
+
     pending_shift_px: float = 0.0
     expected_new: int | None = None
     skipped_reason: str = ""
@@ -227,7 +235,6 @@ class CaptureLoop:
             self.reader.read_text(image), self.matcher, fmt=self.fmt, scope=self.scope
         )
         current = [ligne.observed for ligne in parsed]
-        silver = sum(ligne.silver for ligne in parsed)
 
         expected = self._expected_new(len(current))
         self._pending_shift_px = 0.0
@@ -252,6 +259,19 @@ class CaptureLoop:
         self._consecutive_skips = 0
         self._previous_lines = current
         evenements = self.stager.observe(result.overlap, current)
+
+        # ⚠️ Sur les lignes NOUVELLES seulement, jamais sur la fenêtre entière.
+        # Une ligne de silver reste affichée une dizaine de secondes et se
+        # retrouve donc dans toutes les lectures de cet intervalle : la
+        # réadditionner à chaque fois compte le même gain autant de fois qu'il
+        # a été vu. Mesuré par le banc le 05/08/2026, avec seulement 6 lectures
+        # exploitées sur 300 images : 123 409 silver comptés pour 93 161 réels,
+        # soit +32,5 %. À cadence normale l'erreur serait bien plus grosse.
+        #
+        # Le découpage `result.overlap:` est exactement celui qui définit
+        # `result.new_lines`, donc le silver suit la même règle que les objets
+        # et ne peut pas s'en désynchroniser.
+        silver = sum(ligne.silver for ligne in parsed[result.overlap :])
         self.total_silver += silver
         return TickResult(ocr_ran=True, events=evenements, silver=silver, expected_new=expected)
 

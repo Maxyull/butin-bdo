@@ -11,14 +11,26 @@ Le code du banc est dans `src/butin/bench/`, ses tests dans
 ## 1. Le résultat, en une ligne
 
 > Sur 30 secondes de farm réel, le compteur enregistre **12 drops sur 47**, soit
-> une perte de **74,5 %**, et sur-compte le silver de **32,5 %**.
+> une perte de **74,5 %**, et **68 996 silver sur 93 161**, soit **−25,9 %**.
 
-**Ce n'est pas publiable.** Le sens de l'erreur sur les objets est le bon (on
-rate, on n'invente pas), mais l'ampleur le rend inutilisable, et l'erreur sur le
-silver va, elle, dans le mauvais sens.
+**Ce n'est pas publiable.** L'ampleur rend le total inutilisable, même si le sens
+de l'erreur est le bon : on rate du butin, on n'en invente pas.
 
 Les quatre causes sont identifiées et chiffrées en partie 4. Aucune n'est dans
 la logique d'anti-double-comptage elle-même.
+
+### Historique des mesures
+
+| Date | Drops | Silver | Ce qui a changé |
+| --- | --- | --- | --- |
+| 05/08, mesure initiale | 12 / 47 | **+32,5 %** | — |
+| 05/08, cause D corrigée | 12 / 47 | **−25,9 %** | le silver ne compte plus que les lignes nouvelles |
+
+La correction de la cause D n'améliore pas le total, elle en **inverse le
+signe** : le compteur cesse d'inventer du gain et se contente d'en rater, ce
+qui est le seul comportement acceptable pour ce projet. Ce qui reste de l'écart
+sur le silver n'est plus un défaut à lui, c'est la même perte que sur les
+objets, due aux causes B et C.
 
 ## 2. Les données
 
@@ -170,23 +182,33 @@ Avec 6 lectures utiles et `min_sightings = 3`, presque aucune ligne n'atteint le
 seuil de validation avant de sortir de l'écran. Le compteur le sait et le dit :
 **21 lignes reconnues puis perdues**, 41 sorties sans validation.
 
-### D. Le silver est compté sur toute la fenêtre à chaque lecture
+### D. Le silver était compté sur toute la fenêtre à chaque lecture — CORRIGÉ
 
-`CaptureLoop._read` fait `self.total_silver += sum(ligne.silver for ligne in
-parsed)`, où `parsed` est la fenêtre **entière**, pas les lignes nouvelles. Les
-mêmes lignes sont donc additionnées à chaque lecture.
+`CaptureLoop._read` faisait `self.total_silver += sum(ligne.silver for ligne in
+parsed)`, où `parsed` est la fenêtre **entière**, pas les lignes nouvelles. Une
+ligne de silver reste affichée une dizaine de secondes, donc se retrouvait dans
+toutes les lectures de cet intervalle et était additionnée autant de fois.
 
-Mesuré : 123 409 comptés contre 93 161 réels, soit **+32,5 %**. Avec 6 lectures
-utiles seulement ; à cadence normale l'erreur serait bien plus grosse. C'est le
-seul défaut du lot qui fait **inventer** du gain plutôt qu'en rater, donc le
-plus grave au regard du principe qui tranche tous les arbitrages du projet.
+Mesuré : 123 409 comptés contre 93 161 réels, soit **+32,5 %**. Et encore, avec
+6 lectures utiles seulement ; à cadence normale l'erreur aurait été bien plus
+grosse. C'était le seul défaut du lot qui fasse **inventer** du gain plutôt
+qu'en rater, donc le plus grave au regard du principe qui tranche tous les
+arbitrages du projet.
+
+**Corrigé** : le silver suit maintenant le même découpage `result.overlap:` que
+les objets, donc il ne peut plus s'en désynchroniser. Après correction, le banc
+rend **68 996 contre 93 161, soit −25,9 %**. Le reste de l'écart n'est plus
+imputable au silver : c'est la même perte que sur les objets, causes B et C.
+
+Deux tests de régression le figent dans `tests/test_loop.py`, tous deux vérifiés
+en échec sans le correctif.
 
 ## 5. Ce que ça commande pour la suite
 
 Dans cet ordre, et parce que le banc le montre :
 
-1. **Corriger le silver** (cause D). Une ligne de code, un test de régression,
-   et c'est la seule erreur qui va dans le mauvais sens.
+1. ~~**Corriger le silver** (cause D).~~ **Fait.** L'erreur est passée de
+   +32,5 % à −25,9 %, donc du mauvais côté au bon.
 2. **Ne plus exiger que toutes les paires passent le seuil** (cause C).
    Six lectures utiles sur trois cents est le plus gros levier du lot.
 3. **Trouver une règle de mesure du défilement qui marche** (cause B), ou
