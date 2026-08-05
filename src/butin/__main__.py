@@ -13,11 +13,20 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 from . import __version__, paths
 from .catalog import ItemCatalog, ItemMatcher
 from .catalog.models import LOCALE_FR
 from .catalog.source import CatalogError
+
+if TYPE_CHECKING:
+    # Ces trois-là tirent numpy, mss et le paquet du moteur OCR. Les importer
+    # pour de bon ferait payer tout ça à `butin --version`, et empêcherait la
+    # ligne de commande de démarrer sur une machine sans affichage.
+    from .capture.calibrate import Calibration
+    from .capture.ocr import TextReader
+    from .capture.screen import GrayImage
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -121,11 +130,12 @@ def _commande_calibrer(delai: float, ecran: int, sans_ocr: bool) -> int:
         print(f"Échec du calibrage : {exc}", file=sys.stderr)
         return 1
 
-    if not sans_ocr:
-        from .capture.ocr import TextReader
+    from .capture.ocr import TextReader
 
+    lecteur = TextReader()
+    if not sans_ocr:
         print("Mesure de la largeur utile du texte…")
-        calibrage = measure_width(image, calibrage, TextReader())
+        calibrage = measure_width(image, calibrage, lecteur)
 
     chemin = calibrage.save()
     print(f"Zone du chat : {calibrage.describe()}")
@@ -139,6 +149,63 @@ def _commande_calibrer(delai: float, ecran: int, sans_ocr: bool) -> int:
             "Recalibrer avec un journal plus rempli donnerait une zone plus sûre.",
             file=sys.stderr,
         )
+    if sans_ocr:
+        print(
+            "\nAttention : sans mesure de la largeur, la zone prend toute la largeur "
+            "de l'écran. Utilisable pour un essai, coûteux en reconnaissance.",
+            file=sys.stderr,
+        )
+        return 0
+    return _montrer_la_zone(image, calibrage, lecteur)
+
+
+def _montrer_la_zone(image: GrayImage, calibrage: Calibration, lecteur: TextReader) -> int:
+    """Affiche ce que la zone contient, pour qu'on voie sur quoi on a calibré.
+
+    ⚠️ Nécessaire, et trouvé en essayant la commande pour de bon. La détection
+    cherche ce qui **se répète verticalement** ; elle ne sait pas d'où vient
+    l'image. Un premier essai hors du jeu a calibré, très proprement, sur une
+    **capture du chat ouverte dans une visionneuse d'images** : zone trouvée,
+    pas de ligne juste, 19 lignes de gain lues. Tout était correct sauf que ce
+    n'était pas le jeu.
+
+    Aucune heuristique ne distingue le chat du jeu d'une image du chat du jeu :
+    ce sont les mêmes pixels. Ce qui reste possible, et suffisant, c'est de
+    **montrer ce qui a été lu**. Un terminal, une mauvaise fenêtre ou un mauvais
+    écran se reconnaissent d'un coup d'œil, et le cas de la capture affichée se
+    règle par la consigne : avoir le jeu devant soi.
+
+    Zéro ligne de gain déclenche un avertissement explicite, parce que c'est la
+    seule chose qu'on puisse affirmer : la zone ne contient pas de journal.
+    """
+    from .capture.lines import parse_frame
+
+    region = calibrage.region
+    zone = image[region.top : region.bottom, region.left : region.right]
+    rangees = lecteur.read_text(zone)
+
+    print("\nCe que la zone contient :")
+    for ligne in rangees[:4] or ["(aucun texte lu)"]:
+        print(f"  {ligne[:90]}")
+
+    try:
+        matcher = ItemMatcher(_charger())
+    except CatalogError:
+        # Sans catalogue on ne peut pas compter les gains, mais l'extrait
+        # ci-dessus suffit déjà à voir si on regarde le bon endroit.
+        return 0
+
+    gains = len(parse_frame(list(rangees), matcher))
+    if gains == 0:
+        print(
+            "\nAttention : aucune ligne du journal d'acquisition dans cette zone. "
+            "Si l'extrait ci-dessus n'est pas le chat du jeu, la zone est FAUSSE : "
+            "revenez dans le jeu, journal visible, et relancez « butin calibrer ».",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"\n{gains} lignes de gain reconnues dans la zone.")
     return 0
 
 
