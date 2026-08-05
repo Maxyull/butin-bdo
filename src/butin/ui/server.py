@@ -38,8 +38,9 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
+from .. import paths
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import ItemCatalog, ItemMatcher
@@ -61,6 +62,19 @@ STATIC = Path(__file__).resolve().parent / "static"
 MAX_BODY = 64 * 1024
 
 
+class OverlayWindow(Protocol):
+    """Ce que l'état attend d'un panneau en surimpression.
+
+    Réduit à ouvrir et fermer : la couche interface ne doit rien savoir de la
+    bibliothèque de fenêtres, sans quoi elle deviendrait impossible à tester
+    sans session graphique.
+    """
+
+    def open(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
 class AppState:
     """État partagé entre les requêtes.
 
@@ -75,10 +89,18 @@ class AppState:
         book: PriceBook,
         catalog: ItemCatalog | None = None,
         worker: CaptureWorker | None = None,
+        overlay: OverlayWindow | None = None,
     ) -> None:
         self.store = store
         self.book = book
         self.worker = worker
+        self.overlay = overlay
+        """Panneau en surimpression, ouvert avec la session et fermé avec elle.
+
+        Optionnel : sans lui l'application reste utilisable, la fenêtre
+        principale montrant les mêmes chiffres. C'est aussi ce qui permet aux
+        tests de vérifier le cycle sans ouvrir de fenêtre.
+        """
         """Ce qui fait tourner la capture. Optionnel pour que l'interface reste
         consultable sans écran ni moteur de reconnaissance, ce dont les tests et
         une machine sans affichage profitent."""
@@ -115,6 +137,8 @@ class AppState:
         except ValueError:
             calibrage = None
         reglages["calibrage"] = calibrage.describe() if calibrage is not None else ""
+        reglages["dossier"] = str(paths.storage_root())
+        reglages["dossier_defaut"] = str(paths.default_storage_root())
 
         if session_id is None:
             return {
@@ -317,6 +341,21 @@ class AppState:
             if isinstance(taux, (int, float)) and 0 < float(taux) <= 1:
                 self.market_rate = float(taux)
 
+    def set_storage(self, chemin: str) -> dict[str, Any]:
+        """Retient un nouveau dossier de données, effectif au prochain lancement.
+
+        ⚠️ Rien n'est déplacé, et c'est délibéré : la base SQLite est ouverte à
+        cet instant précis par le programme qui répond à cette requête.
+        Déplacer un fichier de base pendant qu'il est ouvert est le meilleur
+        moyen de le perdre, et perdre l'historique de quelqu'un pour lui rendre
+        service serait absurde.
+        """
+        vise = chemin.strip()
+        if not vise:
+            raise ValueError("dossier vide")
+        cible = paths.set_storage_root(Path(vise))
+        return {"dossier": str(cible), "redemarrage": True}
+
     def calibrate(self, *, monitor: int = 1) -> dict[str, Any]:
         """Cherche la fenêtre de chat et enregistre la zone. Rend ce qu'elle contient.
 
@@ -378,7 +417,13 @@ class AppState:
                     self.store.end_session(session.id, ended_at=maintenant)
                     raise
             self.session_id = session.id
-            return session.id
+
+        # Hors du verrou : ouvrir une fenêtre passe par la couche graphique,
+        # qui peut prendre son temps. Le garder verrouillé bloquerait toutes les
+        # autres requêtes, dont celles qui rafraîchissent l'écran.
+        if self.overlay is not None:
+            self.overlay.open()
+        return session.id
 
     def stop(self, *, now: float | None = None) -> None:
         """Arrête la capture PUIS ferme la session.
@@ -395,6 +440,9 @@ class AppState:
                 self.worker.stop()
             self.store.end_session(self.session_id, ended_at=maintenant)
             self.session_id = None
+
+        if self.overlay is not None:
+            self.overlay.close()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -472,6 +520,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path in ("/", "/index.html"):
             self._send_file("index.html")
+        elif self.path == "/overlay":
+            self._send_file("overlay.html")
         elif self.path == "/api/etat":
             self._send_json(self.state.snapshot())
         elif self.path == "/api/historique":
@@ -496,6 +546,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"erreur": str(exc)}, status=409)
                 return
             self._send_json(self.state.snapshot())
+        elif self.path == "/api/dossier":
+            try:
+                self._send_json(self.state.set_storage(str(self._read_json().get("dossier", ""))))
+            except (ValueError, OSError) as exc:
+                # Un chemin refusé par le système, un lecteur absent, un droit
+                # manquant : autant de choses que l'utilisateur peut corriger,
+                # à condition qu'on lui dise laquelle.
+                self._send_json({"erreur": f"dossier impossible : {exc}"}, status=400)
         elif self.path == "/api/calibrer":
             try:
                 self._send_json(self.state.calibrate())

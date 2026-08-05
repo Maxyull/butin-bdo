@@ -243,6 +243,101 @@ class TestFilDesDrops:
         assert state.snapshot()["derniers"] == []
 
 
+class TestPanneauEnSurimpression:
+    """Le panneau posé par-dessus le jeu, ouvert avec la session.
+
+    C'est le seul écran que le joueur regarde en farmant : la fenêtre
+    principale est derrière le jeu, ou sur un autre écran.
+    """
+
+    class _Overlay:
+        def __init__(self) -> None:
+            self.trace: list[str] = []
+
+        def open(self) -> None:
+            self.trace.append("ouvert")
+
+        def close(self) -> None:
+            self.trace.append("ferme")
+
+    def test_il_s_ouvre_avec_la_session_et_se_ferme_avec_elle(self, store: SessionStore) -> None:
+        panneau = self._Overlay()
+        etat = AppState(store, PriceBook(), None, None, panneau)
+
+        etat.start("Gyfin")
+        etat.stop()
+
+        assert panneau.trace == ["ouvert", "ferme"]
+
+    def test_un_demarrage_refuse_n_ouvre_pas_le_panneau(self, store: SessionStore) -> None:
+        """Un panneau vide posé sur le jeu, sans session derrière, ferait croire
+        que ça tourne."""
+
+        class Refuse:
+            def start(self, session_id: int) -> None:
+                raise CaptureUnavailable("zone non calibrée")
+
+            def stop(self, *, timeout: float = 5.0) -> int:
+                return 0
+
+            def status(self) -> CaptureStatus:
+                return CaptureStatus(False, 0, 0, 0, 0, 0, 0)
+
+        panneau = self._Overlay()
+        etat = AppState(store, PriceBook(), None, Refuse(), panneau)
+
+        with pytest.raises(CaptureUnavailable):
+            etat.start("Gyfin")
+
+        assert panneau.trace == []
+
+    def test_la_page_du_panneau_est_servie(self, app) -> None:
+        _, base = app
+
+        page = urllib.request.urlopen(f"{base}/overlay").read().decode("utf-8")  # noqa: S310
+
+        assert "background: transparent" in page
+
+    def test_l_application_reste_utilisable_sans_panneau(self, store: SessionStore) -> None:
+        """Sans lui, la fenêtre principale montre les mêmes chiffres."""
+        etat = AppState(store, PriceBook(), None, None, None)
+
+        etat.start("Gyfin")
+        etat.stop()
+
+        assert etat.session_id is None
+
+
+class TestDossierDesSessions:
+    def test_le_dossier_est_visible_dans_les_reglages(self, app) -> None:
+        """Sinon personne ne sait où sont ses sessions, et « quelque part sur le
+        disque » n'est pas une réponse."""
+        state, _ = app
+
+        reglages = state.snapshot()["reglages"]
+
+        assert reglages["dossier"]
+        assert reglages["dossier_defaut"].endswith("BDO Tracker")
+
+    def test_changer_de_dossier_le_retient(
+        self, app, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state, _ = app
+        monkeypatch.setenv("BUTIN_HOME", str(tmp_path))
+        cible = tmp_path / "ailleurs"
+
+        reponse = state.set_storage(str(cible))
+
+        assert reponse["redemarrage"] is True
+        assert cible.is_dir()
+
+    def test_un_dossier_vide_est_refuse(self, app) -> None:
+        state, _ = app
+
+        with pytest.raises(ValueError):
+            state.set_storage("   ")
+
+
 class TestPageHistorique:
     """La seconde page. Sans elle, une session fermée disparaissait pour de bon.
 

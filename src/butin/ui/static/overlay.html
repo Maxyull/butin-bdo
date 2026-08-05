@@ -1,0 +1,167 @@
+<meta charset="utf-8">
+<title>Butin — en direct</title>
+<style>
+  /* ⚠️ Fond entièrement transparent. C'est la seule raison d'être de cette
+     page : elle se pose PAR-DESSUS le jeu, et tout pixel opaque qu'elle
+     ajoute est un pixel de jeu que le joueur ne voit plus. Seules les
+     pastilles de texte ont un fond, et il est translucide. */
+  html, body {
+    margin: 0; padding: 0; background: transparent;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: #e6e8ee; user-select: none; overflow: hidden;
+  }
+  /* Le halo sombre remplace un fond opaque : il rend le texte lisible sur un
+     décor clair sans cacher le jeu derrière. */
+  body { text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+
+  #cadre {
+    padding: 10px 12px;
+    background: rgba(12, 14, 19, 0.55);
+    border: 1px solid rgba(120, 130, 150, 0.35);
+    border-radius: 10px;
+    backdrop-filter: blur(2px);
+  }
+
+  /* La poignée de déplacement est explicite : sans cadre de fenêtre, rien
+     n'indiquerait qu'on peut bouger le panneau, et le joueur croirait qu'il
+     est cloué là où il est tombé. */
+  #barre {
+    display: flex; align-items: center; gap: 10px;
+    margin: -10px -12px 8px; padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 10px 10px 0 0;
+    cursor: move; font-size: 12px; color: #97a0b5;
+  }
+  #barre .titre { letter-spacing: .08em; text-transform: uppercase; }
+  #barre button {
+    margin-left: auto; background: transparent; color: #97a0b5;
+    border: 1px solid rgba(120, 130, 150, 0.35); border-radius: 6px;
+    padding: 2px 9px; cursor: pointer; font-size: 12px;
+  }
+  #barre button:hover { color: #ff8b3d; border-color: #ff8b3d; }
+
+  .chiffres { display: flex; gap: 20px; margin-bottom: 8px; }
+  .chiffres div { min-width: 92px; }
+  .chiffres .etiquette { font-size: 10px; color: #97a0b5; letter-spacing: .06em; }
+  .chiffres .valeur { font-size: 19px; font-variant-numeric: tabular-nums; }
+
+  #drops { max-height: 260px; overflow: hidden; }
+  .drop { display: flex; gap: 9px; align-items: baseline; padding: 2px 0; font-size: 14px; }
+  .drop .qte { color: #97a0b5; font-variant-numeric: tabular-nums; }
+  .drop .valeur { margin-left: auto; font-variant-numeric: tabular-nums; color: #cfd4e0; }
+  @keyframes arrivee { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+  .drop.neuf { animation: arrivee .35s ease-out; }
+
+  /* Les couleurs de rareté du jeu, identiques à la fenêtre principale. */
+  .rarete-0 { color: #e6e8ee; }
+  .rarete-1 { color: #6fdb6f; }
+  .rarete-2 { color: #57a8ff; }
+  .rarete-3 { color: #f2c14e; }
+  .rarete-4 { color: #ff8b3d; }
+  .rarete-5 { color: #ff8b3d; }
+
+  #vide { color: #97a0b5; font-size: 13px; padding: 4px 0; }
+  #panne { color: #ff8b3d; font-size: 13px; padding: 4px 0; display: none; }
+</style>
+
+<div id="cadre">
+  <div id="barre">
+    <span class="titre">Butin — en direct</span>
+    <span id="etat"></span>
+    <button id="fermer" title="Arrête la session et referme le panneau">Arrêter</button>
+  </div>
+
+  <div class="chiffres">
+    <div><div class="etiquette">SILVER/HEURE</div><div class="valeur" id="par-heure">0</div></div>
+    <div><div class="etiquette">TOTAL NET</div><div class="valeur" id="total">0</div></div>
+    <div><div class="etiquette">DURÉE</div><div class="valeur" id="duree">00:00:00</div></div>
+  </div>
+
+  <div id="panne"></div>
+  <div id="drops"><div id="vide">En attente du premier drop…</div></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const nombre = (v) => new Intl.NumberFormat("fr-FR").format(Math.round(v || 0));
+
+function chrono(secondes) {
+  const s = Math.max(0, Math.floor(secondes));
+  const h = String(Math.floor(s / 3600)).padStart(2, "0");
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  return h + ":" + m + ":" + String(s % 60).padStart(2, "0");
+}
+
+let dejaVus = new Set();
+
+function afficher(etat) {
+  const stats = etat.stats;
+  $("par-heure").textContent = nombre(stats ? stats.par_heure : 0);
+  $("total").textContent = nombre(stats ? stats.total : 0);
+  $("duree").textContent = chrono(etat.session ? etat.session.duree_s : 0);
+
+  const capture = etat.capture;
+  // Une panne du fil de capture doit se voir ICI aussi : c'est le seul écran
+  // que le joueur regarde pendant qu'il farme, et un total qui n'augmente plus
+  // sans explication est indistinguable d'un farm calme.
+  $("panne").style.display = capture && capture.erreur ? "block" : "none";
+  if (capture && capture.erreur) $("panne").textContent = "Capture arrêtée : " + capture.erreur;
+  $("etat").textContent = capture && capture.en_cours
+    ? capture.drops_enregistres + " drops"
+    : "";
+
+  const drops = etat.derniers || [];
+  const zone = $("drops");
+  if (!drops.length) {
+    dejaVus = new Set();
+    zone.innerHTML = '<div id="vide">En attente du premier drop…</div>';
+    return;
+  }
+
+  const vues = new Set();
+  zone.innerHTML = "";
+  for (const drop of drops.slice(0, 12)) {
+    const cle = drop.item_id + ":" + drop.il_y_a_s + ":" + drop.quantite;
+    vues.add(cle);
+    const ligne = document.createElement("div");
+    ligne.className = "drop" + (dejaVus.size && !dejaVus.has(cle) ? " neuf" : "");
+
+    const nom = document.createElement("span");
+    nom.className = "rarete-" + (drop.rarete || 0);
+    // textContent : un nom d'objet vient d'une source externe.
+    nom.textContent = drop.nom;
+    const qte = document.createElement("span");
+    qte.className = "qte";
+    qte.textContent = "x" + drop.quantite;
+    const valeur = document.createElement("span");
+    valeur.className = "valeur";
+    valeur.textContent = drop.valeur ? nombre(drop.valeur) : "—";
+
+    ligne.append(nom, qte, valeur);
+    zone.appendChild(ligne);
+  }
+  dejaVus = vues;
+}
+
+$("fermer").addEventListener("click", async () => {
+  await fetch("/api/session/arreter", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: "{}",
+  });
+  // La fenêtre se referme d'elle-même : l'application surveille la fin de
+  // session. Rien à faire de plus ici.
+});
+
+async function rafraichir() {
+  try {
+    afficher(await (await fetch("/api/etat")).json());
+  } catch (erreur) {
+    // Le serveur local s'arrête quand l'application se ferme. Ce n'est pas une
+    // panne à signaler au joueur, c'est la fin normale.
+  }
+}
+
+rafraichir();
+setInterval(rafraichir, 1000);
+</script>

@@ -164,14 +164,25 @@
 </div>
 
 <div class="onglets" role="tablist">
-  <button id="onglet-session" role="tab" aria-selected="true">Session en cours</button>
+  <button id="onglet-session" role="tab" aria-selected="true">Réglages</button>
   <button id="onglet-historique" role="tab" aria-selected="false">Historique</button>
 </div>
 
 <div class="page" id="page-session">
 
 <div class="panneau" style="margin-bottom:18px">
-  <button class="action demarrer" id="bouton-session">Démarrer une session</button>
+  <div class="etiquette" style="margin-bottom:8px">Dossier des sessions</div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input id="dossier" type="text" spellcheck="false"
+           style="flex:1;min-width:320px;background:#0f1116;color:var(--texte);
+                  border:1px solid #2a2e39;border-radius:8px;padding:9px 11px;font-size:14px">
+    <button class="action" id="bouton-dossier">Changer</button>
+  </div>
+  <div id="etat-dossier" style="margin-top:8px;color:var(--doux);font-size:13px"></div>
+</div>
+
+<div class="panneau" style="margin-bottom:18px">
+  <button class="action demarrer" id="bouton-session">Commencer le grind</button>
   <button class="action" id="bouton-calibrer">Calibrer la zone</button>
   <span id="etat-session" style="margin-left:14px;color:var(--doux)">Aucune session en cours</span>
   <div id="etat-capture" style="margin-top:10px;color:var(--doux);font-size:14px"></div>
@@ -386,6 +397,13 @@ function afficher(etat) {
     ligneCapture.textContent = "";
   }
 
+  const dossier = etat.reglages ? etat.reglages.dossier : "";
+  // Jamais pendant qu'on tape : écraser le champ à chaque rafraîchissement,
+  // une fois par seconde, rendrait la saisie impossible.
+  if (dossier && document.activeElement !== $("dossier") && !$("dossier").value) {
+    $("dossier").value = dossier;
+  }
+
   const calibrage = etat.reglages ? etat.reglages.calibrage : "";
   $("etat-calibrage").textContent = calibrage
     ? "Zone calibrée : " + calibrage
@@ -450,6 +468,24 @@ $("bouton-session").addEventListener("click", async () => {
   const etat = await (await fetch("/api/etat")).json();
   const enCours = Boolean(etat.session && etat.session.en_cours);
   const route = enCours ? "/api/session/arreter" : "/api/session/demarrer";
+
+  // Décompte avant de commencer, pas avant d'arrêter : on part dans le jeu
+  // pour farmer, on n'a aucune raison d'attendre pour s'arrêter. Il est
+  // affiché dans la page plutôt que côté serveur, pour que la requête reste
+  // courte et que le joueur voie le temps qu'il lui reste.
+  const bouton = $("bouton-session");
+  if (!enCours) {
+    bouton.disabled = true;
+    try {
+      for (let reste = 5; reste > 0; reste--) {
+        bouton.textContent = "Bascule dans le jeu… " + reste;
+        await new Promise((suite) => setTimeout(suite, 1000));
+      }
+    } finally {
+      bouton.disabled = false;
+    }
+  }
+
   const reponse = await fetch(route, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -613,6 +649,29 @@ async function ouvrirSession(id, corps, ligne) {
   }
   $("detail-session").hidden = false;
 }
+
+$("bouton-dossier").addEventListener("click", async () => {
+  const ligne = $("etat-dossier");
+  const reponse = await fetch("/api/dossier", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({dossier: $("dossier").value}),
+  });
+  const corps = await reponse.json();
+  if (!reponse.ok) {
+    ligne.className = "avertissement";
+    ligne.textContent = corps.erreur || "dossier impossible";
+    return;
+  }
+  ligne.className = "";
+  // Le changement ne déplace rien et ne prend effet qu'au relancement : la
+  // base de sessions est ouverte à cet instant précis, et déplacer un fichier
+  // de base pendant qu'il est ouvert est le meilleur moyen de le perdre.
+  ligne.textContent =
+    "Dossier retenu : " + corps.dossier +
+    " — les sessions déjà enregistrées restent où elles sont, et le changement " +
+    "prend effet au prochain lancement.";
+});
 
 $("onglet-session").addEventListener("click", () => basculer("session"));
 $("onglet-historique").addEventListener("click", () => basculer("historique"));

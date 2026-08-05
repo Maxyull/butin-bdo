@@ -103,31 +103,59 @@ pip install -e ".[dev]"
 
 ## Utilisation
 
-Trois commandes, dans cet ordre.
+**Lancez `butin-app`.** Une fenêtre s'ouvre, et tout s'y fait. Pas d'adresse à
+taper, pas de navigateur, pas de terminal.
 
-```bash
-butin catalogue
-```
+### La fenêtre principale : réglages et historique
 
-Télécharge et vérifie le catalogue d'objets français. À faire une fois.
+Deux onglets.
 
-```bash
-butin interface
-```
+**Réglages** contient le dossier où sont enregistrées vos sessions, le calibrage
+de la zone de chat, et le bouton qui lance le grind.
 
-Ouvre l'interface locale sur `http://127.0.0.1:8771`. **Tout le reste s'y
-fait**, il n'y a plus rien à taper :
+**Historique** liste vos sessions passées : durée, nombre d'objets, silver par
+heure et total net, avec le détail du butin en cliquant sur une ligne.
 
-- **Calibrer la zone** cherche la fenêtre de chat sur votre écran, le pas
-  vertical entre deux lignes et la bande où mesurer le défilement. Un décompte
-  de cinq secondes vous laisse basculer dans le jeu, journal d'acquisition
-  visible. La page affiche ensuite **les lignes qu'elle a lues**, pour que vous
-  vérifiiez qu'elle regarde bien votre chat ;
-- **Démarrer une session** lance la capture. La page montre ce qu'elle compte,
-  et ce qu'elle rate : lectures, drops, images écartées, lignes perdues.
+### Le panneau en surimpression : pendant le grind
 
-Le calibrage reste disponible en ligne de commande, `butin calibrer`, pour
-diagnostiquer sans navigateur.
+**Commencer le grind** vous laisse cinq secondes pour basculer dans le jeu, puis
+pose un **panneau translucide par-dessus** : silver par heure, total net, durée,
+et **chaque drop au moment où il tombe**, avec sa quantité, sa valeur et son nom
+coloré selon la rareté du jeu.
+
+Sans cadre, toujours au-dessus, déplaçable par sa barre de titre. C'est le seul
+écran que vous regardez en farmant — la fenêtre principale est derrière le jeu.
+
+Le bouton **Arrêter** du panneau referme la session et le panneau avec elle.
+
+### Où sont vos sessions
+
+Dans **Documents\BDO Tracker** par défaut. Ce sont vos données : vous voudrez
+les sauvegarder ou les retrouver, pas les chercher dans `%LOCALAPPDATA%`.
+
+Le dossier est affiché dans les réglages et se change. ⚠️ Le changement ne
+déplace rien et prend effet **au prochain lancement** : la base de sessions est
+ouverte à cet instant, et déplacer un fichier de base ouvert est le meilleur
+moyen de le perdre.
+
+### Le premier lancement
+
+Ouvrez **Réglages**, choisissez le dossier si celui par défaut ne vous va pas,
+puis **Calibrer la zone** avec le jeu devant vous et le journal d'acquisition
+visible. La fenêtre affiche les lignes qu'elle a lues : vérifiez que c'est bien
+votre chat avant de commencer.
+
+### Pour diagnostiquer
+
+Une ligne de commande existe à côté, et ne sert qu'à ça :
+
+| Commande | Rôle |
+| --- | --- |
+| `butin` | ouvre la même fenêtre, mais avec un terminal derrière |
+| `butin catalogue` | état du catalogue d'objets et couverture française |
+| `butin calibrer` | calibrage sans fenêtre, affiche ce qu'il a lu |
+| `butin interface` | sert l'interface dans un navigateur, sans fenêtre |
+| `butin reconnaitre "<texte>"` | teste la reconnaissance d'un nom |
 
 ## État d'avancement
 
