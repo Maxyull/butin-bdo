@@ -10,27 +10,32 @@ Le code du banc est dans `src/butin/bench/`, ses tests dans
 
 ## 1. Le résultat, en une ligne
 
-> Sur 30 secondes de farm réel, le compteur enregistre **12 drops sur 47**, soit
-> une perte de **74,5 %**, et **68 996 silver sur 93 161**, soit **−25,9 %**.
+> Sur 30 secondes de farm réel, le compteur enregistre **41 drops sur 47**, soit
+> une perte de **12,8 %** (**8,5 %** en quantité cumulée), et **71 910 silver
+> sur 93 161**, soit **−22,8 %**.
 
-**Ce n'est pas publiable.** L'ampleur rend le total inutilisable, même si le sens
-de l'erreur est le bon : on rate du butin, on n'en invente pas.
-
-Les quatre causes sont identifiées et chiffrées en partie 4. Aucune n'est dans
-la logique d'anti-double-comptage elle-même.
+Toujours pas publiable, mais plus pour la même raison : le compteur ne se trompe
+plus, il **manque d'images**. Les deux causes qui restent sont en amont de lui.
 
 ### Historique des mesures
 
-| Date | Drops | Silver | Ce qui a changé |
-| --- | --- | --- | --- |
-| 05/08, mesure initiale | 12 / 47 | **+32,5 %** | — |
-| 05/08, cause D corrigée | 12 / 47 | **−25,9 %** | le silver ne compte plus que les lignes nouvelles |
+| Date | Drops | Quantité | Silver | Ce qui a changé |
+| --- | --- | --- | --- | --- |
+| 05/08, mesure initiale | 12 / 47 | −70,5 % | **+32,5 %** | — |
+| 05/08, cause D corrigée | 12 / 47 | −70,5 % | **−25,9 %** | le silver ne compte que les lignes nouvelles |
+| 05/08, cause C corrigée | **41 / 47** | **−8,5 %** | −22,8 % | les garde-fous ne jettent plus les lectures valides |
 
-La correction de la cause D n'améliore pas le total, elle en **inverse le
-signe** : le compteur cesse d'inventer du gain et se contente d'en rater, ce
-qui est le seul comportement acceptable pour ce projet. Ce qui reste de l'écart
-sur le silver n'est plus un défaut à lui, c'est la même perte que sur les
-objets, due aux causes B et C.
+Deux façons de lire ce tableau, et les deux comptent :
+
+* la correction de la cause D **n'améliore pas le total, elle en inverse le
+  signe**. Le compteur cesse d'inventer du gain et se contente d'en rater, ce
+  qui est le seul comportement acceptable ici ;
+* la correction de la cause C fait passer la perte de **74,5 % à 12,8 %**, et
+  ramène les images jetées de 9 à **0** et le butin reconnu puis perdu de 21 à
+  **1**. C'était bien le plus gros levier du lot.
+
+Les causes restantes sont en partie 4. Aucune n'a jamais été dans la logique
+d'anti-double-comptage elle-même.
 
 ## 2. Les données
 
@@ -165,22 +170,48 @@ minuteur de repli de 2 secondes. Sans détection, c'est toujours le repli qui
 s'applique : **15 images lues sur 300**, soit une par 2 secondes, là où la seule
 contrainte machine en autoriserait 27.
 
-### C. Huit des quinze lectures sont jetées
+### C. Huit des quinze lectures étaient jetées — CORRIGÉ
 
-Sur les 15 images lues, **8 sont écartées** par le garde-fou « image aberrante :
-recouvrement perdu d'un coup », et une neuvième par « saut invraisemblable ».
-Il ne reste que **6 lectures utiles sur 300 images**.
+Sur les 15 images lues, **8 étaient écartées** par le garde-fou « image
+aberrante : recouvrement perdu d'un coup », et une neuvième par « saut
+invraisemblable ». Il ne restait que **6 lectures utiles sur 300 images**.
 
-La cause est dans `tracking/alignment.py` : `_overlap_score` renvoie `None` dès
-qu'**une seule** paire de lignes passe sous le seuil. Entre deux lectures
-espacées de 2 secondes, le recouvrement porte sur une quinzaine de lignes ; il
-suffit que l'OCR en abîme une pour qu'aucun recouvrement ne soit jugé valide, et
-que l'image entière soit rejetée. Le garde-fou fait alors exactement son travail
-sur une alerte qui n'aurait pas dû être levée.
+Deux défauts distincts, tous deux des garde-fous qui se déclenchaient sur du
+travail correct.
 
-Avec 6 lectures utiles et `min_sightings = 3`, presque aucune ligne n'atteint le
-seuil de validation avant de sortir de l'écran. Le compteur le sait et le dit :
-**21 lignes reconnues puis perdues**, 41 sorties sans validation.
+**`_overlap_score` exigeait que toutes les paires passent le seuil.** Il
+renvoyait `None` dès qu'**une seule** paire de lignes tombait dessous. Entre
+deux lectures espacées de 2 secondes, le recouvrement porte sur une vingtaine de
+lignes ; il suffisait que l'OCR en abîme une pour qu'aucun recouvrement ne soit
+jugé valide. L'appelant concluait que rien ne se recouvrait, et `is_glitch_frame`
+faisait alors exactement son travail sur une alerte qui n'aurait pas dû être
+levée.
+
+Le seuil de remplacement n'est pas posé au jugé. En comparant chaque lecture au
+recouvrement que la référence sait exact :
+
+| Recouvrement | Part des paires qui s'accordent |
+| --- | --- |
+| le vrai | **74 % à 100 %** |
+| le meilleur des faux | **50 % au plus** |
+
+`MatchConfig.overlap_accept` vaut donc **0,60**, à 14 points de chacune des deux
+bornes. Les mauvais scores du vrai recouvrement valent tous autour de 0,47,
+c'est-à-dire exactement le plafond appliqué à une ligne dont l'objet n'a pas été
+reconnu : ce sont des ratés de lecture isolés, pas un désaccord de fond.
+
+**Le plafond de vraisemblance supposait une cadence que la boucle n'a pas.**
+`PLAUSIBLE_MAX_NEW` valait 10, justifié par « le journal ne défile pas de dix
+lignes en un dixième de seconde ». C'est vrai de la cadence de **capture**, pas
+de celle de **lecture** : la reconnaissance ne tourne qu'une fois par seconde au
+mieux, et une fois toutes les deux secondes quand rien ne déclenche de lecture
+anticipée. Sur cette rafale, les lectures portent jusqu'à **14 lignes réellement
+nouvelles**, et celle-là était rejetée. Le plafond suit maintenant le temps
+réellement écoulé, avec un plancher qui garantit qu'il ne devient jamais plus
+sévère qu'avant.
+
+**Après correction :** 15 lectures, **0 écartée**, et le butin reconnu puis
+perdu passe de 21 à **1**. Les drops comptés passent de 12 à **41 sur 47**.
 
 ### D. Le silver était compté sur toute la fenêtre à chaque lecture — CORRIGÉ
 
@@ -209,12 +240,23 @@ Dans cet ordre, et parce que le banc le montre :
 
 1. ~~**Corriger le silver** (cause D).~~ **Fait.** L'erreur est passée de
    +32,5 % à −25,9 %, donc du mauvais côté au bon.
-2. **Ne plus exiger que toutes les paires passent le seuil** (cause C).
-   Six lectures utiles sur trois cents est le plus gros levier du lot.
+2. ~~**Ne plus jeter les lectures valides** (cause C).~~ **Fait.** La perte est
+   passée de 74,5 % à 12,8 %, et les images jetées de 9 à 0.
 3. **Trouver une règle de mesure du défilement qui marche** (cause B), ou
    assumer de s'en passer et régler la cadence autrement. Le calibrage de la
    zone, déjà prévu, devra de toute façon trancher où mesurer.
 4. **Recaler le budget d'OCR sur la taille réelle de la zone** (cause A).
+
+Les deux qui restent sont la **même** question posée deux fois : la boucle ne
+lit que 15 images sur 300. Sans mesure de défilement elle retombe sur son
+minuteur de repli de 2 secondes ; avec une reconnaissance à 1 100 ms elle ne
+pourrait de toute façon pas dépasser 27 lectures. Ce qui reste de perte n'est
+plus un défaut de comptage, c'est un manque d'images.
+
+L'écart sur le silver (−22,8 %) est plus grand que sur les drops (−12,8 %) pour
+la même raison : une ligne de silver n'est comptée qu'à sa première apparition,
+alors qu'un objet est tranché au vote sur plusieurs lectures. Avec 15 lectures
+pour 92 lignes, le vote rattrape ce que la première apparition rate.
 
 Le banc se relance après chaque correction et rend le même rapport : c'est
 exactement ce pour quoi il a été écrit.

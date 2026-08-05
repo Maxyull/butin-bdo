@@ -52,6 +52,31 @@ class MatchConfig:
     """Score minimal pour considérer que deux lignes sont la même ligne
     physique du journal."""
 
+    overlap_accept: float = 0.60
+    """Part des paires qui doivent s'accorder pour qu'un recouvrement soit
+    valide.
+
+    ⚠️ Une **part**, et non la totalité. Exiger que toutes les paires passent
+    revient à laisser une seule ligne mal lue annuler un recouvrement de vingt,
+    ce qui fait rejeter l'image entière. Mesuré par le banc le 05/08/2026 sur
+    300 images de vrai farm : **8 lectures sur 15 étaient jetées** pour cette
+    raison.
+
+    La valeur est posée au milieu de deux populations mesurées, pas au jugé.
+    Sur ces mêmes images, en comparant chaque lecture au recouvrement que la
+    référence sait exact :
+
+    | Recouvrement | Part des paires qui s'accordent |
+    | --- | --- |
+    | le vrai | **74 % à 100 %** |
+    | le meilleur des faux | **50 % au plus** |
+
+    0,60 tombe à 14 points de chacune des deux bornes. Les mauvais scores du
+    vrai recouvrement valent tous autour de 0,47, c'est-à-dire exactement le
+    plafond appliqué à une ligne dont l'objet n'a pas été reconnu : ce sont des
+    ratés de lecture isolés, pas un désaccord de fond.
+    """
+
     name_weight: float = 0.6
     qty_weight: float = 0.4
 

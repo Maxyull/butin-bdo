@@ -112,6 +112,21 @@ dans [docs/versionnage.md](docs/versionnage.md).
   +32,5 %**, et avec seulement 6 lectures exploitées sur 300 images. C'était le
   seul défaut connu qui fasse **inventer** du gain plutôt qu'en rater. Après
   correction, l'écart est de −25,9 %, donc du bon côté.
+- **Une seule ligne mal lue annulait un recouvrement de vingt.** L'alignement
+  exigeait que *toutes* les paires de lignes franchissent le seuil de
+  similarité ; il suffisait donc d'un raté d'OCR pour qu'aucun recouvrement ne
+  soit jugé valide et que l'image entière soit rejetée comme aberrante. Un
+  recouvrement est désormais retenu quand une **part** suffisante de ses paires
+  s'accordent, seuil posé au milieu de deux populations mesurées : le vrai
+  recouvrement accorde 74 à 100 % de ses paires, le meilleur des faux jamais
+  plus de 50 %.
+- **Le plafond de vraisemblance supposait deux lectures espacées de 100 ms**,
+  alors que la reconnaissance ne tourne qu'une fois par seconde au mieux. Une
+  lecture portant 14 lignes réellement nouvelles était rejetée comme un saut
+  invraisemblable. Le plafond suit maintenant le temps réellement écoulé, avec
+  un plancher qui garantit qu'il ne devient jamais plus sévère qu'avant.
+  Mesuré : ces deux corrections ramènent les images jetées de 9 à **0**, le
+  butin reconnu puis perdu de 21 à **1**, et la perte de **74,5 % à 12,8 %**.
 
 ### Connu et non résolu
 
@@ -122,12 +137,12 @@ dans [docs/versionnage.md](docs/versionnage.md).
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- ⛔ **Le compteur perd 74,5 % des drops et 25,9 % du silver.** Mesuré par le
-  banc d'essai sur 30 secondes de farm réel : 12 drops enregistrés sur 47, et
-  68 996 silver comptés pour 93 161 réels. **Rien ne peut être publié en
-  l'état.** Les causes restantes sont identifiées, chiffrées et aucune n'est
-  dans l'anti-double-comptage lui-même :
-  [docs/banc-essai.md](docs/banc-essai.md).
+- ⛔ **Le compteur perd 12,8 % des drops et 22,8 % du silver.** Mesuré par le
+  banc d'essai sur 30 secondes de farm réel : 41 drops enregistrés sur 47, et
+  71 910 silver comptés pour 93 161 réels. **Rien ne peut être publié en
+  l'état**, mais la cause n'est plus le comptage : la boucle ne lit que 15
+  images sur 300, faute de mesure de défilement et à cause du coût de la
+  reconnaissance. [docs/banc-essai.md](docs/banc-essai.md).
 - La reconnaissance de texte coûte 336 ms par image sur une zone de 520 x 385,
   et **1 100 ms** sur une zone de 780 x 575. Le découplage de la boucle absorbe
   le premier chiffre, pas le second.
@@ -141,6 +156,4 @@ dans [docs/versionnage.md](docs/versionnage.md).
   identiques et espacées de 21 px, donc un défilement d'une ligne les superpose
   et ne change rien. Le chiffre qui l'avait fait retenir comparait deux scènes
   différentes.
-- L'alignement rejette une image entière dès qu'**une seule** ligne du
-  recouvrement passe sous le seuil. Mesuré : 8 lectures écartées sur 15.
 - Aucune interface, et aucun calibrage automatique de la zone.

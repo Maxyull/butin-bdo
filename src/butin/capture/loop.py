@@ -62,7 +62,13 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from ..catalog.matcher import ItemMatcher, Scope
-from ..tracking.alignment import AlignmentResult, align, is_glitch_frame, is_implausible_jump
+from ..tracking.alignment import (
+    AlignmentResult,
+    align,
+    is_glitch_frame,
+    is_implausible_jump,
+    plausible_max_new,
+)
 from ..tracking.models import LootEvent, ObservedLine
 from ..tracking.scroll import ScrollResult, estimate_scroll_px, expected_new_lines
 from ..tracking.staging import LootStager
@@ -230,6 +236,10 @@ class CaptureLoop:
     # -- boucle lente ----------------------------------------------------
 
     def _read(self, image: GrayImage, now: float) -> TickResult:
+        # Écart avec la lecture précédente, mesuré AVANT de le remplacer. C'est
+        # lui, et non la cadence de capture, qui borne le nombre de lignes qui
+        # ont pu apparaître entre les deux images comparées.
+        depuis = now - self._last_ocr_at if self._last_ocr_at is not None else 0.0
         self._last_ocr_at = now
         parsed = parse_frame(
             self.reader.read_text(image), self.matcher, fmt=self.fmt, scope=self.scope
@@ -251,7 +261,7 @@ class CaptureLoop:
 
         result = align(self._previous_lines, current, expected_new=expected)
 
-        motif = self._rejection_reason(result, expected)
+        motif = self._rejection_reason(result, expected, depuis)
         if motif:
             self._consecutive_skips += 1
             return TickResult(ocr_ran=True, expected_new=expected, skipped_reason=motif)
@@ -292,11 +302,17 @@ class CaptureLoop:
         )
         return expected_new_lines(mesure, self.config.row_height_px, max(visible, 1))
 
-    def _rejection_reason(self, result: AlignmentResult, expected: int | None) -> str:
+    def _rejection_reason(
+        self, result: AlignmentResult, expected: int | None, elapsed_s: float
+    ) -> str:
         if is_glitch_frame(result, len(self._previous_lines), self._consecutive_skips):
             return "image aberrante : recouvrement perdu d'un coup"
-        if is_implausible_jump(result, self._consecutive_skips, expected):
-            return f"saut invraisemblable : {len(result.new_lines)} lignes annoncées"
+        plafond = plausible_max_new(elapsed_s)
+        if is_implausible_jump(result, self._consecutive_skips, expected, max_new=plafond):
+            return (
+                f"saut invraisemblable : {len(result.new_lines)} lignes annoncées "
+                f"en {elapsed_s:.1f} s, plafond {plafond}"
+            )
         return ""
 
     # -- fin de session --------------------------------------------------

@@ -274,6 +274,52 @@ class TestComptage:
         assert boucle.total_silver == montants[2] + montants[3]
 
 
+class TestPlafondDeVraisemblance:
+    def test_une_lecture_espacee_de_deux_secondes_n_est_pas_jetee(
+        self, matcher: ItemMatcher
+    ) -> None:
+        """Régression : le plafond supposait une cadence que la boucle n'a pas.
+
+        La boucle capture toutes les 100 ms mais ne fait lire le texte qu'une
+        fois par seconde au mieux, et jusqu'à une fois toutes les deux secondes
+        quand aucun défilement ne déclenche de lecture anticipée. Le plafond de
+        dix nouvelles lignes, justifié par « pas dix lignes en un dixième de
+        seconde », s'appliquait pourtant tel quel.
+
+        Mesuré par le banc d'essai le 05/08/2026 : une lecture portant
+        **14 lignes réellement nouvelles** après deux secondes était rejetée
+        comme un saut invraisemblable, donc quatorze lignes de journal perdues
+        d'un seul coup.
+        """
+        depart = [gain("Pierre noire (arme)", qty) for qty in range(1, 17)]
+        apres = [*depart[-2:], *[gain("Pierre de Caphras", qty) for qty in range(1, 15)]]
+        _, _, boucle = construire([depart, apres], matcher, ocr_max_idle_s=0.1)
+
+        boucle.tick(now=0.0)
+        resultat = boucle.tick(now=2.0)
+
+        assert resultat.skipped_reason == ""
+        assert resultat.ocr_ran
+
+    def test_le_meme_saut_en_un_dixieme_de_seconde_reste_refuse(self, matcher: ItemMatcher) -> None:
+        """L'autre bord : quatorze lignes en 100 ms restent invraisemblables.
+
+        Le plafond suit l'intervalle, il ne disparaît pas. Le supprimer
+        laisserait passer une estimation de recouvrement aberrante, qui est
+        exactement la façon dont des doublons se glissent dans le total.
+        """
+        depart = [gain("Pierre noire (arme)", qty) for qty in range(1, 17)]
+        apres = [*depart[-2:], *[gain("Pierre de Caphras", qty) for qty in range(1, 15)]]
+        _, _, boucle = construire(
+            [depart, apres], matcher, ocr_min_interval_s=0.0, ocr_max_idle_s=0.0
+        )
+
+        boucle.tick(now=0.0)
+        resultat = boucle.tick(now=0.1)
+
+        assert "saut invraisemblable" in resultat.skipped_reason
+
+
 class TestImagesEcartees:
     def test_une_image_aberrante_est_ecartee_avec_son_motif(self, matcher: ItemMatcher) -> None:
         """Une image écartée sans trace serait indiscernable d'une sans butin.

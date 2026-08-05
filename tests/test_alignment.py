@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from butin.catalog import ItemCatalog
 from butin.tracking import align, is_glitch_frame, is_implausible_jump
-from butin.tracking.alignment import GLITCH_MAX_SKIPS, PLAUSIBLE_MAX_NEW
+from butin.tracking.alignment import (
+    GLITCH_MAX_SKIPS,
+    PLAUSIBLE_MAX_NEW,
+    AlignmentResult,
+    plausible_max_new,
+)
 from butin.tracking.models import ObservedLine
 
 
@@ -158,6 +163,57 @@ class TestBruitDeLecture:
         assert result.overlap == 2
         assert result.new_lines == []
 
+    def test_une_ligne_illisible_ne_fait_pas_perdre_tout_le_recouvrement(
+        self, catalog: ItemCatalog
+    ) -> None:
+        """Régression : une ligne ratée annulait un recouvrement de vingt.
+
+        `_overlap_score` exigeait que **toutes** les paires franchissent le
+        seuil. Il suffisait donc qu'une seule ligne de la fenêtre soit mal lue
+        pour qu'aucun recouvrement ne soit jugé valide : l'appelant concluait
+        que rien ne se recouvrait, et `is_glitch_frame` jetait l'image entière.
+
+        Mesuré par le banc d'essai le 05/08/2026 sur 300 images de vrai farm :
+        **8 lectures sur 15 partaient ainsi à la poubelle**, alors qu'elles
+        portaient chacune une vingtaine de lignes parfaitement lisibles. C'est
+        ce qui faisait perdre les trois quarts du butin.
+
+        Ici une ligne sur vingt est illisible, la proportion réellement
+        observée.
+        """
+        fenetre = [ligne(catalog, A, qty=index + 1) for index in range(20)]
+        previous = list(fenetre)
+        current = [*fenetre[1:], ligne(catalog, D)]
+        # L'OCR n'a pas reconnu l'objet sur cette lecture-là : la ligne existe
+        # toujours à l'écran, mais elle ne ressemble plus à rien.
+        current[5] = ObservedLine(raw="Systeme Vous avez obtenu : [??] x9 (01:45)")
+
+        result = align(previous, current)
+
+        assert result.overlap == 19
+        assert [line.item_id for line in result.new_lines] == [D]
+        assert not is_glitch_frame(result, previous_length=20, consecutive_skips=0)
+        assert result.diagnostics["mismatched_pairs"] == 1
+
+    def test_un_recouvrement_a_moitie_faux_reste_refuse(self, catalog: ItemCatalog) -> None:
+        """L'autre bord du seuil : la tolérance ne doit rien ouvrir de plus.
+
+        C'est le test qui compte le plus des deux. Accepter un recouvrement
+        trop petit ferait déclarer nouvelles des lignes déjà comptées, donc
+        **recompter des drops**, ce qui est l'erreur que ce projet refuse.
+
+        Le seuil est posé au milieu de deux populations mesurées sur les 300
+        images : le vrai recouvrement accorde 74 % à 100 % de ses paires, le
+        meilleur des faux n'en accorde jamais plus de 50 %. Ici la moitié des
+        paires s'accordent, exactement le pire cas mesuré côté faux.
+        """
+        previous = [ligne(catalog, A), ligne(catalog, B), ligne(catalog, C), ligne(catalog, D)]
+        current = [ligne(catalog, A), ligne(catalog, D), ligne(catalog, B), ligne(catalog, C)]
+
+        result = align(previous, current)
+
+        assert 4 not in result.diagnostics["valid_overlaps"]
+
 
 class TestImageAberrante:
     def test_perte_totale_de_recouvrement_signalee(self, catalog: ItemCatalog) -> None:
@@ -199,11 +255,16 @@ class TestImageAberrante:
         assert not is_glitch_frame(result, previous_length=1, consecutive_skips=0)
 
 
+def saut_de(catalog: ItemCatalog, nouvelles: int) -> AlignmentResult:
+    """Alignement déclarant `nouvelles` lignes nouvelles et rien de commun."""
+    previous = [ligne(catalog, A)]
+    current = [ligne(catalog, D) for _ in range(nouvelles)]
+    return align(previous, current)
+
+
 class TestSautInvraisemblable:
-    def _resultat_avec(self, catalog: ItemCatalog, nouvelles: int):
-        previous = [ligne(catalog, A)]
-        current = [ligne(catalog, D) for _ in range(nouvelles)]
-        return align(previous, current)
+    def _resultat_avec(self, catalog: ItemCatalog, nouvelles: int) -> AlignmentResult:
+        return saut_de(catalog, nouvelles)
 
     def test_saut_normal_accepte(self, catalog: ItemCatalog) -> None:
         result = self._resultat_avec(catalog, 3)
@@ -227,3 +288,38 @@ class TestSautInvraisemblable:
     def test_on_finit_par_ceder(self, catalog: ItemCatalog) -> None:
         result = self._resultat_avec(catalog, PLAUSIBLE_MAX_NEW + 10)
         assert not is_implausible_jump(result, consecutive_skips=GLITCH_MAX_SKIPS)
+
+
+class TestPlafondSelonLeTempsEcoule:
+    def test_le_plafond_suit_l_intervalle(self) -> None:
+        """Deux secondes autorisent vingt fois ce qu'autorise un dixième."""
+        assert plausible_max_new(2.0) == 40
+        assert plausible_max_new(5.0) == 100
+
+    def test_le_plancher_protege_les_intervalles_courts(self) -> None:
+        """Le plafond ne doit jamais devenir plus sévère qu'avant.
+
+        Sur un intervalle très court, le calcul au débit donnerait un plafond
+        inférieur à l'ancienne constante, donc rejetterait des lectures que le
+        code acceptait. Un correctif ne doit pas resserrer ce qu'il vient
+        desserrer.
+        """
+        assert plausible_max_new(0.1) == PLAUSIBLE_MAX_NEW
+        assert plausible_max_new(0.0) == PLAUSIBLE_MAX_NEW
+
+    def test_quatorze_lignes_en_deux_secondes_sont_normales(self, catalog: ItemCatalog) -> None:
+        """Régression : le plafond supposait une cadence que la boucle n'a pas.
+
+        `PLAUSIBLE_MAX_NEW` valait 10 avec pour justification écrite que « le
+        journal ne défile pas de dix lignes en un dixième de seconde ». C'était
+        vrai de la cadence de **capture**, pas de celle de **lecture** : la
+        reconnaissance ne tourne qu'une fois par seconde au mieux.
+
+        Mesuré par le banc le 05/08/2026 : une lecture portant **14 lignes
+        réellement nouvelles** après deux secondes était rejetée comme un saut
+        invraisemblable, donc quatorze lignes de journal perdues d'un coup.
+        """
+        result = saut_de(catalog, 14)
+
+        assert not is_implausible_jump(result, 0, max_new=plausible_max_new(2.0))
+        assert is_implausible_jump(result, 0, max_new=plausible_max_new(0.1))
