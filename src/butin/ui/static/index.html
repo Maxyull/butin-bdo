@@ -79,6 +79,25 @@
   #fil .drop.neuf { animation: arrivee 1.2s ease-out; }
   #fil .vide { color: var(--doux); padding: 10px 8px; }
 
+  /* Les onglets. Deux écrans dans une fenêtre : ce qu'on farme maintenant,
+     et ce qu'on a farmé avant. Les mélanger sur un seul écran obligerait à
+     chercher le chiffre du jour au milieu de l'historique. */
+  .onglets { display: flex; gap: 6px; margin-bottom: 18px; }
+  .onglets button {
+    background: transparent; color: var(--doux); border: 1px solid #2a2e39;
+    border-radius: 8px 8px 0 0; padding: 9px 18px; cursor: pointer; font-size: 15px;
+  }
+  .onglets button[aria-selected="true"] {
+    background: var(--panneau); color: var(--texte); border-bottom-color: var(--panneau);
+  }
+  .onglets button:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
+  .page[hidden] { display: none; }
+
+  #sessions tr { cursor: pointer; }
+  #sessions tr:hover td { background: #191d26; }
+  #sessions tr[aria-selected="true"] td { background: #1d2230; }
+  .en-cours { color: var(--or); }
+
   button.action {
     border: 1px solid var(--bord); background: #1b2130; color: var(--texte);
     border-radius: 8px; padding: 9px 18px; font: inherit; font-weight: 600;
@@ -144,6 +163,13 @@
   </div>
 </div>
 
+<div class="onglets" role="tablist">
+  <button id="onglet-session" role="tab" aria-selected="true">Session en cours</button>
+  <button id="onglet-historique" role="tab" aria-selected="false">Historique</button>
+</div>
+
+<div class="page" id="page-session">
+
 <div class="panneau" style="margin-bottom:18px">
   <button class="action demarrer" id="bouton-session">Démarrer une session</button>
   <button class="action" id="bouton-calibrer">Calibrer la zone</button>
@@ -177,6 +203,44 @@
 </div>
 
 <div id="avertissements"></div>
+
+</div>
+
+<div class="page" id="page-historique" hidden>
+  <div class="panneau" style="margin-bottom:18px">
+    <table>
+      <thead>
+        <tr>
+          <th>Session</th>
+          <th>Spot</th>
+          <th class="num">Durée</th>
+          <th class="num">Objets</th>
+          <th class="num">Silver/heure</th>
+          <th class="num">Total net</th>
+        </tr>
+      </thead>
+      <tbody id="sessions">
+        <tr><td colspan="6">Aucune session enregistrée.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panneau" id="detail-session" hidden>
+    <div class="etiquette" id="detail-titre" style="margin-bottom:8px"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Objet</th>
+          <th class="num">Quantité</th>
+          <th class="num">Valeur unitaire</th>
+          <th class="num">Total</th>
+          <th>Provenance</th>
+        </tr>
+      </thead>
+      <tbody id="detail-butin"></tbody>
+    </table>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -453,6 +517,105 @@ $("bouton-calibrer").addEventListener("click", async () => {
 
 brancherBascule("langue", "langue");
 brancherBascule("region", "region");
+
+function basculer(page) {
+  const surSession = page === "session";
+  $("page-session").hidden = !surSession;
+  $("page-historique").hidden = surSession;
+  $("onglet-session").setAttribute("aria-selected", String(surSession));
+  $("onglet-historique").setAttribute("aria-selected", String(!surSession));
+  // L'historique est chargé à l'ouverture et pas dans le rafraîchissement
+  // d'une seconde : recalculer trente sessions par seconde coûterait cher
+  // pour un écran que personne ne regarde en farmant.
+  if (!surSession) chargerHistorique();
+}
+
+function duree(secondes) {
+  const h = Math.floor(secondes / 3600);
+  const m = Math.floor((secondes % 3600) / 60);
+  return h ? h + " h " + String(m).padStart(2, "0") : m + " min";
+}
+
+async function chargerHistorique() {
+  const corps = $("sessions");
+  const reponse = await (await fetch("/api/historique")).json();
+  const sessions = reponse.sessions || [];
+  corps.innerHTML = "";
+  if (!sessions.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 6;
+    td.textContent = "Aucune session enregistrée.";
+    tr.appendChild(td);
+    corps.appendChild(tr);
+    $("detail-session").hidden = true;
+    return;
+  }
+  for (const session of sessions) {
+    const tr = document.createElement("tr");
+    const debut = new Date(session.debut * 1000);
+    const cellules = [
+      debut.toLocaleString("fr-FR", {dateStyle: "short", timeStyle: "short"}),
+      session.spot || "—",
+      duree(session.duree_s),
+      nombre(session.objets),
+      nombre(session.par_heure),
+      nombre(session.total),
+    ];
+    cellules.forEach((valeur, index) => {
+      const td = document.createElement("td");
+      if (index >= 2) td.className = "num";
+      td.textContent = valeur;
+      tr.appendChild(td);
+    });
+    if (session.en_cours) tr.firstChild.classList.add("en-cours");
+    tr.addEventListener("click", () => ouvrirSession(session.id, corps, tr));
+    corps.appendChild(tr);
+  }
+}
+
+async function ouvrirSession(id, corps, ligne) {
+  for (const autre of corps.querySelectorAll("tr")) autre.removeAttribute("aria-selected");
+  ligne.setAttribute("aria-selected", "true");
+
+  const reponse = await fetch("/api/historique/" + id);
+  if (!reponse.ok) return;
+  const detail = await reponse.json();
+
+  const debut = new Date(detail.debut * 1000);
+  $("detail-titre").textContent =
+    "Butin du " + debut.toLocaleString("fr-FR", {dateStyle: "short", timeStyle: "short"}) +
+    (detail.spot ? " — " + detail.spot : "");
+
+  const cible = $("detail-butin");
+  cible.innerHTML = "";
+  for (const item of detail.butin || []) {
+    const [libelle, classe] = LIBELLES[item.source] || ["?", "inconnu"];
+    const tr = document.createElement("tr");
+    const nom = document.createElement("td");
+    nom.textContent = item.nom;
+    const qte = document.createElement("td");
+    qte.className = "num";
+    qte.textContent = nombre(item.quantite);
+    const unitaire = document.createElement("td");
+    unitaire.className = "num";
+    unitaire.textContent = nombre(item.valeur_unitaire);
+    const total = document.createElement("td");
+    total.className = "num";
+    total.textContent = nombre(item.valeur_totale);
+    const source = document.createElement("td");
+    const marque = document.createElement("span");
+    marque.className = "source " + classe;
+    marque.textContent = libelle;
+    source.appendChild(marque);
+    tr.append(nom, qte, unitaire, total, source);
+    cible.appendChild(tr);
+  }
+  $("detail-session").hidden = false;
+}
+
+$("onglet-session").addEventListener("click", () => basculer("session"));
+$("onglet-historique").addEventListener("click", () => basculer("historique"));
 
 async function rafraichir() {
   try {
