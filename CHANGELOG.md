@@ -183,6 +183,13 @@ dans [docs/versionnage.md](docs/versionnage.md).
   valeur au marchand, sans la moindre erreur pour le dire. Centralisé dans
   `paths.bundled_data_dir()`, qui détecte l'exécution figée et cherche au bon
   endroit dans les deux cas. Première pierre d'un installeur.
+- **Un aperçu montre la zone calibrée, cadre dessiné dessus.** Jusqu'ici le
+  calibrage ne rendait que des coordonnées et un extrait de texte : juste, mais
+  un nombre de pixels ne dit rien à l'œil. Un essai réel avait calibré très
+  proprement sur une capture du chat ouverte dans une visionneuse — une zone
+  juste au pixel près, mais fausse quand même, parce que ce n'était pas le jeu.
+  Voir le cadre posé sur sa propre capture d'écran rend cette confusion
+  impossible d'un coup d'œil.
 - ⭐ **Le calibrage se fait sur plusieurs images, pas une seule.** Mesuré sur une
   vraie session : la largeur trouvée variait de 468 à 542 px d'une image à
   l'autre, et trois calibrages successifs d'un joueur qui n'avait rien touché

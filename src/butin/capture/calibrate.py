@@ -633,3 +633,59 @@ def calibrate_frames(
     if not zones:
         raise dernier or CalibrationError("aucune image exploitable pour le calibrage")
     return combine(zones)
+
+
+PREVIEW_MARGIN_PX = 80
+"""Marge autour de la zone dans l'aperçu, en pixels.
+
+Assez pour montrer OÙ dans le jeu la zone est tombée, pas seulement son
+contenu : un cadre collé au bord du texte ne dit pas si c'est vraiment le
+journal ou une fenêtre qui lui ressemble."""
+
+PREVIEW_COLOR = (255, 200, 60)
+PREVIEW_WIDTH_PX = 3
+
+
+def draw_preview(
+    image: GrayImage, calibration: Calibration, *, margin: int = PREVIEW_MARGIN_PX
+) -> bytes:
+    """Rend un aperçu PNG de la zone calibrée, avec un cadre dessiné dessus.
+
+    ⭐ Pas seulement des coordonnées ou du texte lu : un rectangle qu'on VOIT
+    sur sa propre capture d'écran lève un doute qu'aucun nombre ne lève. Un
+    essai réel a calibré très proprement sur une capture du chat ouverte dans
+    une visionneuse — une zone juste au pixel près, mais fausse quand même,
+    parce que ce n'était pas le jeu. Voir le cadre posé sur l'image qu'on
+    vient de capturer rend cette confusion impossible d'un coup d'œil.
+
+    Recadré autour de la zone plutôt que l'écran entier : un écran complet en
+    PNG pèserait plusieurs mégaoctets pour un aperçu qui n'en a pas besoin, et
+    montrerait le reste de l'écran sans raison.
+    """
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    hauteur, largeur = image.shape[:2]
+    region = calibration.region
+    gauche = max(0, region.left - margin)
+    haut = max(0, region.top - margin)
+    droite = min(largeur, region.left + region.width + margin)
+    bas = min(hauteur, region.top + region.height + margin)
+
+    extrait = np.asarray(image[haut:bas, gauche:droite], dtype=np.uint8)
+    rendu = Image.fromarray(extrait).convert("RGB")
+    ImageDraw.Draw(rendu).rectangle(
+        (
+            region.left - gauche,
+            region.top - haut,
+            region.left - gauche + region.width,
+            region.top - haut + region.height,
+        ),
+        outline=PREVIEW_COLOR,
+        width=PREVIEW_WIDTH_PX,
+    )
+
+    tampon = BytesIO()
+    rendu.save(tampon, format="PNG")
+    return tampon.getvalue()

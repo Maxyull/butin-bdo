@@ -226,6 +226,8 @@
   <pre id="extrait-calibrage" style="margin-top:8px;display:none;white-space:pre-wrap;
        background:#0f1116;border:1px solid #2a2e39;border-radius:8px;padding:10px;
        font-size:13px;color:var(--doux)"></pre>
+  <img id="apercu-calibrage" alt="Zone calibrée, cadre en surbrillance" style="margin-top:8px;
+       display:none;max-width:100%;border:1px solid #2a2e39;border-radius:8px">
 </div>
 
 <div class="panneau" style="margin-bottom:18px">
@@ -617,8 +619,10 @@ $("bouton-calibrer").addEventListener("click", async () => {
   const bouton = $("bouton-calibrer");
   const ligne = $("etat-calibrage");
   const extrait = $("extrait-calibrage");
+  const apercu = $("apercu-calibrage");
   bouton.disabled = true;
   extrait.style.display = "none";
+  apercu.style.display = "none";
 
   // Le décompte est affiché ici plutôt que côté serveur : la requête reste
   // courte, et l'utilisateur voit combien de temps il lui reste pour basculer
@@ -652,6 +656,13 @@ $("bouton-calibrer").addEventListener("click", async () => {
         ? corps.gains + " lignes de gain reconnues. Vérifie que c'est bien ton chat :"
         : "AUCUNE ligne de journal dans cette zone. Si ce n'est pas ton chat, recommence :") +
       "\n" + (corps.extrait.length ? corps.extrait.join("\n") : "(aucun texte lu)");
+    // Le cadre orangé montre EXACTEMENT ce que le compteur va lire, posé sur
+    // la capture qui vient d'être prise : un nombre de pixels ne dit rien à
+    // l'œil, un cadre sur sa propre capture d'écran ne laisse aucun doute.
+    if (corps.apercu) {
+      apercu.src = corps.apercu;
+      apercu.style.display = "block";
+    }
     afficher(await (await fetch("/api/etat")).json());
   } finally {
     bouton.disabled = false;

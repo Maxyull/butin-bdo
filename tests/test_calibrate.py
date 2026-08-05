@@ -11,6 +11,7 @@ espacées d'un pas de ligne, et du texte propre à chaque rangée.
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from butin.capture.calibrate import (
     CalibrationError,
     calibrate_frames,
     combine,
+    draw_preview,
     find_chat,
     measure_width,
 )
@@ -414,3 +416,49 @@ class TestPlusieursImages:
 
         with pytest.raises(CalibrationError):
             calibrate_frames([_decor(graine=k) for k in range(3)], lecteur)
+
+
+class TestApercu:
+    """⭐ Montrer le cadre sur sa propre capture, pas seulement des coordonnées.
+
+    Un essai réel a calibré très proprement sur une capture du chat ouverte
+    dans une visionneuse : une zone juste au pixel près, mais fausse quand
+    même, parce que ce n'était pas le jeu. Un rectangle qu'on VOIT sur l'image
+    qu'on vient de capturer lève un doute qu'aucun nombre ne lève.
+    """
+
+    def test_l_apercu_est_un_png_valide(self) -> None:
+        from PIL import Image
+
+        image = _ecran_avec_chat(rangees=20)
+        calibrage = find_chat(image)
+
+        png = draw_preview(image, calibrage)
+
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
+        rendu = Image.open(io.BytesIO(png))
+        assert rendu.mode == "RGB"
+
+    def test_l_apercu_est_recadre_autour_de_la_zone(self) -> None:
+        """Pas l'écran entier : un écran complet pèserait plusieurs mégaoctets
+        pour un aperçu qui n'en a pas besoin."""
+        from PIL import Image
+
+        image = _ecran_avec_chat(rangees=20)
+        calibrage = find_chat(image)
+
+        png = draw_preview(image, calibrage, margin=40)
+        rendu = Image.open(io.BytesIO(png))
+
+        assert rendu.width <= calibrage.region.width + 2 * 40 + 1
+        assert rendu.width < image.shape[1]
+
+    def test_la_zone_ne_deborde_pas_pres_du_bord_de_l_ecran(self) -> None:
+        """Régression : une marge naïve donnerait des coordonnées négatives
+        près du bord, et PIL lèverait plutôt que de rogner proprement."""
+        image = _ecran_avec_chat(rangees=20)
+        calibrage = find_chat(image)
+
+        png = draw_preview(image, calibrage, margin=10_000)
+
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
