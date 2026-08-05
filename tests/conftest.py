@@ -31,6 +31,9 @@ REAL_ITEMS: tuple[tuple[int, str, str], ...] = (
     (9771, "Cœur transmuté de Garmoth", "Inverted Heart of Garmoth"),
     (10010, "Épée longue de Kzarka", "Kzarka Longsword"),
     (586, "Potion d'énergie (petite)", "Energy Potion (Small)"),
+    # L'objet qui tombe dans la rafale de 300 images du banc d'essai. Vérifié
+    # le 2026-08-05 contre le catalogue bdocodex chargé par ItemCatalog.load().
+    (44451, "Poudre spirituelle du clair de lune", "Moonlight Spirit Powder"),
 )
 
 # Cinq identifiants réels partageant exactement le même nom français.
