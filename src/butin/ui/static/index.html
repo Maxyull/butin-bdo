@@ -121,6 +121,17 @@
                    font-size: 13px; }
   .vide { color: var(--doux); padding: 26px 0; text-align: center; }
 
+  /* L'image de l'objet. Taille FIXE, et la place est gardée même quand
+     l'image manque : sans ça, une icône qui arrive après coup décalerait la
+     ligne, et le tableau sauterait à chaque téléchargement. */
+  .icone {
+    width: 28px; height: 28px; flex: 0 0 28px; object-fit: contain;
+    vertical-align: middle;
+  }
+  .icone.absente { visibility: hidden; }
+  td.objet { display: flex; align-items: center; gap: 10px; }
+  #fil .drop .icone { width: 22px; height: 22px; flex: 0 0 22px; }
+
   label.case { display: flex; align-items: center; gap: 8px; font-size: 14px;
                color: var(--texte); cursor: pointer; }
   label.case input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--or);
@@ -321,6 +332,12 @@ function rendreLeFil(drops) {
     quand.className = "quand";
     quand.textContent = ilYA(drop.il_y_a_s);
 
+    const icone = document.createElement("img");
+    icone.className = "icone";
+    icone.alt = "";
+    icone.src = "/icone/" + drop.item_id;
+    icone.addEventListener("error", () => icone.classList.add("absente"));
+
     const nom = document.createElement("span");
     // textContent : un nom d'objet vient d'une source externe, l'injecter en
     // HTML ouvrirait une porte pour rien.
@@ -335,7 +352,7 @@ function rendreLeFil(drops) {
     valeur.className = "valeur";
     valeur.textContent = drop.valeur ? nombre(drop.valeur) : "—";
 
-    ligne.append(quand, nom, qte, valeur);
+    ligne.append(quand, icone, nom, qte, valeur);
     fil.appendChild(ligne);
   }
   dejaVus = vues;
@@ -368,6 +385,26 @@ function brancherBascule(id, champ) {
     // pas ce qu'on vient de cliquer. Une valeur refusee doit se voir revenir.
     afficher(await poster("/api/reglages", { [champ]: bouton.dataset.valeur }));
   });
+}
+
+// Une cellule « objet » : l'image, puis le nom. Partagée entre le butin de la
+// session en cours et le détail d'une session passée, qui affichent la même
+// chose ; deux copies finiraient par diverger sur le repli d'image absente.
+function celluleObjet(ligne) {
+  const td = document.createElement("td");
+  td.className = "objet";
+  const icone = document.createElement("img");
+  icone.className = "icone";
+  icone.alt = "";
+  icone.src = "/icone/" + ligne.item_id;
+  // Une image absente se cache sans décaler la colonne : elle est cosmétique,
+  // et le nom reste la vraie information.
+  icone.addEventListener("error", () => icone.classList.add("absente"));
+  const nom = document.createElement("span");
+  // textContent : un nom d'objet vient d'une source externe.
+  nom.textContent = ligne.nom || "#" + ligne.item_id;
+  td.append(icone, nom);
+  return td;
 }
 
 const LIBELLES = {
@@ -451,10 +488,10 @@ function afficher(etat) {
   for (const ligne of etat.butin || []) {
     const [libelle, classe] = LIBELLES[ligne.source] || ["?", "inconnu"];
     const tr = document.createElement("tr");
+    tr.appendChild(celluleObjet(ligne));
     // textContent partout : un nom d'objet vient d'une source externe, l'injecter
     // en HTML serait une porte d'entree pour du balisage arbitraire.
     const cellules = [
-      [ligne.nom || "#" + ligne.item_id, ""],
       [nombre(ligne.quantite), "num"],
       [nombre(ligne.valeur_unitaire), "num"],
       [nombre(ligne.valeur_totale), "num"],
@@ -734,8 +771,7 @@ async function ouvrirSession(id, corps, ligne) {
   for (const item of detail.butin || []) {
     const [libelle, classe] = LIBELLES[item.source] || ["?", "inconnu"];
     const tr = document.createElement("tr");
-    const nom = document.createElement("td");
-    nom.textContent = item.nom;
+    const nom = celluleObjet(item);
     const qte = document.createElement("td");
     qte.className = "num";
     qte.textContent = nombre(item.quantite);

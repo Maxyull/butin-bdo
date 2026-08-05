@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import threading
 import urllib.request
 from pathlib import Path
 
@@ -26,6 +27,21 @@ def store(tmp_path: Path) -> SessionStore:
     return SessionStore(tmp_path / "sessions.sqlite3")
 
 
+def lancer(**kwargs: object) -> int:
+    """`app.run` sans préchargement d'images.
+
+    ⭐ Ce n'est pas une commodité, c'est une correction. Le préchargement tourne
+    dans un fil de fond qui **survit à `run`** : dans l'application il est démon
+    et meurt avec le processus, mais dans une suite de tests le processus
+    continue. Le fil écrivait alors dans le dossier de cache pendant qu'un AUTRE
+    test vérifiait le contenu du sien, et ce test échouait sur un dossier qu'il
+    n'avait pas créé. Attrapé par l'intégration continue, sur un seul des trois
+    jobs : l'ordre décidait.
+    """
+    kwargs.setdefault("preload", lambda: 0)
+    return app.run(**kwargs)  # type: ignore[arg-type]
+
+
 class TestOuverture:
     def test_la_fenetre_recoit_une_adresse_qui_sert_la_page(self, store: SessionStore) -> None:
         """La fenêtre affiche l'interface, pas une page d'erreur."""
@@ -35,7 +51,7 @@ class TestOuverture:
             vu["url"] = url
             vu["page"] = urllib.request.urlopen(url).read().decode("utf-8")  # noqa: S310
 
-        assert app.run(store=store, window=fenetre) == 0
+        assert lancer(store=store, window=fenetre) == 0
         assert vu["url"].startswith("http://127.0.0.1:")
         assert "bouton-session" in vu["page"]
         assert "bouton-calibrer" in vu["page"]
@@ -51,8 +67,8 @@ class TestOuverture:
         def fenetre(url: str) -> None:
             ports.append(int(url.rsplit(":", 1)[1].rstrip("/")))
 
-        app.run(store=store, window=fenetre)
-        app.run(store=store, window=fenetre)
+        lancer(store=store, window=fenetre)
+        lancer(store=store, window=fenetre)
 
         assert all(port > 0 for port in ports)
         assert ports[0] != ports[1]
@@ -64,10 +80,50 @@ class TestOuverture:
         def fenetre(url: str) -> None:
             adresses.append(url)
 
-        app.run(store=store, window=fenetre)
+        lancer(store=store, window=fenetre)
 
         with pytest.raises(OSError):
             urllib.request.urlopen(adresses[0], timeout=2)  # noqa: S310
+
+
+class TestPrechargementDesImages:
+    def test_il_est_lance_au_demarrage(self, store: SessionStore) -> None:
+        """Sinon la première heure de farm affiche un récap sans images.
+
+        Le lancement est le seul moment où l'on peut payer quelques centaines
+        d'allers-retours réseau sans que personne ne les attende.
+        """
+        appele = threading.Event()
+
+        def fenetre(url: str) -> None:
+            # La fenêtre bloque jusqu'à sa fermeture : c'est pendant ce temps
+            # que le fil de fond travaille, dans l'application comme ici.
+            appele.wait(timeout=3.0)
+
+        app.run(store=store, window=fenetre, preload=appele.set)
+
+        assert appele.is_set()
+
+    def test_il_ne_bloque_pas_l_ouverture_de_la_fenetre(self, store: SessionStore) -> None:
+        """⚠️ Le préchargement dure. La fenêtre, elle, doit s'ouvrir tout de suite.
+
+        Un préchargement au premier plan ferait attendre le joueur devant un
+        écran vide, pour un gain purement cosmétique.
+        """
+        ouverte = threading.Event()
+        libere = threading.Event()
+
+        def fenetre(url: str) -> None:
+            ouverte.set()
+
+        def prechargement() -> int:
+            libere.wait(timeout=3.0)
+            return 0
+
+        app.run(store=store, window=fenetre, preload=prechargement)
+        libere.set()
+
+        assert ouverte.is_set(), "la fenêtre a attendu le préchargement"
 
 
 class TestFermeture:
@@ -93,7 +149,7 @@ class TestFermeture:
             reponse = json.loads(urllib.request.urlopen(requete).read())  # noqa: S310
             assert reponse["session"]["en_cours"] is True
 
-        app.run(state=etat, window=fenetre)
+        lancer(state=etat, window=fenetre)
 
         ouvertes = [session for session in store.sessions() if session.is_open]
         assert ouvertes == [], "fermer la fenêtre doit refermer la session"
@@ -105,7 +161,7 @@ class TestFermeture:
             raise RuntimeError("la vue système a refusé de démarrer")
 
         with pytest.raises(RuntimeError):
-            app.run(store=store, window=fenetre)
+            lancer(store=store, window=fenetre)
 
 
 class TestSansVueSysteme:

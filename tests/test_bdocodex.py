@@ -19,13 +19,29 @@ from butin.catalog import bdocodex
 from butin.catalog.source import CatalogError
 
 
-def _ligne(item_id: int, nom: str, grade: int) -> list[object]:
+def _vignette(item_id: int) -> str:
+    """La deuxième colonne, au format réel.
+
+    ⚠️ bdocodex y écrit la balise `[img src="…"` et non `<img`. Ce n'est pas une
+    coquille de ce test : c'est ce que la source rend, et c'est pourquoi
+    l'extraction vise l'attribut plutôt que la balise.
+    """
+    return (
+        f'<div class="iconset_wrapper_big inlinediv"><a href="/fr/item/{item_id}/" '
+        f'class="qtooltip"><div class="icon_wrapper">'
+        f'[img src="/items/new_icon/03_etc/{item_id:08d}.webp" alt="icon" class="lazy">'
+        f"</div></a></div>"
+    )
+
+
+def _ligne(item_id: int, nom: str, grade: int, *, vignette: str | None = None) -> list[object]:
     """Une ligne d'export, au format réel."""
     lien = (
         f'<a href="/fr/item/{item_id}/" class="qtooltip item_grade_{grade}" '
         f'data-id="item--{item_id}"><b><span></span>{nom}</b></a>'
     )
-    return [item_id, "<div>vignette</div>", lien, 1, "[255]", grade, "[0,0]"]
+    image = _vignette(item_id) if vignette is None else vignette
+    return [item_id, image, lien, 1, "[255]", grade, "[0,0]"]
 
 
 def _export(lignes: list[list[object]], *, complet: bool = True) -> bytes:
@@ -137,6 +153,53 @@ class TestCacheCompact:
         assert charge["1"]["grade"] == 0
 
 
+class TestImages:
+    """Le chemin de l'image de l'objet, relevé dans le même export.
+
+    Rien de plus n'est téléchargé pour le connaître : il est déjà là, à côté du
+    nom et de la rareté. Mesuré sur l'export du 05/08/2026 : 68 747 sur 68 747.
+    """
+
+    def test_le_chemin_de_l_image_est_releve(self) -> None:
+        charge = _export([_ligne(16001, "Pierre noire", 4)])
+
+        assert bdocodex.extract_icons(charge)[16001] == "/items/new_icon/03_etc/00016001.webp"
+
+    def test_un_objet_sans_image_est_absent_et_non_vide(self) -> None:
+        """Absent, pas présent avec une chaîne vide.
+
+        Une chaîne vide ferait tenter un téléchargement voué à échouer, à chaque
+        drop de cet objet, pendant toute la session.
+        """
+        charge = _export([_ligne(1, "Sans image", 0, vignette="<div>rien</div>")])
+
+        assert 1 not in bdocodex.extract_icons(charge)
+
+    def test_l_image_ne_depend_pas_de_la_langue(self) -> None:
+        """Comme la rareté : une seule des deux langues suffit à la relever."""
+        fr = _export([_ligne(16001, "Pierre noire", 4)])
+        us = _export([_ligne(16001, "Black Stone", 4)])
+
+        assert bdocodex.extract_icons(fr) == bdocodex.extract_icons(us)
+
+    def test_le_cache_compact_porte_l_image(self) -> None:
+        compact = bdocodex.build_compact({"fr": {1: "Un"}}, {1: 3}, {1: "/items/a.webp"})
+
+        assert compact["1"][bdocodex.COMPACT_ICON] == "/items/a.webp"
+
+    def test_la_charge_du_catalogue_porte_l_image(self) -> None:
+        compact = bdocodex.build_compact({"fr": {1: "Un"}}, None, {1: "/items/a.webp"})
+
+        assert bdocodex.to_catalog_payload(compact)["1"]["icon"] == "/items/a.webp"
+
+    def test_un_objet_sans_image_a_une_chaine_vide_dans_la_charge(self) -> None:
+        """Le catalogue, lui, veut un champ toujours présent : c'est la couche
+        qui télécharge qui décide de ne rien tenter sur une chaîne vide."""
+        charge = bdocodex.to_catalog_payload(bdocodex.build_compact({"fr": {1: "Un"}}))
+
+        assert charge["1"]["icon"] == ""
+
+
 class TestFormatPerime:
     def test_un_cache_de_l_ancienne_version_est_rejete(self) -> None:
         """Régression : les noms étaient à la racine, ils sont sous une clé.
@@ -151,10 +214,42 @@ class TestFormatPerime:
         assert bdocodex._compact_valide(ancien) is False
 
     def test_un_cache_au_format_courant_est_accepte(self) -> None:
-        entree = {bdocodex.COMPACT_NAMES: {"fr": "Objet"}, bdocodex.COMPACT_GRADE: 0}
+        entree = {
+            bdocodex.COMPACT_NAMES: {"fr": "Objet"},
+            bdocodex.COMPACT_GRADE: 0,
+            bdocodex.COMPACT_ICON: "/items/a.webp",
+        }
         courant = {str(index): dict(entree) for index in range(bdocodex.MIN_ITEMS + 1)}
 
         assert bdocodex._compact_valide(courant) is True
+
+    def test_un_cache_sans_aucune_image_est_rejete(self) -> None:
+        """Régression : le cache d'avant les images avait déjà les noms.
+
+        L'accepter afficherait un récap sans une seule icône, ce qui ressemble à
+        une panne de la source alors qu'une reconstruction depuis les exports
+        bruts déjà sur le disque règle tout, sans réseau.
+        """
+        entree = {bdocodex.COMPACT_NAMES: {"fr": "Objet"}, bdocodex.COMPACT_GRADE: 0}
+        sans_images = {str(index): dict(entree) for index in range(bdocodex.MIN_ITEMS + 1)}
+
+        assert bdocodex._compact_valide(sans_images) is False
+
+    def test_un_seul_objet_sans_image_ne_fait_pas_tout_reconstruire(self) -> None:
+        """⭐ Régression : sinon 70 Mo relus à CHAQUE lancement.
+
+        La validité se lisait sur la première entrée. Depuis que l'image en fait
+        partie, un objet exotique tombé en tête du fichier condamnerait le cache
+        entier alors qu'il est parfaitement bon. D'où l'échantillon.
+        """
+        entree = {
+            bdocodex.COMPACT_NAMES: {"fr": "Objet"},
+            bdocodex.COMPACT_ICON: "/items/a.webp",
+        }
+        cache = {str(index): dict(entree) for index in range(bdocodex.MIN_ITEMS + 1)}
+        cache["0"] = {bdocodex.COMPACT_NAMES: {"fr": "Exotique sans image"}}
+
+        assert bdocodex._compact_valide(cache) is True
 
     def test_un_cache_trop_court_est_rejete(self) -> None:
         assert bdocodex._compact_valide({"1": {bdocodex.COMPACT_NAMES: {"fr": "Un"}}}) is False

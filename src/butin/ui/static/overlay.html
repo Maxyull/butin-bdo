@@ -62,9 +62,17 @@
   .chiffres .valeur { font-size: 19px; font-variant-numeric: tabular-nums; }
 
   #drops { max-height: 260px; overflow: hidden; }
-  .drop { display: flex; gap: 9px; align-items: baseline; padding: 2px 0; font-size: 14px; }
+  .drop { display: flex; gap: 9px; align-items: center; padding: 2px 0; font-size: 14px; }
   .drop .qte { color: #97a0b5; font-variant-numeric: tabular-nums; }
   .drop .valeur { margin-left: auto; font-variant-numeric: tabular-nums; color: #cfd4e0; }
+  /* L'image garde sa place même quand elle manque : sans taille fixe, une
+     icône qui arrive après coup décalerait toute la ligne sous les yeux du
+     joueur, et le récap sauterait à chaque téléchargement. */
+  .drop .icone {
+    width: 26px; height: 26px; flex: 0 0 26px; object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .drop .icone.absente { visibility: hidden; }
   @keyframes arrivee { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
   .drop.neuf { animation: arrivee .35s ease-out; }
 
@@ -110,7 +118,10 @@ function chrono(secondes) {
   return h + ":" + m + ":" + String(s % 60).padStart(2, "0");
 }
 
-let dejaVus = new Set();
+// Quantité déjà affichée par objet, pour repérer celles qui viennent de monter.
+// Une Map et non un Set : c'est la VARIATION qui signale un drop, pas la
+// présence de la ligne, qui elle ne disparaît plus de la session.
+let dejaVus = new Map();
 
 function afficher(etat) {
   const stats = etat.stats;
@@ -134,35 +145,52 @@ function afficher(etat) {
   if (capture && capture.erreur) $("panne").textContent = "Capture arrêtée : " + capture.erreur;
   $("etat").textContent = capture ? capture.drops_enregistres + " drops" : "";
 
-  const drops = etat.derniers || [];
+  // ⭐ Le RÉCAP CUMULÉ, et non le fil des drops un par un. Sur des heures de
+  // farm, « combien j'ai ramassé de Pierres noires » est la question ; « quel
+  // objet est tombé il y a quatre secondes » ne l'est plus au bout de dix
+  // minutes. Le fil défilait plus vite qu'on ne le lit.
+  const butin = etat.butin || [];
   const zone = $("drops");
-  if (!drops.length) {
-    dejaVus = new Set();
+  if (!butin.length) {
+    dejaVus = new Map();
     zone.innerHTML = '<div id="vide">En attente du premier drop…</div>';
     return;
   }
 
-  const vues = new Set();
+  const vues = new Map();
   zone.innerHTML = "";
-  for (const drop of drops.slice(0, 12)) {
-    const cle = drop.item_id + ":" + drop.il_y_a_s + ":" + drop.quantite;
-    vues.add(cle);
-    const ligne = document.createElement("div");
-    ligne.className = "drop" + (dejaVus.size && !dejaVus.has(cle) ? " neuf" : "");
+  for (const ligne of butin.slice(0, 12)) {
+    vues.set(ligne.item_id, ligne.quantite);
+    // Une ligne s'anime quand sa quantité AUGMENTE. C'est ce qui remplace
+    // l'arrivée d'une ligne neuve : sans ça, un récap cumulé ne dirait plus
+    // jamais « quelque chose vient de tomber ».
+    const avant = dejaVus.get(ligne.item_id);
+    const bouge = dejaVus.size && (avant === undefined || avant < ligne.quantite);
+
+    const rangee = document.createElement("div");
+    rangee.className = "drop" + (bouge ? " neuf" : "");
+
+    const icone = document.createElement("img");
+    icone.className = "icone";
+    icone.alt = "";
+    icone.src = "/icone/" + ligne.item_id;
+    // Une image absente ne doit rien casser ni rien décaler : elle se cache,
+    // la ligne garde sa place, et le drop reste lisible.
+    icone.addEventListener("error", () => icone.classList.add("absente"));
 
     const nom = document.createElement("span");
-    nom.className = "rarete-" + (drop.rarete || 0);
+    nom.className = "rarete-" + (ligne.rarete || 0);
     // textContent : un nom d'objet vient d'une source externe.
-    nom.textContent = drop.nom;
+    nom.textContent = ligne.nom;
     const qte = document.createElement("span");
     qte.className = "qte";
-    qte.textContent = "x" + drop.quantite;
+    qte.textContent = "x" + nombre(ligne.quantite);
     const valeur = document.createElement("span");
     valeur.className = "valeur";
-    valeur.textContent = drop.valeur ? nombre(drop.valeur) : "—";
+    valeur.textContent = ligne.valeur_totale ? nombre(ligne.valeur_totale) : "—";
 
-    ligne.append(nom, qte, valeur);
-    zone.appendChild(ligne);
+    rangee.append(icone, nom, qte, valeur);
+    zone.appendChild(rangee);
   }
   dejaVus = vues;
 }

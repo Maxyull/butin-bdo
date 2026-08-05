@@ -106,6 +106,7 @@ class ItemCatalog:
                     grade=_as_int(entry.get("grade")),
                     category_primary=_as_int(entry.get("category_primary")),
                     category_secondary=_as_int(entry.get("category_secondary")),
+                    icon=str(entry.get("icon") or ""),
                 )
             )
         if skipped:

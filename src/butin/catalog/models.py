@@ -32,6 +32,14 @@ class Item:
     category_primary: int = 0
     category_secondary: int = 0
 
+    icon: str = ""
+    """Chemin de l'image de l'objet chez bdocodex, vide si on ne l'a pas.
+
+    Un CHEMIN et pas une URL complète : c'est une donnée de catalogue, et
+    reconstituer l'adresse est l'affaire de la couche qui télécharge. Le jour où
+    la source change d'hôte, un seul endroit bouge.
+    """
+
     def name(self, locale: str = LOCALE_FR, fallback: str = LOCALE_EN) -> str:
         """Nom dans la locale demandée, avec repli.
 

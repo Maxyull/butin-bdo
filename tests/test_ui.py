@@ -779,6 +779,152 @@ class TestPause:
         assert repris["session"]["en_pause"] is False
 
 
+class TestImagesDesObjets:
+    """L'image de l'objet dans le récap, à côté du nom et de la quantité.
+
+    Un joueur reconnaît son butin à l'image avant d'avoir lu le nom. Mais une
+    image n'est que cosmétique : rien de ce qui la concerne ne doit empêcher
+    d'afficher un drop.
+    """
+
+    class _Magasin:
+        """Faux magasin d'images, piloté par le test."""
+
+        def __init__(self, connues: dict[int, Path] | None = None) -> None:
+            self.connues = connues or {}
+            self.demandes: list[tuple[int, str]] = []
+
+        def get(self, item_id: int, remote: str) -> Path | None:
+            self.demandes.append((item_id, remote))
+            return self.connues.get(item_id)
+
+        def preload(self, entries) -> int:
+            return len(dict(entries))
+
+    def _serveur(self, etat: AppState):
+        serveur = build_server(etat, port=0)
+        fil = threading.Thread(target=serveur.serve_forever, daemon=True)
+        fil.start()
+        return serveur, f"http://{HOST}:{serveur.server_address[1]}"
+
+    def test_l_image_est_servie_avec_son_type(self, store: SessionStore, tmp_path: Path) -> None:
+        image = tmp_path / "16001.webp"
+        image.write_bytes(b"RIFF\x00\x00\x00\x00WEBP")
+        etat = AppState(store, PriceBook(), None, None, icons=self._Magasin({16001: image}))
+        serveur, base = self._serveur(etat)
+        try:
+            with urllib.request.urlopen(base + "/icone/16001", timeout=5) as reponse:  # noqa: S310
+                assert reponse.headers["Content-Type"] == "image/webp"
+                assert reponse.headers["X-Content-Type-Options"] == "nosniff"
+                assert reponse.read() == b"RIFF\x00\x00\x00\x00WEBP"
+        finally:
+            serveur.shutdown()
+            serveur.server_close()
+
+    def test_une_image_absente_rend_404(self, store: SessionStore) -> None:
+        """404 et non 500 : la page cache une image qui ne charge pas.
+
+        Une icône manquante ne signale pas une panne et n'interrompt rien.
+        """
+        etat = AppState(store, PriceBook(), None, None, icons=self._Magasin())
+        serveur, base = self._serveur(etat)
+        try:
+            with pytest.raises(urllib.error.HTTPError) as erreur:
+                get(base, "/icone/16001")
+            assert erreur.value.code == 404
+        finally:
+            serveur.shutdown()
+            serveur.server_close()
+
+    def test_un_identifiant_qui_n_en_est_pas_un_rend_400(self, store: SessionStore) -> None:
+        """Régression : le chemin vient du réseau.
+
+        Le convertir sans vérifier laisserait remonter une `ValueError` jusqu'au
+        gestionnaire, qui rendrait une erreur serveur là où la bonne réponse est
+        « cette adresse n'existe pas ».
+        """
+        etat = AppState(store, PriceBook(), None, None, icons=self._Magasin())
+        serveur, base = self._serveur(etat)
+        try:
+            with pytest.raises(urllib.error.HTTPError) as erreur:
+                get(base, "/icone/pas-un-nombre")
+            assert erreur.value.code == 400
+        finally:
+            serveur.shutdown()
+            serveur.server_close()
+
+    def test_le_chemin_distant_vient_du_catalogue(self, store: SessionStore) -> None:
+        """C'est le catalogue qui sait où est l'image, pas la page."""
+        catalogue = ItemCatalog.from_raw(
+            {
+                "16001": {
+                    "id": 16001,
+                    "locale_default": "us",
+                    "locale_name": {"us": "Black Stone", "fr": "Pierre noire"},
+                    "grade": 4,
+                    "icon": "/items/new_icon/03_etc/00016001.webp",
+                }
+            }
+        )
+        magasin = self._Magasin()
+        etat = AppState(store, PriceBook(), catalogue, None, icons=magasin)
+
+        etat.icon(16001)
+
+        assert magasin.demandes == [(16001, "/items/new_icon/03_etc/00016001.webp")]
+
+    def test_sans_catalogue_on_sert_ce_qui_est_deja_la(self, store: SessionStore) -> None:
+        """Une machine sans réseau doit rester consultable : le catalogue peut
+        manquer, les images déjà téléchargées sont toujours là."""
+        magasin = self._Magasin()
+        etat = AppState(store, PriceBook(), None, None, icons=magasin)
+
+        etat.icon(16001)
+
+        assert magasin.demandes == [(16001, "")]
+
+    def test_le_prechargement_ne_prend_que_le_butin_connu(self, store: SessionStore) -> None:
+        """362 objets et non 68 747 : ce sont ceux qui tombent réellement.
+
+        ⚠️ « Pierre noire » n'en fait PAS partie, et c'est normal : la table est
+        celle du trash loot, pas celle des objets de marché. Son image sera
+        téléchargée au moment où elle tombe, comme n'importe quel objet hors
+        table.
+        """
+        catalogue = ItemCatalog.from_raw(
+            {
+                # Elkarr, identifiant 6393, présent dans data/butin-connu.json.
+                "6393": {
+                    "id": 6393,
+                    "locale_default": "us",
+                    "locale_name": {"us": "Elkarr", "fr": "Elkarr"},
+                    "icon": "/items/a.webp",
+                },
+                "16001": {
+                    "id": 16001,
+                    "locale_default": "us",
+                    "locale_name": {"us": "Black Stone", "fr": "Pierre noire"},
+                    "icon": "/items/b.webp",
+                },
+            }
+        )
+        etat = AppState(store, PriceBook(), catalogue, None, icons=self._Magasin())
+
+        assert etat.preload_icons() == 1
+
+    def test_sans_catalogue_le_prechargement_ne_fait_rien(self, store: SessionStore) -> None:
+        etat = AppState(store, PriceBook(), None, None, icons=self._Magasin())
+
+        assert etat.preload_icons() == 0
+
+    def test_la_page_demande_les_images(self, app) -> None:
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        assert "/icone/" in corps
+
+
 class TestCalibrageDepuisLInterface:
     """Le calibrage sans terminal. Sinon le produit reste un outil de dev."""
 

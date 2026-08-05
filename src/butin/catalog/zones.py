@@ -82,6 +82,35 @@ def load_zones(path: Path | None = None) -> dict[int, tuple[str, ...]]:
     return {item_id: tuple(sorted(set(zones))) for item_id, zones in par_objet.items()}
 
 
+def known_loot_ids(path: Path | None = None) -> tuple[int, ...]:
+    """Identifiants de TOUT le butin connu, zone renseignée ou non.
+
+    Distinct de `load_zones`, qui ne garde que les objets rattachés à une zone
+    parce que c'est ce que la détection de spot demande. Ici on veut la liste
+    complète : un objet sans zone tombe quand même, et son image sera quand même
+    affichée.
+
+    Un fichier absent rend un tuple vide, comme ailleurs : rien de ce qui
+    dépend de ce fichier n'est une condition de fonctionnement.
+    """
+    chemin = path or default_path()
+    if not chemin.exists():
+        return ()
+    try:
+        brut = json.loads(chemin.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _log.warning("butin connu illisible (%s)", exc)
+        return ()
+
+    identifiants: list[int] = []
+    for cle in brut.get("items") or {}:
+        try:
+            identifiants.append(int(cle))
+        except (TypeError, ValueError):
+            continue
+    return tuple(sorted(set(identifiants)))
+
+
 def zones_for(item_ids: Iterable[int], zones: dict[int, tuple[str, ...]]) -> dict[str, int]:
     """Compte, pour chaque zone, combien d'objets observés la désignent."""
     scores: dict[str, int] = {}
