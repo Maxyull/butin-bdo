@@ -779,6 +779,73 @@ class TestPause:
         assert repris["session"]["en_pause"] is False
 
 
+class TestApresLArret:
+    """Ce qu'on doit pouvoir montrer juste après avoir cliqué sur « Arrêter ».
+
+    ⭐ Le cas réel, remonté par Maxime le 05/08/2026 : il farme, il arrête, et
+    « on voit pas la session dans le logiciel ». Les données étaient bien là,
+    mais l'écran qu'il regardait retombait à zéro faute de session en cours,
+    sans rien dire qu'elles étaient enregistrées ailleurs. La page emmène
+    désormais sur la session qu'on vient de finir ; ces tests figent le contrat
+    dont elle a besoin pour le faire.
+    """
+
+    def test_la_session_arretee_est_dans_l_historique(self, app) -> None:
+        state, _ = app
+        session_id = state.start("Thornwood Forest", now=1000.0)
+        state.store.add_loot(session_id, [LootRow(item_id=44451, qty=84, at=1010.0)])
+
+        state.stop(now=1100.0)
+
+        historique = state.history()
+        assert [ligne["id"] for ligne in historique] == [session_id]
+        assert historique[0]["objets"] == 84
+        assert historique[0]["en_cours"] is False
+
+    def test_son_detail_est_lisible_immediatement(self, app) -> None:
+        """Sans ça, la page emmènerait sur une session vide juste après l'arrêt."""
+        state, _ = app
+        session_id = state.start("Thornwood Forest", now=1000.0)
+        state.store.add_loot(state.session_id or 0, [LootRow(item_id=44451, qty=84, at=1010.0)])
+
+        state.stop(now=1100.0)
+        detail = state.session_detail(session_id)
+
+        assert detail is not None
+        assert detail["spot"] == "Thornwood Forest"
+        assert [ligne["quantite"] for ligne in detail["butin"]] == [84]
+
+    def test_une_session_sans_butin_reste_visible(self, app) -> None:
+        """Une session vide doit se voir, justement.
+
+        C'est le seul moyen de distinguer « le farm n'a rien donné » de « la
+        capture n'a rien vu », et les deux se règlent différemment.
+        """
+        state, _ = app
+        session_id = state.start("Gyfin", now=1000.0)
+
+        state.stop(now=1100.0)
+
+        assert [ligne["id"] for ligne in state.history()] == [session_id]
+
+    def test_l_ecran_en_cours_se_vide_bien_apres_l_arret(self, app) -> None:
+        """Le comportement qui a dérouté, figé pour qu'il reste volontaire.
+
+        Il est juste : il n'y a plus de session en cours. C'est la PAGE qui doit
+        emmener ailleurs, pas l'état qui doit mentir en gardant des chiffres
+        d'une session finie sur l'écran du farm en cours.
+        """
+        state, _ = app
+        state.start("Gyfin", now=1000.0)
+
+        state.stop(now=1100.0)
+        vue = state.snapshot(now=1100.0)
+
+        assert vue["session"] is None
+        assert vue["stats"] is None
+        assert vue["butin"] == []
+
+
 class TestImagesDesObjets:
     """L'image de l'objet dans le récap, à côté du nom et de la quantité.
 
