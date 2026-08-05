@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from typing import Any
 
 from . import paths
@@ -141,14 +142,23 @@ def run(
     store: SessionStore | None = None,
     state: AppState | None = None,
     window: Any = None,
+    preload: Callable[[], object] | None = None,
 ) -> int:
     """Ouvre la fenêtre et ne rend la main qu'à sa fermeture.
 
-    `window` et `state` existent pour les tests, et pour la même raison : ouvrir
-    une vraie fenêtre demande une session graphique, et faire tourner une vraie
-    capture demande un écran et le moteur de reconnaissance. L'intégration
-    continue n'a ni l'un ni l'autre. `window` reçoit l'adresse locale et doit
-    bloquer jusqu'à la fermeture, exactement comme le fait la vraie.
+    `window`, `state` et `preload` existent pour les tests, et pour la même
+    raison : ouvrir une vraie fenêtre demande une session graphique, faire
+    tourner une vraie capture demande un écran et le moteur de reconnaissance,
+    et précharger les images demande le réseau. L'intégration continue n'a rien
+    de tout ça. `window` reçoit l'adresse locale et doit bloquer jusqu'à la
+    fermeture, exactement comme le fait la vraie.
+
+    ⚠️ `preload` est injectable et pas seulement désactivable, parce que le
+    problème n'est pas qu'il coûte cher : c'est qu'il tourne dans un **fil de
+    fond qui survit à cet appel**. Dans l'application c'est sans conséquence,
+    le fil est démon et meurt avec le processus. Dans une suite de tests, le
+    processus continue : le fil écrivait alors sur le disque pendant un autre
+    test, qui échouait sur un dossier qu'il n'avait pas créé.
     """
     state = state or build_state(store)
     serveur = build_server(state, port=port)
@@ -166,7 +176,9 @@ def run(
     # connu, ce sont quelques centaines d'allers-retours réseau : les faire ici
     # retarderait l'ouverture de la fenêtre d'autant, pour un gain purement
     # cosmétique. Le fil est démon, donc il ne retient jamais la fermeture.
-    threading.Thread(target=state.preload_icons, daemon=True, name="butin-icones").start()
+    threading.Thread(
+        target=preload or state.preload_icons, daemon=True, name="butin-icones"
+    ).start()
     try:
         (window or _open_window)(adresse)
     finally:
