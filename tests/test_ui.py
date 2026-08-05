@@ -20,6 +20,7 @@ from butin import paths
 from butin.capture.calibrate import Calibration
 from butin.capture.screen import Region
 from butin.capture.worker import CaptureStatus, CaptureUnavailable
+from butin.catalog import ItemCatalog
 from butin.market import PriceBook, PriceCache
 from butin.store import LootRow, SessionStore
 from butin.ui.server import HOST, AppState, build_server
@@ -180,6 +181,66 @@ class TestSession:
     def test_arreter_sans_session_ne_plante_pas(self, app) -> None:
         _, base = app
         assert post(base, "/api/session/arreter")["session"] is None
+
+
+class TestFilDesDrops:
+    """Le fil qui s'écrit pendant qu'on farme.
+
+    Le total cumulé ne montre pas ce qui vient d'arriver : il grandit, c'est
+    tout. Ce fil est la seule chose qui dise « ça, c'est tombé il y a trois
+    secondes », et c'est ce qu'on regarde en jouant.
+    """
+
+    def test_les_derniers_drops_apparaissent_du_plus_recent_au_plus_ancien(self, app) -> None:
+        state, _ = app
+        session_id = state.start("Gyfin", now=1000.0)
+        state.store.add_loot(
+            session_id,
+            [
+                LootRow(item_id=16001, qty=1, at=1001.0),
+                LootRow(item_id=4998, qty=3, at=1005.0),
+            ],
+        )
+
+        derniers = state.snapshot(now=1010.0)["derniers"]
+
+        assert [ligne["item_id"] for ligne in derniers] == [4998, 16001]
+        assert derniers[0]["quantite"] == 3
+        assert derniers[0]["il_y_a_s"] == pytest.approx(5.0)
+        assert derniers[1]["il_y_a_s"] == pytest.approx(9.0)
+
+    def test_la_rarete_accompagne_chaque_drop(self, app) -> None:
+        """C'est le code couleur du jeu, et il était déjà dans le catalogue.
+
+        Un joueur reconnaît un drop rare à sa couleur avant d'avoir lu son nom.
+        La donnée existait sans être utilisée nulle part.
+        """
+        state, _ = app
+        state.catalog = ItemCatalog.from_raw(
+            {
+                "16001": {
+                    "id": 16001,
+                    "locale_default": "us",
+                    "locale_name": {"us": "Black Stone", "fr": "Pierre noire"},
+                    "grade": 3,
+                    "category_primary": 1,
+                    "category_secondary": 1,
+                }
+            }
+        )
+        session_id = state.start("Gyfin", now=0.0)
+        state.store.add_loot(session_id, [LootRow(item_id=16001, qty=1, at=1.0)])
+
+        derniers = state.snapshot(now=2.0)["derniers"]
+
+        assert derniers[0]["rarete"] == 3
+
+    def test_sans_session_le_fil_est_vide_et_non_absent(self, app) -> None:
+        """La page lit toujours la même forme : un champ absent la ferait
+        planter là où une liste vide se rend toute seule."""
+        state, _ = app
+
+        assert state.snapshot()["derniers"] == []
 
 
 class TestCapture:

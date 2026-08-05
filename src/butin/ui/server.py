@@ -122,6 +122,7 @@ class AppState:
                 "session": None,
                 "stats": None,
                 "butin": [],
+                "derniers": [],
                 "capture": capture,
             }
 
@@ -132,6 +133,7 @@ class AppState:
                 "session": None,
                 "stats": None,
                 "butin": [],
+                "derniers": [],
                 "capture": capture,
             }
 
@@ -165,8 +167,43 @@ class AppState:
                 "complet": stats.is_complete,
             },
             "butin": self._loot_rows(quantites, maintenant, langue),
+            "derniers": self._recent_rows(session_id, maintenant, langue),
             "capture": capture,
         }
+
+    def _recent_rows(self, session_id: int, maintenant: float, langue: str) -> list[dict[str, Any]]:
+        """Les derniers drops, tels qu'ils sont tombés.
+
+        Le total cumulé ne montre pas ce qui vient d'arriver : il grandit, c'est
+        tout. Ce fil-là est la seule chose qui dise « ça, c'est tombé il y a
+        trois secondes », et c'est ce qu'on regarde en farmant.
+        """
+        lignes: list[dict[str, Any]] = []
+        for ligne in self.store.recent_loot(session_id):
+            prix = self.book.price(ligne.item_id, sid=ligne.sid, now=maintenant)
+            lignes.append(
+                {
+                    "item_id": ligne.item_id,
+                    "nom": self._name(ligne.item_id, langue),
+                    "quantite": ligne.qty,
+                    "valeur": prix.value * ligne.qty,
+                    "rarete": self._grade(ligne.item_id),
+                    "il_y_a_s": max(0.0, round(maintenant - ligne.at, 1)),
+                }
+            )
+        return lignes
+
+    def _grade(self, item_id: int) -> int:
+        """Rareté de l'objet, de 0 à 4, pour la couleur du nom.
+
+        C'est le code couleur du jeu lui-même : blanc, vert, bleu, jaune,
+        orange. Un joueur reconnaît un drop rare à sa couleur avant d'avoir lu
+        son nom, et la donnée était déjà dans le catalogue sans être utilisée.
+        """
+        if self.catalog is None:
+            return 0
+        item = self.catalog.get(item_id)
+        return item.grade if item is not None else 0
 
     def _name(self, item_id: int, langue: str) -> str:
         """Nom de l'objet dans la langue choisie.

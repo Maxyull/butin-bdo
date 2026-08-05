@@ -291,3 +291,41 @@ class TestHonnetete:
         stats = compute({}, livre(tmp_path), duration_s=HEURE)
         assert stats == Stats(duration_s=HEURE, per_source={})
         assert stats.is_complete
+
+
+class TestDerniersDrops:
+    def test_du_plus_recent_au_plus_ancien(self, tmp_path: Path) -> None:
+        store = SessionStore(tmp_path / "s.sqlite3")
+        session = store.start_session(started_at=0.0)
+        store.add_loot(
+            session.id,
+            [
+                LootRow(item_id=1, qty=1, at=10.0),
+                LootRow(item_id=2, qty=2, at=30.0),
+                LootRow(item_id=3, qty=3, at=20.0),
+            ],
+        )
+
+        derniers = store.recent_loot(session.id)
+
+        assert [ligne.item_id for ligne in derniers] == [2, 3, 1]
+
+    def test_la_liste_est_bornee(self, tmp_path: Path) -> None:
+        """Une session de plusieurs heures contient des milliers de lignes.
+
+        La fenêtre n'en montre qu'une vingtaine, et elle se rafraîchit chaque
+        seconde : tout rapatrier pour en jeter 99 % serait payé à chaque fois.
+        """
+        store = SessionStore(tmp_path / "s.sqlite3")
+        session = store.start_session(started_at=0.0)
+        store.add_loot(
+            session.id, [LootRow(item_id=index, qty=1, at=float(index)) for index in range(200)]
+        )
+
+        assert len(store.recent_loot(session.id, limit=25)) == 25
+
+    def test_une_session_sans_butin_rend_une_liste_vide(self, tmp_path: Path) -> None:
+        store = SessionStore(tmp_path / "s.sqlite3")
+        session = store.start_session(started_at=0.0)
+
+        assert store.recent_loot(session.id) == []
