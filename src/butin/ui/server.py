@@ -197,6 +197,7 @@ class AppState:
                 "spot": session.spot,
                 "duree_s": session.duration_s(maintenant),
                 "en_cours": session.is_open,
+                "en_pause": session.is_paused,
             },
             "stats": {
                 "total": stats.total,
@@ -481,6 +482,44 @@ class AppState:
         if self.overlay is not None:
             self.overlay.close()
 
+    def pause(self, *, now: float | None = None) -> None:
+        """Suspend la capture et arrête de compter le temps.
+
+        Dans cet ordre, et pour la même raison que l'arrêt : la pause enregistre
+        le butin encore en attente, qui est bien tombé avant la pause.
+
+        ⚠️ Le panneau **reste ouvert**. Le fermer laisserait le joueur devant son
+        jeu sans rien qui dise que le suivi est suspendu, et une reprise oubliée
+        est du farm perdu qu'aucun écran ne signalerait.
+        """
+        maintenant = time.time() if now is None else now
+        with self.lock:
+            if self.session_id is None:
+                return
+            if self.worker is not None:
+                self.worker.pause()
+            self.store.pause_session(self.session_id, at=maintenant)
+
+    def resume(self, *, now: float | None = None) -> None:
+        """Reprend la capture là où la pause l'avait laissée.
+
+        ⚠️ La capture est relancée AVANT que l'horloge reparte, et si elle refuse
+        la session **reste en pause** : une session qui recompte le temps sans
+        que rien ne l'alimente est exactement la panne silencieuse que ce projet
+        refuse, au même titre qu'une session ouverte sans capture.
+
+        La boucle repart neuve, donc sa première lecture amorce le suivi avec ce
+        qui est déjà à l'écran sans rien compter. C'est ce qui empêche la reprise
+        de recréditer les dernières lignes du journal.
+        """
+        maintenant = time.time() if now is None else now
+        with self.lock:
+            if self.session_id is None:
+                return
+            if self.worker is not None and not self.worker.running:
+                self.worker.start(self.session_id, reprise=True)
+            self.store.resume_session(self.session_id, at=maintenant)
+
 
 class Handler(BaseHTTPRequestHandler):
     """Routes de l'interface. Volontairement peu nombreuses."""
@@ -598,6 +637,19 @@ class Handler(BaseHTTPRequestHandler):
                 # 409 comme le refus de démarrer : ce n'est pas une panne du
                 # serveur, c'est une condition que l'utilisateur peut lever.
                 self._send_json({"erreur": str(exc)}, status=409)
+        elif self.path == "/api/session/pause":
+            self.state.pause()
+            self._send_json(self.state.snapshot())
+        elif self.path == "/api/session/reprendre":
+            try:
+                self.state.resume()
+            except CaptureUnavailable as exc:
+                # 409 comme le refus de démarrer, et pour la même raison : la
+                # session reste en pause, l'utilisateur peut lever la cause et
+                # recliquer. Répondre 200 lui ferait croire que ça recompte.
+                self._send_json({"erreur": str(exc)}, status=409)
+                return
+            self._send_json(self.state.snapshot())
         elif self.path == "/api/session/arreter":
             self.state.stop()
             self._send_json(self.state.snapshot())

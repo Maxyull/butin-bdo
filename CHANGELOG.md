@@ -63,6 +63,18 @@ dans [docs/versionnage.md](docs/versionnage.md).
   saisir : le joueur sait s'il a un abonnement, il ne sait pas forcément que ça
   fait 84,5 %. Les réglages (langue, région, profil de taxe) sont désormais
   écrits dans `reglages.json`, à côté du calibrage.
+- **Mettre la session en pause**, depuis la fenêtre principale ou depuis le
+  panneau posé sur le jeu. La capture s'arrête, et surtout **le temps arrête de
+  compter** : le silver par heure divise le total par la durée, donc une pause
+  repas de vingt minutes comptée comme du farm diviserait le résultat d'une
+  heure de session par 1,3, sans que rien ne l'explique. La reprise repart d'une
+  boucle neuve, dont la première lecture prend ce qui est à l'écran pour du
+  passé : sans ça, reprendre recréditerait les dix-sept lignes encore
+  affichées, c'est-à-dire inventerait des drops. La pause enregistre au passage
+  le butin encore en attente, comme l'arrêt, et **se voit** dans le panneau,
+  cadre compris — un total qui n'augmente plus est indistinguable d'un farm
+  calme, et là c'est nous qui l'aurions arrêté. Schéma de base en version 2, les
+  bases existantes sont migrées sans rien perdre.
 - **Le calibrage depuis l'interface.** Il n'y a plus rien à taper : un bouton
   **Calibrer la zone** avec un décompte de cinq secondes pour basculer dans le
   jeu, et la page affiche **les lignes qu'elle a lues** dans la zone retenue.

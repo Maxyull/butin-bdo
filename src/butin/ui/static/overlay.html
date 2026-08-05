@@ -34,11 +34,27 @@
   }
   #barre .titre { letter-spacing: .08em; text-transform: uppercase; }
   #barre button {
-    margin-left: auto; background: transparent; color: #97a0b5;
+    background: transparent; color: #97a0b5;
     border: 1px solid rgba(120, 130, 150, 0.35); border-radius: 6px;
     padding: 2px 9px; cursor: pointer; font-size: 12px;
   }
+  /* Sur le PREMIER bouton seulement. Mise sur la règle générale, la marge
+     automatique s'appliquerait aux deux et se partagerait l'espace libre au
+     lieu de les pousser ensemble à droite. */
+  #pause { margin-left: auto; }
   #barre button:hover { color: #ff8b3d; border-color: #ff8b3d; }
+
+  /* ⚠️ La pause doit se voir de loin, et pas seulement dans le libellé d'un
+     bouton. C'est le seul écran regardé en farmant : un total qui n'augmente
+     plus est indistinguable d'un farm calme, et là c'est NOUS qui l'aurions
+     arrêté. Le cadre change donc de couleur, franchement. */
+  #cadre.en-pause { border-color: rgba(242, 193, 78, 0.75); }
+  #pause.reprendre { color: #f2c14e; border-color: rgba(242, 193, 78, 0.75); }
+  #en-pause {
+    display: none; color: #f2c14e; font-size: 13px; padding: 4px 0;
+    letter-spacing: .06em;
+  }
+  #cadre.en-pause #en-pause { display: block; }
 
   .chiffres { display: flex; gap: 20px; margin-bottom: 8px; }
   .chiffres div { min-width: 92px; }
@@ -68,6 +84,7 @@
   <div id="barre">
     <span class="titre">Butin — en direct</span>
     <span id="etat"></span>
+    <button id="pause" title="Suspend la capture et arrête de compter le temps">Pause</button>
     <button id="fermer" title="Arrête la session et referme le panneau">Arrêter</button>
   </div>
 
@@ -77,6 +94,7 @@
     <div><div class="etiquette">DURÉE</div><div class="valeur" id="duree">00:00:00</div></div>
   </div>
 
+  <div id="en-pause">EN PAUSE — le temps ne compte plus, rien n'est enregistré.</div>
   <div id="panne"></div>
   <div id="drops"><div id="vide">En attente du premier drop…</div></div>
 </div>
@@ -100,15 +118,21 @@ function afficher(etat) {
   $("total").textContent = nombre(stats ? stats.total : 0);
   $("duree").textContent = chrono(etat.session ? etat.session.duree_s : 0);
 
+  // La pause est un arrêt VOLONTAIRE, donc elle s'annonce autrement qu'une
+  // panne. Mais elle s'annonce, et pour la même raison : sans ça, une pause
+  // oubliée est du farm perdu que rien à l'écran ne signale.
+  const enPause = Boolean(etat.session && etat.session.en_pause);
+  $("cadre").classList.toggle("en-pause", enPause);
+  $("pause").textContent = enPause ? "Reprendre" : "Pause";
+  $("pause").classList.toggle("reprendre", enPause);
+
   const capture = etat.capture;
   // Une panne du fil de capture doit se voir ICI aussi : c'est le seul écran
   // que le joueur regarde pendant qu'il farme, et un total qui n'augmente plus
   // sans explication est indistinguable d'un farm calme.
   $("panne").style.display = capture && capture.erreur ? "block" : "none";
   if (capture && capture.erreur) $("panne").textContent = "Capture arrêtée : " + capture.erreur;
-  $("etat").textContent = capture && capture.en_cours
-    ? capture.drops_enregistres + " drops"
-    : "";
+  $("etat").textContent = capture ? capture.drops_enregistres + " drops" : "";
 
   const drops = etat.derniers || [];
   const zone = $("drops");
@@ -142,6 +166,33 @@ function afficher(etat) {
   }
   dejaVus = vues;
 }
+
+$("pause").addEventListener("click", async () => {
+  const bouton = $("pause");
+  // Désactivé le temps de l'aller-retour : la capture met jusqu'à cinq
+  // secondes à s'arrêter proprement, et un second clic pendant ce temps
+  // demanderait une reprise sur une pause pas encore prise.
+  bouton.disabled = true;
+  try {
+    const enPause = bouton.textContent === "Reprendre";
+    const reponse = await fetch(enPause ? "/api/session/reprendre" : "/api/session/pause", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: "{}",
+    });
+    const corps = await reponse.json();
+    if (!reponse.ok) {
+      // Une reprise refusée laisse la session EN PAUSE. Le dire ici, sinon le
+      // joueur repart farmer en croyant que ça recompte.
+      $("panne").style.display = "block";
+      $("panne").textContent = "Reprise impossible : " + (corps.erreur || "raison inconnue");
+      return;
+    }
+    afficher(corps);
+  } finally {
+    bouton.disabled = false;
+  }
+});
 
 $("fermer").addEventListener("click", async () => {
   await fetch("/api/session/arreter", {

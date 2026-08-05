@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from butin.market import Price, PriceBook, PriceCache, PriceSource
-from butin.store import LootRow, SessionStore, Stats, TaxProfile, compute
+from butin.store import SCHEMA_VERSION, LootRow, SessionStore, Stats, TaxProfile, compute
 from butin.store.stats import MARKET_RATE_BASE
 
 HEURE = 3600.0
@@ -34,7 +35,7 @@ class TestSchema:
         silence sur un historique de farm que personne n'accepte de perdre.
         """
         version = store._connection.execute("SELECT version FROM schema_version").fetchone()
-        assert version["version"] == 1
+        assert version["version"] == SCHEMA_VERSION
 
     def test_une_base_plus_recente_que_le_code_est_refusee(self, tmp_path: Path) -> None:
         """Ouvrir en écriture une base écrite par une version future la
@@ -92,6 +93,192 @@ class TestSession:
         store.add_silver(session.id, 500)
 
         assert store.get_session(session.id).silver_direct == 1500
+
+
+class TestPause:
+    """La mise en pause, et surtout ce qu'elle fait au CHIFFRE.
+
+    Le silver par heure divise le total par la durée. Compter une pause repas
+    comme du farm ne donne pas un chiffre un peu bas, il donne un chiffre faux :
+    vingt minutes de pause sur une heure de session divisent le résultat par 1,3
+    sans que rien ne l'explique à l'écran.
+    """
+
+    def test_le_temps_en_pause_est_deduit(self, store) -> None:
+        session = store.start_session(started_at=0.0)
+        store.pause_session(session.id, at=600.0)
+        store.resume_session(session.id, at=1200.0)
+        store.end_session(session.id, ended_at=1800.0)
+
+        # 30 min de session, 10 min de pause : 20 min de farm.
+        assert store.get_session(session.id).duration_s(now=0.0) == pytest.approx(1200.0)
+
+    def test_la_duree_se_fige_pendant_la_pause(self, store) -> None:
+        """⭐ Régression : c'est pour ça que `paused_at` est en base.
+
+        Cumuler seulement au moment de reprendre laisserait la durée grandir
+        **pendant** la pause, donc le silver par heure s'effondrer sous les yeux
+        de quelqu'un qui a justement mis en pause pour ne pas être compté.
+        """
+        session = store.start_session(started_at=0.0)
+        store.pause_session(session.id, at=600.0)
+        en_pause = store.get_session(session.id)
+
+        assert en_pause.is_paused
+        assert en_pause.duration_s(now=600.0) == pytest.approx(600.0)
+        assert en_pause.duration_s(now=99999.0) == pytest.approx(600.0)
+
+    def test_deux_pauses_s_additionnent(self, store) -> None:
+        session = store.start_session(started_at=0.0)
+        store.pause_session(session.id, at=100.0)
+        store.resume_session(session.id, at=200.0)
+        store.pause_session(session.id, at=300.0)
+        store.resume_session(session.id, at=500.0)
+
+        assert store.get_session(session.id).duration_s(now=600.0) == pytest.approx(300.0)
+
+    def test_mettre_en_pause_deux_fois_ne_decale_pas_le_debut(self, store) -> None:
+        """Régression : deux clics, ou deux requêtes simultanées.
+
+        Sans le `paused_at IS NULL` de la condition, le second appel écraserait
+        le début de la pause et rendrait invisible du temps déjà mis de côté.
+        """
+        session = store.start_session(started_at=0.0)
+        store.pause_session(session.id, at=100.0)
+        store.pause_session(session.id, at=400.0)
+        store.resume_session(session.id, at=500.0)
+
+        assert store.get_session(session.id).duration_s(now=500.0) == pytest.approx(100.0)
+
+    def test_arreter_pendant_une_pause_ferme_la_pause(self, store) -> None:
+        """⭐ Régression : la session qui rétrécit toute seule, pour toujours.
+
+        Arrêter depuis l'état en pause laissait `paused_at` posé. La durée en
+        soustrayait alors le temps écoulé **après** la fin de la session, donc
+        elle diminuait à chaque consultation de l'historique, des mois après.
+        """
+        session = store.start_session(started_at=0.0)
+        store.pause_session(session.id, at=600.0)
+        store.end_session(session.id, ended_at=900.0)
+        arretee = store.get_session(session.id)
+
+        assert not arretee.is_paused
+        assert arretee.duration_s(now=900.0) == pytest.approx(600.0)
+        # Un mois plus tard, le même chiffre.
+        assert arretee.duration_s(now=900.0 + 30 * 86400) == pytest.approx(600.0)
+
+    def test_une_horloge_qui_recule_n_allonge_pas_le_farm(self, store) -> None:
+        """Le passage à l'heure d'hiver recule l'horloge système d'une heure.
+
+        Sans le `MAX(0, ...)`, `paused_s` deviendrait négatif et la pause
+        AJOUTERAIT du temps de farm, donc gonflerait le silver par heure.
+        """
+        session = store.start_session(started_at=0.0)
+        store.pause_session(session.id, at=1000.0)
+        store.resume_session(session.id, at=1000.0 - 3600.0)
+
+        assert store.get_session(session.id).duration_s(now=2000.0) == pytest.approx(2000.0)
+
+    def test_reprendre_sans_pause_ne_fait_rien(self, store) -> None:
+        session = store.start_session(started_at=0.0)
+        store.resume_session(session.id, at=500.0)
+
+        assert store.get_session(session.id).duration_s(now=1000.0) == pytest.approx(1000.0)
+
+    def test_une_session_neuve_n_est_pas_en_pause(self, store) -> None:
+        assert not store.start_session(started_at=0.0).is_paused
+
+
+class TestMigrationV1:
+    """⭐ Une base d'avant doit survivre à la mise à jour.
+
+    `CREATE TABLE IF NOT EXISTS` ne touche pas une table déjà là : sans
+    migration explicite, une base v1 garderait ses six colonnes et toute
+    lecture échouerait sur `paused_s`. Du point de vue de la personne, un
+    historique de farm qu'on ne sait plus relire est un historique perdu.
+    """
+
+    SCHEMA_V1 = """
+    CREATE TABLE schema_version (version INTEGER NOT NULL);
+    CREATE TABLE sessions (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        spot          TEXT    NOT NULL DEFAULT '',
+        region        TEXT    NOT NULL DEFAULT 'eu',
+        started_at    REAL    NOT NULL,
+        ended_at      REAL,
+        silver_direct INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE loot (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        item_id    INTEGER NOT NULL,
+        sid        INTEGER NOT NULL DEFAULT 0,
+        qty        INTEGER NOT NULL,
+        at         REAL    NOT NULL
+    );
+    """
+
+    def _base_v1(self, chemin: Path) -> None:
+        """Écrit une vraie base au schéma v1, tel qu'il était publié."""
+        connexion = sqlite3.connect(chemin)
+        connexion.executescript(self.SCHEMA_V1)
+        connexion.execute("INSERT INTO schema_version (version) VALUES (1)")
+        connexion.execute(
+            "INSERT INTO sessions (spot, region, started_at, ended_at, silver_direct) "
+            "VALUES ('Gyfin', 'eu', 0.0, 3600.0, 4200)"
+        )
+        connexion.execute(
+            "INSERT INTO loot (session_id, item_id, sid, qty, at) VALUES (1, 16001, 0, 7, 10.0)"
+        )
+        connexion.commit()
+        connexion.close()
+
+    def test_une_base_v1_se_relit_sans_rien_perdre(self, tmp_path: Path) -> None:
+        chemin = tmp_path / "sessions.sqlite3"
+        self._base_v1(chemin)
+
+        with SessionStore(chemin) as base:
+            session = base.get_session(1)
+
+            assert session.spot == "Gyfin"
+            assert session.silver_direct == 4200
+            assert base.loot_count(1) == 7
+            assert session.duration_s(now=0.0) == pytest.approx(3600.0)
+
+    def test_les_anciennes_sessions_n_ont_jamais_ete_en_pause(self, tmp_path: Path) -> None:
+        """Les valeurs par défaut disent la vérité : la pause n'existait pas."""
+        chemin = tmp_path / "sessions.sqlite3"
+        self._base_v1(chemin)
+
+        with SessionStore(chemin) as base:
+            session = base.get_session(1)
+
+            assert session.paused_s == 0.0
+            assert session.paused_at is None
+            assert not session.is_paused
+
+    def test_le_numero_de_schema_est_releve(self, tmp_path: Path) -> None:
+        """Régression : sans ça la migration rejouerait à chaque ouverture."""
+        chemin = tmp_path / "sessions.sqlite3"
+        self._base_v1(chemin)
+
+        with SessionStore(chemin) as base:
+            ligne = base._connection.execute("SELECT version FROM schema_version").fetchone()
+            assert ligne["version"] == SCHEMA_VERSION
+
+        with SessionStore(chemin) as relue:
+            assert relue.get_session(1).spot == "Gyfin"
+
+    def test_la_pause_marche_sur_une_base_migree(self, tmp_path: Path) -> None:
+        chemin = tmp_path / "sessions.sqlite3"
+        self._base_v1(chemin)
+
+        with SessionStore(chemin) as base:
+            session = base.start_session(started_at=0.0)
+            base.pause_session(session.id, at=100.0)
+            base.resume_session(session.id, at=300.0)
+
+            assert base.get_session(session.id).duration_s(now=500.0) == pytest.approx(300.0)
 
 
 class TestQuantites:

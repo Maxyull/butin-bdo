@@ -100,6 +100,25 @@ class _Compteurs:
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
+@dataclass(slots=True)
+class _Acquis:
+    """Ce qu'ont compté les tranches de capture déjà terminées.
+
+    Une pause construit une boucle et un enregistreur neufs à la reprise, dont
+    les compteurs repartent de zéro. Sans ce report, l'interface afficherait
+    « 0 drop » après une pause sur une session qui en a enregistré trois cents :
+    un compteur qui **recule** est pire qu'un compteur qui stagne, puisqu'il
+    ressemble à une perte de données alors que la base, elle, a tout gardé.
+    """
+
+    ticks: int = 0
+    ocr_reads: int = 0
+    skipped_frames: int = 0
+    lost_resolved: int = 0
+    recorded_events: int = 0
+    recorded_silver: int = 0
+
+
 class CaptureWorker:
     """Fait tourner la boucle dans un fil, et rend compte de ce qu'elle fait.
 
@@ -135,6 +154,7 @@ class CaptureWorker:
         self._stop = threading.Event()
         self._recorder: SessionRecorder | None = None
         self._compteurs = _Compteurs()
+        self._acquis = _Acquis()
 
     # -- état ------------------------------------------------------------
 
@@ -145,6 +165,7 @@ class CaptureWorker:
 
     def status(self) -> CaptureStatus:
         enregistreur = self._recorder
+        acquis = self._acquis
         with self._compteurs.lock:
             tours, lectures, erreur = (
                 self._compteurs.ticks,
@@ -154,37 +175,47 @@ class CaptureWorker:
         if enregistreur is None:
             return CaptureStatus(
                 running=False,
-                ticks=tours,
-                ocr_reads=lectures,
-                skipped_frames=0,
-                lost_resolved=0,
-                recorded_events=0,
-                recorded_silver=0,
+                ticks=acquis.ticks + tours,
+                ocr_reads=acquis.ocr_reads + lectures,
+                skipped_frames=acquis.skipped_frames,
+                lost_resolved=acquis.lost_resolved,
+                recorded_events=acquis.recorded_events,
+                recorded_silver=acquis.recorded_silver,
                 error=erreur,
             )
         return CaptureStatus(
             running=self.running,
-            ticks=tours,
-            ocr_reads=lectures,
-            skipped_frames=enregistreur.skipped_frames,
-            lost_resolved=enregistreur.loop.stager.lost_resolved,
-            recorded_events=enregistreur.recorded_events,
-            recorded_silver=enregistreur.recorded_silver,
+            ticks=acquis.ticks + tours,
+            ocr_reads=acquis.ocr_reads + lectures,
+            skipped_frames=acquis.skipped_frames + enregistreur.skipped_frames,
+            lost_resolved=acquis.lost_resolved + enregistreur.loop.stager.lost_resolved,
+            recorded_events=acquis.recorded_events + enregistreur.recorded_events,
+            recorded_silver=acquis.recorded_silver + enregistreur.recorded_silver,
             error=erreur,
         )
 
     # -- cycle de vie ----------------------------------------------------
 
-    def start(self, session_id: int) -> None:
+    def start(self, session_id: int, *, reprise: bool = False) -> None:
         """Démarre la capture, ou refuse en disant pourquoi.
 
         ⚠️ Tout ce qui peut échouer est fait ICI, dans le fil de l'appelant :
         lire le calibrage, construire la boucle. Repousser ces échecs dans le
         fil de fond les rendrait invisibles au moment où l'utilisateur clique,
         et il verrait une session démarrer puis ne rien compter.
+
+        ⭐ `reprise` ne change qu'une chose : les compteurs déjà acquis sont
+        conservés au lieu d'être remis à zéro. La boucle, elle, est **neuve dans
+        les deux cas**, et c'est ce qui rend la reprise sûre : sa première
+        lecture amorce le suivi avec ce qui est à l'écran sans rien compter (voir
+        `_seeded` dans `loop.py`). Reprendre en gardant l'ancienne boucle
+        recompterait les dix-sept lignes encore affichées, c'est-à-dire
+        inventerait des drops, l'erreur que ce projet refuse.
         """
         if self.running:
             raise CaptureUnavailable("une capture tourne déjà")
+        if not reprise:
+            self._acquis = _Acquis()
 
         calibrage = self._calibration_loader()
         if calibrage is None:
@@ -206,12 +237,12 @@ class CaptureWorker:
         )
         self._thread.start()
 
-    def stop(self, *, timeout: float = 5.0) -> int:
+    def stop(self, *, timeout: float = 5.0, garder_les_compteurs: bool = False) -> int:
         """Arrête la capture et enregistre ce qui attendait encore.
 
         Le `flush` n'est pas une politesse : le butin vu une seule fois au
         moment de l'arrêt est bien tombé, et le perdre serait une erreur dans le
-        mauvais sens.
+        mauvais sens. Il vaut aussi pour une pause, pour la même raison.
         """
         self._stop.set()
         thread = self._thread
@@ -229,7 +260,34 @@ class CaptureWorker:
         enregistreur = self._recorder
         if enregistreur is None:
             return 0
-        return enregistreur.flush(time.time())
+        ecrites = enregistreur.flush(time.time())
+        if garder_les_compteurs:
+            self._reporter(enregistreur)
+        return ecrites
+
+    def pause(self, *, timeout: float = 5.0) -> int:
+        """Arrête la capture sans perdre ce que la session a déjà compté.
+
+        Exactement `stop`, à ceci près que les compteurs affichés survivent :
+        c'est la même session, elle reprendra. Rend le nombre de drops encore en
+        attente qui ont été enregistrés au passage.
+        """
+        return self.stop(timeout=timeout, garder_les_compteurs=True)
+
+    def _reporter(self, enregistreur: SessionRecorder) -> None:
+        """Verse les compteurs de la tranche qui s'achève dans le total acquis."""
+        with self._compteurs.lock:
+            tours, lectures = self._compteurs.ticks, self._compteurs.ocr_reads
+        self._acquis = _Acquis(
+            ticks=self._acquis.ticks + tours,
+            ocr_reads=self._acquis.ocr_reads + lectures,
+            skipped_frames=self._acquis.skipped_frames + enregistreur.skipped_frames,
+            lost_resolved=self._acquis.lost_resolved + enregistreur.loop.stager.lost_resolved,
+            recorded_events=self._acquis.recorded_events + enregistreur.recorded_events,
+            recorded_silver=self._acquis.recorded_silver + enregistreur.recorded_silver,
+        )
+        self._recorder = None
+        self._compteurs = _Compteurs()
 
     # -- interne ---------------------------------------------------------
 

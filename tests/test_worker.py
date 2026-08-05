@@ -192,6 +192,85 @@ class TestComptage:
         assert travailleur.status().running is False
 
 
+class TestPause:
+    """Mettre en pause, puis reprendre, sans mentir sur ce qui a été compté."""
+
+    def test_les_compteurs_survivent_a_la_reprise(
+        self, store: SessionStore, matcher: ItemMatcher
+    ) -> None:
+        """⭐ Régression : un compteur qui RECULE est pire qu'un qui stagne.
+
+        La reprise construit une boucle et un enregistreur neufs, dont les
+        compteurs repartent de zéro. Sans report, l'interface afficherait
+        « 0 drop » après une pause sur une session qui en a enregistré trois
+        cents : ça ressemble à une perte de données, alors que la base a tout
+        gardé.
+        """
+        avant = [gain("Pierre noire (arme)")]
+        apres = [gain("Pierre noire (arme)"), gain("Trace de sauvagerie")]
+        travailleur = _worker(store, matcher, LecteurFactice([avant] + [apres] * 20))
+        session = store.start_session(started_at=0.0, spot="", region="eu")
+
+        travailleur.start(session.id)
+        assert _attendre(lambda: travailleur.status().recorded_events > 0)
+        travailleur.pause()
+        acquis = travailleur.status()
+
+        assert acquis.recorded_events > 0
+        assert acquis.ticks > 0
+        assert not acquis.running
+
+        travailleur.start(session.id, reprise=True)
+        try:
+            reprise = travailleur.status()
+            assert reprise.recorded_events >= acquis.recorded_events
+            assert reprise.ticks >= acquis.ticks
+        finally:
+            travailleur.stop()
+
+    def test_un_demarrage_neuf_repart_de_zero(
+        self, store: SessionStore, matcher: ItemMatcher
+    ) -> None:
+        """Sans `reprise`, c'est une autre session : ses compteurs sont à elle.
+
+        Reporter les compteurs d'une session sur la suivante attribuerait à la
+        seconde du butin qui appartient à la première.
+        """
+        fenetres = [[gain("Pierre noire (arme)")], [gain("Pierre noire (arme)")]]
+        travailleur = _worker(store, matcher, LecteurFactice(fenetres))
+        premiere = store.start_session(started_at=0.0, spot="", region="eu")
+
+        travailleur.start(premiere.id)
+        _attendre(lambda: travailleur.status().ticks > 3)
+        travailleur.pause()
+        assert travailleur.status().ticks > 0
+
+        seconde = store.start_session(started_at=100.0, spot="", region="eu")
+        travailleur.start(seconde.id)
+        try:
+            assert travailleur.status().recorded_events == 0
+        finally:
+            travailleur.stop()
+
+    def test_la_pause_enregistre_ce_qui_attendait(
+        self, store: SessionStore, matcher: ItemMatcher
+    ) -> None:
+        """Même raison qu'à l'arrêt : le butin vu une fois est bien tombé.
+
+        Et il ne sera pas recompté à la reprise : la boucle neuve amorce le
+        suivi avec ce qui est déjà à l'écran sans rien créditer.
+        """
+        fenetres = [[gain("Pierre noire (arme)")], [gain("Pierre noire (arme)")]]
+        travailleur = _worker(store, matcher, LecteurFactice(fenetres))
+        session = store.start_session(started_at=0.0, spot="", region="eu")
+
+        travailleur.start(session.id)
+        _attendre(lambda: travailleur.status().ticks > 3)
+        travailleur.pause()
+
+        assert not travailleur.status().running
+
+
 class TestPanne:
     def test_une_erreur_dans_le_fil_est_exposee(
         self, store: SessionStore, matcher: ItemMatcher

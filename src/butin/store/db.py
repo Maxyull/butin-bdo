@@ -35,7 +35,7 @@ from pathlib import Path
 
 from .. import paths
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     region        TEXT    NOT NULL DEFAULT 'eu',
     started_at    REAL    NOT NULL,
     ended_at      REAL,
-    silver_direct INTEGER NOT NULL DEFAULT 0
+    silver_direct INTEGER NOT NULL DEFAULT 0,
+    paused_s      REAL    NOT NULL DEFAULT 0,
+    paused_at     REAL
 );
 
 CREATE TABLE IF NOT EXISTS loot (
@@ -77,13 +79,38 @@ class Session:
     """Silver ramassé directement (« Pièces »), déjà exprimé dans l'unité
     finale : il ne passe jamais par une recherche de prix."""
 
+    paused_s: float = 0.0
+    """Temps déjà passé en pause, cumulé sur toute la session."""
+
+    paused_at: float | None = None
+    """Début de la pause en cours, ou None si la session tourne.
+
+    Gardé en base plutôt que cumulé au moment de reprendre : sans lui, la durée
+    affichée continuerait de grandir **pendant** la pause, et le silver par
+    heure de s'effondrer sous les yeux de quelqu'un qui a justement mis en pause
+    pour ne pas être compté.
+    """
+
     @property
     def is_open(self) -> bool:
         return self.ended_at is None
 
+    @property
+    def is_paused(self) -> bool:
+        return self.paused_at is not None
+
     def duration_s(self, now: float) -> float:
+        """Durée de farm réelle, temps de pause déduit.
+
+        ⚠️ Déduire la pause n'est pas un confort, c'est ce qui rend le chiffre
+        juste. Le silver par heure divise le total par cette durée : une pause
+        repas de vingt minutes comptée comme du farm diviserait le résultat
+        d'une session d'une heure par 1,3. Un chiffre faux, pas un chiffre bas.
+        """
         fin = self.ended_at if self.ended_at is not None else now
-        return max(0.0, fin - self.started_at)
+        brut = fin - self.started_at
+        en_cours = (fin - self.paused_at) if self.paused_at is not None else 0.0
+        return max(0.0, brut - self.paused_s - max(0.0, en_cours))
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,8 +189,31 @@ class SessionStore:
                     f"base en version {version}, ce logiciel n'en connaît que "
                     f"{SCHEMA_VERSION} : installer une version plus récente de Butin"
                 )
-            # Aucune migration à jouer pour l'instant. Les futures viendront ici,
-            # une par palier, jamais en sautant des versions.
+            # Une migration par palier, jamais en sautant des versions.
+            if version < 2:
+                self._vers_v2(connection)
+            connection.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
+
+    @staticmethod
+    def _vers_v2(connection: sqlite3.Connection) -> None:
+        """v1 -> v2 : la mise en pause.
+
+        `CREATE TABLE IF NOT EXISTS` ne touche pas une table déjà là : une base
+        d'avant garde donc ses six colonnes, et il faut ajouter les deux
+        nouvelles à la main. Sans ça, l'historique de farm de quelqu'un
+        deviendrait illisible d'un coup après une mise à jour, ce qui est la
+        perte qu'on ne pardonne pas à un outil dont le seul rôle est de compter.
+
+        Les deux valeurs par défaut disent la vérité sur les anciennes sessions :
+        aucune n'a jamais été mise en pause, donc zéro et NULL.
+        """
+        colonnes = {
+            str(ligne["name"]) for ligne in connection.execute("PRAGMA table_info(sessions)")
+        }
+        if "paused_s" not in colonnes:
+            connection.execute("ALTER TABLE sessions ADD COLUMN paused_s REAL NOT NULL DEFAULT 0")
+        if "paused_at" not in colonnes:
+            connection.execute("ALTER TABLE sessions ADD COLUMN paused_at REAL")
 
     # -- écriture --------------------------------------------------------
 
@@ -181,11 +231,53 @@ class SessionStore:
         )
 
     def end_session(self, session_id: int, *, ended_at: float) -> None:
+        """Ferme une session, en refermant d'abord une pause restée ouverte.
+
+        ⚠️ L'ordre compte. Arrêter depuis l'état en pause laisserait `paused_at`
+        posé, et la durée continuerait d'en soustraire le temps écoulé **après**
+        la fin de la session : elle rétrécirait toute seule, pour toujours, dans
+        l'historique.
+        """
         with self._transaction() as connection:
+            self._fermer_la_pause(connection, session_id, at=ended_at)
             connection.execute(
                 "UPDATE sessions SET ended_at = ? WHERE id = ? AND ended_at IS NULL",
                 (ended_at, session_id),
             )
+
+    def pause_session(self, session_id: int, *, at: float) -> None:
+        """Marque le début d'une pause. Sans effet si la session en est déjà à une.
+
+        `paused_at IS NULL` dans la condition : deux clics sur Pause, ou deux
+        requêtes simultanées, décaleraient sinon le début de la pause et
+        rendraient du temps de farm invisible.
+        """
+        with self._transaction() as connection:
+            connection.execute(
+                "UPDATE sessions SET paused_at = ? "
+                "WHERE id = ? AND ended_at IS NULL AND paused_at IS NULL",
+                (at, session_id),
+            )
+
+    def resume_session(self, session_id: int, *, at: float) -> None:
+        """Referme la pause en cours et l'ajoute au temps déjà mis de côté."""
+        with self._transaction() as connection:
+            self._fermer_la_pause(connection, session_id, at=at)
+
+    @staticmethod
+    def _fermer_la_pause(connection: sqlite3.Connection, session_id: int, *, at: float) -> None:
+        """Cumule la pause en cours dans `paused_s` et efface `paused_at`.
+
+        `MAX(0, ...)` sur l'écart : une horloge qui recule, ce que fait celle du
+        système à un changement d'heure, rendrait sinon `paused_s` négatif et
+        allongerait la durée de farm au lieu de la raccourcir.
+        """
+        connection.execute(
+            "UPDATE sessions "
+            "SET paused_s = paused_s + MAX(0, ? - paused_at), paused_at = NULL "
+            "WHERE id = ? AND paused_at IS NOT NULL",
+            (at, session_id),
+        )
 
     def add_loot(self, session_id: int, rows: Iterable[LootRow]) -> int:
         """Enregistre des drops. Renvoie le nombre de lignes écrites."""
@@ -302,4 +394,6 @@ def _to_session(ligne: sqlite3.Row) -> Session:
         started_at=float(ligne["started_at"]),
         ended_at=float(ligne["ended_at"]) if ligne["ended_at"] is not None else None,
         silver_direct=int(ligne["silver_direct"]),
+        paused_s=float(ligne["paused_s"]),
+        paused_at=float(ligne["paused_at"]) if ligne["paused_at"] is not None else None,
     )

@@ -207,6 +207,7 @@
 
 <div class="panneau" style="margin-bottom:18px">
   <button class="action demarrer" id="bouton-session">Commencer le grind</button>
+  <button class="action" id="bouton-pause" hidden>Pause</button>
   <button class="action" id="bouton-calibrer">Calibrer la zone</button>
   <span id="etat-session" style="margin-left:14px;color:var(--doux)">Aucune session en cours</span>
   <div id="etat-capture" style="margin-top:10px;color:var(--doux);font-size:14px"></div>
@@ -396,11 +397,15 @@ function afficher(etat) {
     Math.round((stats ? stats.couverture : 1) * 100) + " %";
 
   const enCours = Boolean(etat.session && etat.session.en_cours);
+  const enPause = Boolean(etat.session && etat.session.en_pause);
   $("bouton-session").textContent = enCours ? "Arrêter la session" : "Démarrer une session";
   $("bouton-session").classList.toggle("demarrer", !enCours);
-  $("etat-session").textContent = enCours
-    ? "Session en cours" + (etat.session.spot ? " : " + etat.session.spot : "")
-    : "Aucune session en cours";
+  $("bouton-pause").hidden = !enCours;
+  $("bouton-pause").textContent = enPause ? "Reprendre" : "Pause";
+  $("etat-session").textContent = !enCours
+    ? "Aucune session en cours"
+    : (enPause ? "EN PAUSE" : "Session en cours") +
+      (etat.session.spot ? " : " + etat.session.spot : "");
 
   // Ce que fait la capture, et surtout ce qu'elle ne fait plus. Un fil de
   // capture mort laisserait un total qui n'augmente pas, indistinguable d'un
@@ -413,9 +418,13 @@ function afficher(etat) {
   } else if (capture.erreur) {
     ligneCapture.className = "avertissement";
     ligneCapture.textContent = "La capture s'est arrêtée : " + capture.erreur;
-  } else if (capture.en_cours) {
+  } else if (capture.en_cours || enPause) {
+    // Les compteurs restent affichés pendant la pause. Les faire disparaître
+    // ressemblerait à une perte de ce que la session a déjà compté, alors que
+    // la base l'a gardé et que la reprise repartira de là.
     ligneCapture.textContent =
-      "Capture active — " + capture.lectures + " lectures, " +
+      (enPause ? "Capture suspendue — " : "Capture active — ") +
+      capture.lectures + " lectures, " +
       capture.drops_enregistres + " drops, " +
       capture.images_ecartees + " images écartées" +
       (capture.butin_perdu ? ", " + capture.butin_perdu + " lignes perdues" : "");
@@ -489,6 +498,33 @@ function afficher(etat) {
     zone.appendChild(div);
   }
 }
+
+$("bouton-pause").addEventListener("click", async () => {
+  const bouton = $("bouton-pause");
+  // Désactivé pendant l'aller-retour : l'arrêt propre de la capture prend
+  // jusqu'à cinq secondes, et un second clic demanderait une reprise sur une
+  // pause pas encore prise.
+  bouton.disabled = true;
+  try {
+    const reprendre = bouton.textContent === "Reprendre";
+    const reponse = await fetch(
+      reprendre ? "/api/session/reprendre" : "/api/session/pause",
+      {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"},
+    );
+    const corps = await reponse.json();
+    if (!reponse.ok) {
+      // Une reprise refusée laisse la session EN PAUSE, et il faut le dire :
+      // sinon le joueur repart farmer en croyant que ça recompte.
+      const ligne = $("etat-capture");
+      ligne.className = "avertissement";
+      ligne.textContent = "Reprise impossible : " + (corps.erreur || "raison inconnue");
+      return;
+    }
+    afficher(corps);
+  } finally {
+    bouton.disabled = false;
+  }
+});
 
 $("bouton-session").addEventListener("click", async () => {
   const etat = await (await fetch("/api/etat")).json();
