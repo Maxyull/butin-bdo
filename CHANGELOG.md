@@ -53,6 +53,14 @@ dans [docs/versionnage.md](docs/versionnage.md).
   l'hôtel des ventes ne s'applique qu'aux objets vendables, jamais au butin
   vendu au marchand ni au silver ramassé. Les objets non valorisés et les prix
   périmés sont comptés et affichés à part.
+- **Le calibrage depuis l'interface.** Il n'y a plus rien à taper : un bouton
+  **Calibrer la zone** avec un décompte de cinq secondes pour basculer dans le
+  jeu, et la page affiche **les lignes qu'elle a lues** dans la zone retenue.
+  Montrer l'extrait n'est pas un confort : la détection cherche ce qui se répète
+  verticalement et ne sait pas d'où vient l'image, un essai réel ayant calibré
+  très proprement sur une capture du chat ouverte dans une visionneuse. La page
+  dit aussi, en permanence, si la zone est calibrée, pour qu'on le sache **avant**
+  de cliquer sur Démarrer.
 - **Le bouton qui lance la capture.** L'interface ouvrait une session dans la
   base et **rien ne l'alimentait** : le compteur restait à zéro, ce qui est
   impossible à distinguer d'une session sans butin. La boucle tourne désormais

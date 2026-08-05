@@ -16,6 +16,9 @@ from typing import Any
 
 import pytest
 
+from butin import paths
+from butin.capture.calibrate import Calibration
+from butin.capture.screen import Region
 from butin.capture.worker import CaptureStatus, CaptureUnavailable
 from butin.market import PriceBook, PriceCache
 from butin.store import LootRow, SessionStore
@@ -293,6 +296,55 @@ class TestCapture:
         etat.start("Gyfin")
 
         assert etat.snapshot()["capture"] is None
+
+
+class TestCalibrageDepuisLInterface:
+    """Le calibrage sans terminal. Sinon le produit reste un outil de dev."""
+
+    def test_l_etat_dit_si_la_zone_est_calibree(self, store: SessionStore) -> None:
+        """Sans ça, l'utilisateur clique « Démarrer » et se prend un refus.
+
+        Savoir avant de cliquer que la zone n'est pas calibrée est ce qui
+        transforme une erreur en étape.
+        """
+        etat = AppState(store, PriceBook(), None, None)
+
+        assert etat.snapshot()["reglages"]["calibrage"] == ""
+
+    def test_un_calibrage_enregistre_apparait_dans_l_etat(
+        self, store: SessionStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("BUTIN_HOME", str(tmp_path))
+        Calibration(
+            region=Region(left=0, top=0, width=400, height=500),
+            row_height_px=21.6,
+            ruler_left_ratio=0.2,
+            ruler_right_ratio=1.0,
+            rows=20,
+            strength=0.5,
+        ).save()
+
+        etat = AppState(store, PriceBook(), None, None)
+
+        assert "400x500" in etat.snapshot()["reglages"]["calibrage"]
+
+    def test_un_calibrage_illisible_ne_casse_pas_la_page(
+        self, store: SessionStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Le fichier est éditable à la main, donc cassable à la main.
+
+        Une page qui refuse de s'afficher parce qu'un champ manque dans un
+        fichier de réglage laisserait l'utilisateur sans aucun moyen de
+        comprendre, ni de relancer un calibrage.
+        """
+        monkeypatch.setenv("BUTIN_HOME", str(tmp_path))
+        chemin = paths.calibration_path()
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        chemin.write_text(json.dumps({"region": {"left": 0, "top": 0, "width": 9, "height": 9}}))
+
+        etat = AppState(store, PriceBook(), None, None)
+
+        assert etat.snapshot()["reglages"]["calibrage"] == ""
 
 
 class TestButin:
