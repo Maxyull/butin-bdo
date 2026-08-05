@@ -63,6 +63,21 @@ dans [docs/versionnage.md](docs/versionnage.md).
   saisir : le joueur sait s'il a un abonnement, il ne sait pas forcément que ça
   fait 84,5 %. Les réglages (langue, région, profil de taxe) sont désormais
   écrits dans `reglages.json`, à côté du calibrage.
+- **L'image de chaque objet dans le récap**, à côté de son nom et de sa quantité
+  totale. Un joueur reconnaît son butin à l'image avant d'avoir lu le nom,
+  exactement comme il le reconnaît à la couleur de rareté. Le chemin de l'image
+  était déjà dans l'export bdocodex qu'on télécharge pour les noms (68 747 sur
+  68 747) : rien de nouveau n'est téléchargé pour les connaître, seules les
+  images le sont, une fois chacune. Celles du butin connu sont préchargées au
+  lancement dans un fil de fond, pour que le récap n'ait pas de trou pendant le
+  farm. Une image absente **ne casse rien** : elle se cache sans décaler la
+  ligne, et le drop reste compté et lisible.
+- **Le panneau posé sur le jeu montre désormais le récap cumulé** et non le fil
+  des drops un par un. Sur des heures de farm, « combien j'ai ramassé de Pierres
+  noires » est la question ; « quel objet est tombé il y a quatre secondes » ne
+  l'est plus au bout de dix minutes, et le fil défilait plus vite qu'on ne le
+  lit. Une ligne s'anime quand sa quantité augmente, ce qui garde le signal
+  « quelque chose vient de tomber ».
 - **Mettre la session en pause**, depuis la fenêtre principale ou depuis le
   panneau posé sur le jeu. La capture s'arrête, et surtout **le temps arrête de
   compter** : le silver par heure divise le total par la durée, donc une pause

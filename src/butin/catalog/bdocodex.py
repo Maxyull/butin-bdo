@@ -80,8 +80,16 @@ nommée, là où un indice de colonne se décale en silence le jour où l'export
 gagne un champ.
 """
 
+_ICON_RE = re.compile(r'src="(/items/[^"]+?\.webp)"')
+"""Chemin de l'image de l'objet, dans la deuxième colonne de l'export.
+
+⚠️ La balise y est écrite `[img src="…"` et non `<img`, ce qui n'a l'air de rien
+mais interdit de chercher `<img`. On vise donc l'attribut, pas la balise.
+Mesuré sur l'export du 05/08/2026 : **68 747 icônes sur 68 747 objets**."""
+
 COMPACT_NAMES = "n"
 COMPACT_GRADE = "g"
+COMPACT_ICON = "i"
 """Clés du cache compact. Courtes parce que le fichier contient 68 000 entrées
 et qu'il est relu à chaque démarrage."""
 
@@ -211,8 +219,35 @@ def extract_grades(payload: bytes) -> dict[int, int]:
     return grades
 
 
+def extract_icons(payload: bytes) -> dict[int, str]:
+    """Extrait `identifiant -> chemin de l'image` d'un export brut.
+
+    Comme la rareté, l'image **ne dépend pas de la langue** : une seule des deux
+    langues téléchargées suffit à la relever.
+
+    Un objet sans image est simplement absent du résultat, pas présent avec une
+    chaîne vide : l'affichage sait se passer d'une icône, et prétendre en
+    connaître une qui n'existe pas ferait tenter un téléchargement voué à
+    échouer à chaque drop de cet objet.
+    """
+    icones: dict[int, str] = {}
+    for ligne in _rows(payload):
+        if not isinstance(ligne, list) or len(ligne) < 2:
+            continue
+        try:
+            item_id = int(ligne[0])
+        except (TypeError, ValueError):
+            continue
+        trouve = _ICON_RE.search(str(ligne[1]))
+        if trouve is not None:
+            icones[item_id] = trouve.group(1)
+    return icones
+
+
 def build_compact(
-    par_langue: dict[str, dict[int, str]], grades: dict[int, int] | None = None
+    par_langue: dict[str, dict[int, str]],
+    grades: dict[int, int] | None = None,
+    icones: dict[int, str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Fusionne les langues et les raretés en `identifiant -> {noms, rareté}`.
 
@@ -223,6 +258,7 @@ def build_compact(
     intermédiaire existe.
     """
     grades = grades or {}
+    icones = icones or {}
     compact: dict[str, dict[str, Any]] = {}
     for lang, noms in par_langue.items():
         for item_id, nom in noms.items():
@@ -232,6 +268,10 @@ def build_compact(
         connue = compact.get(str(item_id))
         if connue is not None:
             connue[COMPACT_GRADE] = grade
+    for item_id, icone in icones.items():
+        connue = compact.get(str(item_id))
+        if connue is not None:
+            connue[COMPACT_ICON] = icone
     return compact
 
 
@@ -239,32 +279,54 @@ def refresh(*, session: requests.Session | None = None) -> dict[str, dict[str, A
     """Télécharge les deux langues et écrit le cache compact."""
     par_langue: dict[str, dict[int, str]] = {}
     grades: dict[int, int] = {}
+    icones: dict[int, str] = {}
     for lang in LANGS:
         payload = download(lang, session=session)
         write_cache(payload, raw_path(lang))
         par_langue[lang] = extract(payload)
         if not grades:
-            # La rareté ne dépend pas de la langue : la relever une fois suffit.
+            # Ni la rareté ni l'image ne dépendent de la langue : les relever
+            # une fois suffit.
             grades = extract_grades(payload)
+            icones = extract_icons(payload)
 
-    compact = build_compact(par_langue, grades)
+    compact = build_compact(par_langue, grades, icones)
     write_cache(json.dumps(compact, ensure_ascii=False).encode("utf-8"), compact_path())
     _log.info("bdocodex : %d objets mis en cache", len(compact))
     return compact
 
 
-def _compact_valide(data: object) -> bool:
-    """Vrai si le cache est au format courant, noms sous leur clé.
+_ECHANTILLON_FORMAT = 50
+"""Entrées inspectées pour reconnaître le format du cache.
 
-    Un cache de la version précédente mettait les noms à la racine. Le
-    reconnaître explicitement vaut mieux que de le charger à moitié : les objets
-    s'afficheraient sans nom, ce qui ressemble à un défaut de catalogue alors
-    que c'est un format périmé qu'une reconstruction règle toute seule.
+Une seule ne suffit pas : depuis que l'image en fait partie, un objet exotique
+tombé en tête du fichier ferait reconstruire 70 Mo à **chaque lancement**. Un
+échantillon distingue « format d'avant, aucune image » de « format courant, une
+image manquante », qui est le cas normal.
+"""
+
+
+def _compact_valide(data: object) -> bool:
+    """Vrai si le cache est au format courant : noms, et images.
+
+    Un cache d'une version antérieure mettait les noms à la racine, puis n'avait
+    pas les images. Le reconnaître explicitement vaut mieux que de le charger à
+    moitié : les objets s'afficheraient sans nom ou sans image, ce qui ressemble
+    à un défaut de catalogue alors que c'est un format périmé qu'une
+    reconstruction depuis les exports bruts règle toute seule, sans réseau.
     """
     if not isinstance(data, dict) or len(data) < MIN_ITEMS:
         return False
-    premiere = next(iter(data.values()), None)
-    return isinstance(premiere, dict) and COMPACT_NAMES in premiere
+    echantillon = [
+        entree
+        for _, entree in zip(range(_ECHANTILLON_FORMAT), data.values(), strict=False)
+        if isinstance(entree, dict)
+    ]
+    if not echantillon:
+        return False
+    return all(COMPACT_NAMES in entree for entree in echantillon) and any(
+        COMPACT_ICON in entree for entree in echantillon
+    )
 
 
 def load(
@@ -292,11 +354,13 @@ def load(
         try:
             octets = {lang: chemin_brut.read_bytes() for lang, chemin_brut in bruts.items()}
             par_langue = {lang: extract(brut) for lang, brut in octets.items()}
-            grades = extract_grades(next(iter(octets.values())))
+            premier = next(iter(octets.values()))
+            grades = extract_grades(premier)
+            icones = extract_icons(premier)
         except (CatalogError, OSError, StopIteration) as exc:
             _log.warning("exports bruts bdocodex inexploitables (%s)", exc)
         else:
-            compact = build_compact(par_langue, grades)
+            compact = build_compact(par_langue, grades, icones)
             write_cache(json.dumps(compact, ensure_ascii=False).encode("utf-8"), compact_path())
             return compact
 
@@ -317,6 +381,7 @@ def to_catalog_payload(compact: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "id": int(item_id),
             "locale_name": entree.get(COMPACT_NAMES, {}),
             "grade": entree.get(COMPACT_GRADE, 0),
+            "icon": entree.get(COMPACT_ICON, ""),
         }
         for item_id, entree in compact.items()
     }

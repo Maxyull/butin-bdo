@@ -43,7 +43,8 @@ from typing import Any, Protocol
 from .. import paths
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
-from ..catalog import ItemCatalog, ItemMatcher
+from ..catalog import IconStore, ItemCatalog, ItemMatcher
+from ..catalog.icons import TYPES_MIME
 from ..market import PriceBook
 from ..store import SessionStore, Settings, compute
 
@@ -89,6 +90,7 @@ class AppState:
         catalog: ItemCatalog | None = None,
         worker: CaptureWorker | None = None,
         overlay: OverlayWindow | None = None,
+        icons: IconStore | None = None,
     ) -> None:
         self.store = store
         self.book = book
@@ -106,6 +108,10 @@ class AppState:
         self.catalog = catalog
         """Sert à nommer les objets. C'est tout l'objet du sélecteur de langue :
         sans lui, il ne changerait rien de visible."""
+        self.icons = icons if icons is not None else IconStore()
+        """Images des objets. Toujours présent, parce qu'il ne fait jamais
+        échouer quoi que ce soit : sans réseau il rend simplement None, et la
+        page se passe de l'image."""
         self.lock = threading.Lock()
         self.settings = Settings.load()
         """Langue, région et profil de taxe, relus au lancement.
@@ -215,6 +221,38 @@ class AppState:
             "derniers": self._recent_rows(session_id, maintenant, langue),
             "capture": capture,
         }
+
+    def icon(self, item_id: int) -> Path | None:
+        """Image de l'objet sur le disque, téléchargée au besoin, ou None.
+
+        Le chemin distant vient du catalogue. Sans catalogue on ne peut que
+        servir ce qui est déjà là : c'est le cas d'une machine sans réseau, où
+        la page doit rester consultable.
+        """
+        item = self.catalog.get(item_id) if self.catalog is not None else None
+        return self.icons.get(item_id, item.icon if item is not None else "")
+
+    def preload_icons(self) -> int:
+        """Télécharge d'avance les images du butin connu.
+
+        ⚠️ À appeler dans un fil de fond. C'est quelques centaines d'allers-
+        retours réseau : les faire au premier plan retarderait l'ouverture de la
+        fenêtre d'autant, pour un gain purement cosmétique.
+
+        Le butin connu et pas le catalogue entier : 362 objets contre 68 747.
+        Ce sont ceux qui tombent réellement, donc ceux dont le récap aura besoin
+        pendant le farm. Tout autre objet est téléchargé au moment où il tombe.
+        """
+        if self.catalog is None:
+            return 0
+        from ..catalog.zones import known_loot_ids
+
+        entrees = {}
+        for item_id in known_loot_ids():
+            item = self.catalog.get(item_id)
+            if item is not None and item.icon:
+                entrees[item_id] = item.icon
+        return self.icons.preload(entrees)
 
     def history(self, *, limit: int = 30) -> list[dict[str, Any]]:
         """Les sessions passées, avec ce qu'elles ont rapporté.
@@ -562,6 +600,33 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_json(detail)
 
+    def _send_icon(self, brut: str) -> None:
+        """Sert l'image d'un objet, en la téléchargeant si on ne l'a pas encore.
+
+        404 quand il n'y en a pas, et c'est suffisant : la page cache une image
+        qui ne charge pas. Une icône manquante est cosmétique, elle ne doit ni
+        signaler une panne ni interrompre l'affichage du drop.
+        """
+        try:
+            item_id = int(brut)
+        except ValueError:
+            self._send_json({"erreur": "identifiant d'objet invalide"}, status=400)
+            return
+        chemin = self.state.icon(item_id)
+        if chemin is None:
+            self._send_json({"erreur": "pas d'image pour cet objet"}, status=404)
+            return
+        corps = chemin.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", TYPES_MIME.get(chemin.suffix, "application/octet-stream"))
+        self.send_header("Content-Length", str(len(corps)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        # Une image d'objet ne change pas d'un patch à l'autre, et la page en
+        # redemande une par ligne à chaque rafraîchissement, donc chaque seconde.
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(corps)
+
     def _send_file(self, name: str) -> None:
         chemin = (STATIC / name).resolve()
         # Garde-fou de traversée : sans lui, une requête « /../../secrets » se
@@ -604,6 +669,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"sessions": self.state.history()})
         elif self.path.startswith("/api/historique/"):
             self._send_detail(self.path.removeprefix("/api/historique/"))
+        elif self.path.startswith("/icone/"):
+            self._send_icon(self.path.removeprefix("/icone/"))
         else:
             self._send_json({"erreur": "introuvable"}, status=404)
 

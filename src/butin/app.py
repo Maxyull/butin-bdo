@@ -161,6 +161,12 @@ def run(
 
     fil = threading.Thread(target=serveur.serve_forever, daemon=True, name="butin-ui")
     fil.start()
+
+    # ⚠️ Dans un fil de fond, et jamais devant. Précharger les images du butin
+    # connu, ce sont quelques centaines d'allers-retours réseau : les faire ici
+    # retarderait l'ouverture de la fenêtre d'autant, pour un gain purement
+    # cosmétique. Le fil est démon, donc il ne retient jamais la fermeture.
+    threading.Thread(target=state.preload_icons, daemon=True, name="butin-icones").start()
     try:
         (window or _open_window)(adresse)
     finally:
