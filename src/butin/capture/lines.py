@@ -47,7 +47,72 @@ from ..tracking.models import ObservedLine
 
 # Heure de fin de ligne. Le « h » est accepté en plus du deux-points parce que
 # l'OCR confond régulièrement les deux sur cette police.
-_STAMP_RE = re.compile(r"\(\s*(\d{1,2}\s*[:h.]\s*\d{2})\s*\)\s*$")
+#
+# ⚠️ Les parenthèses PLEINE LARGEUR « （ » et « ） » sont acceptées, et ce n'est
+# pas de la coquetterie : mesuré sur 13 646 lignes d'une vraie session, 7,6 %
+# des heures étaient perdues pour cette seule raison. rapidocr rend
+# régulièrement « x2,243（16:40) », avec une parenthèse ouvrante pleine largeur
+# et une fermante normale. Or ces lignes-là sont précisément les plus vieilles
+# de la fenêtre, donc celles qu'on veut pouvoir refuser.
+_STAMP_RE = re.compile(r"[(（]\s*(\d{1,2}\s*[:h.]\s*\d{2})\s*[)）]\s*$")
+
+MINUTES_PAR_JOUR = 24 * 60
+
+HORIZON_MIN = 12 * 60
+"""Au-delà de combien d'avance une heure est comprise comme du retard.
+
+L'heure du jeu n'a ni date ni seconde : « 00:05 » pendant une session ouverte à
+23:58 est le lendemain, pas dix-huit heures plus tôt. On raisonne donc en écart
+circulaire sur la journée, et un écart de plus de douze heures « en avant » est
+lu comme du passé.
+
+⚠️ La conséquence est qu'une session de plus de douze heures verrait son propre
+butin passer pour périmé. Aucune session de farm ne dure ça, et le jour où
+quelqu'un le fait, l'erreur va dans le sens de rater plutôt que d'inventer.
+"""
+
+
+def stamp_minutes(stamp: str) -> int | None:
+    """Heure d'une ligne en minutes depuis minuit, ou None si illisible.
+
+    Illisible et non zéro : minuit est une heure valide, et les confondre
+    ferait passer tout un journal pour périmé.
+    """
+    if not stamp:
+        return None
+    heure, _, minute = stamp.partition(":")
+    try:
+        h, m = int(heure), int(minute)
+    except ValueError:
+        return None
+    if not (0 <= h < 24 and 0 <= m < 60):
+        return None
+    return h * 60 + m
+
+
+def is_stale(stamp: str, session_start_min: int) -> bool:
+    """Vrai si la ligne date d'AVANT le début de la session.
+
+    ⭐ C'est ce qui empêche de compter le journal déjà à l'écran au démarrage.
+    Mesuré sur une vraie session : le chat contenait 39 minutes de butin
+    antérieur, et le compteur en créditait une partie, c'est-à-dire inventait
+    des drops. Voir la section 4septies du CLAUDE.md.
+
+    Une heure illisible n'est PAS périmée : la refuser perdrait de vrais drops
+    sur toute la durée de la session, alors que le journal périmé, lui, ne pose
+    problème qu'au démarrage. Rater vaut mieux qu'inventer, mais pas au point de
+    rater ce dont on ne sait rien.
+
+    ⚠️ L'heure n'a pas de secondes. Une session ouverte à 17:19:35 ne peut donc
+    pas distinguer une ligne de 17:19 déjà là d'une ligne de 17:19 qui vient de
+    tomber, et garde les deux. Il reste au pire une minute d'historique, contre
+    trente-neuf sans ce filtre.
+    """
+    minutes = stamp_minutes(stamp)
+    if minutes is None:
+        return False
+    return (minutes - session_start_min) % MINUTES_PAR_JOUR > HORIZON_MIN
+
 
 # Marqueur de quantité. Accepte la croix de multiplication typographique et
 # l'astérisque, deux lectures fréquentes du « x » sur fond clair.

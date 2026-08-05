@@ -163,6 +163,20 @@ dans [docs/versionnage.md](docs/versionnage.md).
 
 ### Corrigé
 
+- ⭐⭐ **Le compteur créditait le journal DÉJÀ À L'ÉCRAN au démarrage**, donc il
+  **inventait des drops** — l'erreur que ce projet refuse avant toute autre.
+  Trouvé au premier vrai farm, le 05/08/2026, et prouvé sur 600 images de
+  Thornwood Forest : le chat était estompé au lancement, l'amorce s'est faite
+  sur une lecture partielle de 4 lignes, et les lectures suivantes n'avaient
+  donc plus aucun recouvrement avec elle. Les 23 lignes déjà affichées, datées
+  de 16:40 à 17:14 pour une session ouverte à 17:19, sont passées pour neuves :
+  **cinq objets que le joueur n'avait jamais ramassés**. Le jeu horodate chaque
+  ligne, et cette heure était lue sans être utilisée ; elle sert désormais à
+  refuser ce qui date d'avant la session. Mesuré sur la même rafale : de 104
+  drops et 305 unités à 96 et 253, **zéro objet fantôme**. ⚠️ L'heure n'ayant
+  pas de secondes, il reste au pire une minute d'historique, contre
+  trente-neuf. Au passage, 7,6 % des heures étaient perdues sur une parenthèse
+  pleine largeur rendue par la reconnaissance ; elle est acceptée.
 - ⭐ **La fenêtre principale ne réagissait plus à rien.** Une vraie fin de ligne
   s'était glissée dans une chaîne de caractères du script de la page, ce qui est
   une erreur de syntaxe et fait tomber le bloc entier : plus de

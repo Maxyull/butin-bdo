@@ -15,9 +15,11 @@ import pytest
 from butin.capture.lines import (
     DEFAULT_FORMAT,
     ChatLineFormat,
+    is_stale,
     parse_frame,
     parse_line,
     split_line,
+    stamp_minutes,
 )
 from butin.catalog import ItemCatalog, ItemMatcher
 
@@ -183,6 +185,100 @@ class TestHeure:
         parts = split_line("Système Vous avez obtenu : [Pain moelleux].")
         assert parts is not None
         assert parts.stamp == ""
+
+
+class TestHeurePleineLargeur:
+    """⭐ Régression mesurée : 7,6 % des heures étaient perdues pour une parenthèse.
+
+    Sur 13 646 lignes d'une vraie session de Thornwood Forest, rapidocr rend
+    régulièrement une parenthèse ouvrante PLEINE LARGEUR : « x2,243（16:40) ».
+    L'expression régulière n'acceptait que la parenthèse normale, et ces
+    lignes-là ressortaient sans heure. Or ce sont précisément les plus vieilles
+    de la fenêtre, donc celles qu'on veut pouvoir refuser.
+    """
+
+    @pytest.mark.parametrize(
+        "brut",
+        [
+            "Systeme Vous avez obtenu:[Pieces]x2,243（16:40)",
+            "Systeme Vous avez obtenu:[Pieces]x2,243（16:40）",
+            "Système Vous avez obtenu : [Pièces] x2,243 (16:40)",
+        ],
+    )
+    def test_l_heure_est_lue_quelle_que_soit_la_parenthese(self, brut: str) -> None:
+        parts = split_line(brut)
+
+        assert parts is not None
+        assert parts.stamp == "16:40"
+
+
+class TestJournalPerime:
+    """⭐ Ce qui empêche de compter le journal DÉJÀ À L'ÉCRAN au démarrage.
+
+    Le cas réel, mesuré le 05/08/2026 : à l'ouverture d'une session à 17:19, le
+    chat affichait 39 minutes de butin antérieur, daté de 16:40 à 17:14. Le
+    compteur en a crédité une partie, c'est-à-dire **inventé des drops**, ce que
+    le principe du projet refuse avant tout le reste.
+
+    Le jeu horodate chaque ligne : il n'y a aucune incertitude à trancher ici,
+    la réponse est écrite dans le journal.
+    """
+
+    DEPART = 17 * 60 + 19  # session ouverte à 17:19
+
+    def test_les_minutes_sont_lues(self) -> None:
+        assert stamp_minutes("17:19") == 17 * 60 + 19
+        assert stamp_minutes("00:00") == 0
+        assert stamp_minutes("23:59") == 23 * 60 + 59
+
+    def test_une_heure_illisible_n_est_pas_minuit(self) -> None:
+        """Régression : confondre les deux ferait passer tout un journal pour
+        périmé, puisque minuit est la plus petite heure possible."""
+        assert stamp_minutes("") is None
+        assert stamp_minutes("xx:yy") is None
+        assert stamp_minutes("25:00") is None
+        assert stamp_minutes("17:99") is None
+
+    @pytest.mark.parametrize("heure", ["16:40", "16:41", "17:07", "17:10", "17:13", "17:14"])
+    def test_les_heures_reellement_perimees_sont_refusees(self, heure: str) -> None:
+        """Les six heures réellement présentes dans le journal périmé de la
+        session mesurée, relevées sur la transcription."""
+        assert is_stale(heure, self.DEPART) is True
+
+    @pytest.mark.parametrize("heure", ["17:19", "17:20", "17:21"])
+    def test_les_heures_du_farm_sont_gardees(self, heure: str) -> None:
+        """Les trois heures du vrai farm, dans la même session."""
+        assert is_stale(heure, self.DEPART) is False
+
+    def test_la_minute_de_depart_est_gardee(self) -> None:
+        """⚠️ Limite assumée : l'heure n'a pas de secondes.
+
+        Une session ouverte à 17:19:35 ne peut pas distinguer une ligne de
+        17:19 déjà affichée d'une ligne de 17:19 qui vient de tomber. On garde
+        les deux, donc il reste au pire une minute d'historique. Refuser la
+        minute entière perdrait de vrais drops à chaque démarrage.
+        """
+        assert is_stale("17:19", self.DEPART) is False
+
+    def test_une_heure_illisible_est_gardee(self) -> None:
+        """Rater vaut mieux qu'inventer, mais pas au point de rater ce dont on
+        ne sait rien : le journal périmé ne pose problème qu'au démarrage, une
+        heure illisible peut arriver pendant toute la session."""
+        assert is_stale("", self.DEPART) is False
+
+    def test_minuit_ne_perime_pas_la_session(self) -> None:
+        """⭐ Régression : une session commencée avant minuit.
+
+        Ouverte à 23:58, une ligne de 00:05 est le lendemain, pas dix-huit
+        heures plus tôt. Une comparaison naïve la refuserait, et le compteur
+        s'arrêterait de compter au passage de minuit.
+        """
+        avant_minuit = 23 * 60 + 58
+
+        assert is_stale("00:05", avant_minuit) is False
+        assert is_stale("23:59", avant_minuit) is False
+        assert is_stale("23:57", avant_minuit) is True
+        assert is_stale("18:00", avant_minuit) is True
 
 
 class TestFiltrage:
