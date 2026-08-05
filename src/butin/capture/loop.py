@@ -3,8 +3,11 @@
 Pourquoi découpler
 ------------------
 
-Mesuré : la reconnaissance de texte coûte **336 ms par image**, alors que la
-capture et la mesure de défilement en coûtent moins de dix à elles deux. Faire
+Mesuré : la reconnaissance de texte coûte **336 ms par image** sur une zone de
+520 x 385, et **1 100 ms** sur une zone de 780 x 575 (banc du 05/08/2026), alors
+que la capture et la mesure de défilement en coûtent moins de dix à elles deux.
+Le coût suit la surface, donc `ocr_min_interval_s` ci-dessous promet une cadence
+que la machine ne tient pas dès que la zone du chat est grande. Faire
 tourner toute la chaîne au rythme de l'OCR reviendrait à mesurer le défilement
 trois fois moins souvent que nécessaire, pour rien.
 
@@ -19,24 +22,30 @@ Le défilement accumulé entre deux passages d'OCR est exactement ce que
 pas seulement moins coûteux, il rend la prédiction **plus fine** : un défilement
 rapide qui aurait été vu d'un bloc à 350 ms est vu en trois mesures à 100 ms.
 
-La règle de mesure : les pastilles de canal
--------------------------------------------
+⛔ La règle de mesure retenue ici ne fonctionne pas
+---------------------------------------------------
 
-Le fond du journal est **transparent sur le monde du jeu**. Mesurer le
-défilement sur la zone entière reviendrait donc à mesurer surtout le décor qui
-bouge, pas le texte qui défile.
+📕 `docs/banc-essai.md`, partie 4 B. Le banc l'a mesuré le 05/08/2026 sur 300
+images de vrai farm : **zéro détection de défilement sûre sur 299 transitions**,
+et la colonne des pastilles est la **pire** des quatre bandes testées, avec 0
+décalage juste sur 20 alors que 92 lignes sont réellement passées.
 
-Les pastilles de canal (`Système`, `Général`) sont la solution : elles sont
-**opaques**, contrastées, et elles défilent exactement avec les lignes. Mesuré
-sur de vraies captures, entre deux images :
+La raison est structurelle : les pastilles `Système` sont toutes identiques et
+espacées de 21 px. Un défilement d'exactement une ligne superpose la pastille
+`n` sur la pastille `n+1`, donc ne change rien. C'est précisément la colonne qui
+ne peut pas voir ce qu'on lui demande de voir.
 
-| Zone mesurée | Écart entre deux images | Contraste interne |
-| --- | --- | --- |
-| chat entier | 11,3 | 35,2 |
-| colonne des pastilles | **3,9** | 37,5 |
+Le chiffre de 3,9 contre 11,3 qui l'avait fait retenir comparait deux captures
+de scènes **différentes** : il mesurait le bruit du décor, pas un défilement.
 
-Trois fois moins de bruit pour un contraste équivalent. C'est cette colonne, et
-elle seule, qui sert de règle.
+Conséquence, et elle est lourde : `expected_new` vaut toujours `None`,
+l'alignement travaille sur le texte seul, et surtout `_should_read` retombe en
+permanence sur son minuteur de repli. La boucle ne lit alors que **15 images sur
+300**, là où le seul coût de l'OCR en autoriserait 27.
+
+Le code est laissé tel quel, sans réglage bricolé : trouver où mesurer le
+défilement est le même problème que le calibrage de la zone, et les deux se
+tranchent ensemble.
 
 ⚠️ Le garde-fou de stabilité n'est PAS utilisé pour conditionner l'OCR, et c'est
 délibéré. Il a été écrit pour un fond fixe, où l'immobilité signifie que

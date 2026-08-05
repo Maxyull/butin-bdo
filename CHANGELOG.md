@@ -60,6 +60,14 @@ dans [docs/versionnage.md](docs/versionnage.md).
   y sont signalés explicitement plutôt que noyés dans le total.
 - **Interface en ligne de commande** minimale : état du catalogue et test de
   reconnaissance d'un nom.
+- **Banc d'essai sur données réelles** (`butin.bench`, `scripts/banc_essai.py`).
+  Il rejoue la vraie boucle sur une rafale de captures et dit **de combien le
+  compteur se trompe**, ce qui est la condition pour publier quoi que ce soit.
+  Sa règle de conception : aucun des nombres qu'il produit ne sert de vérité aux
+  autres. Le compteur est comparé à un recalage du texte qui ignore les pixels,
+  le score flou et les garde-fous, lui-même corroboré par un comptage des
+  montants de silver qui n'utilise aucune notion de position. Résultat mesuré et
+  causes détaillées dans [docs/banc-essai.md](docs/banc-essai.md).
 
 - **Base de butin français** (`data/butin-connu.json`) : 362 objets avec leur
   nom anglais, leur nom français, leur valeur en silver par niveau
@@ -107,13 +115,25 @@ dans [docs/versionnage.md](docs/versionnage.md).
   [docs/couverture-du-catalogue.md](docs/couverture-du-catalogue.md).
 - veliainn est périmé d'au moins une mise à jour du jeu sur les **noms**. Il
   n'est plus une source de noms, seulement de prix.
-- La reconnaissance de texte coûte 336 ms par image. **Tranché par le
-  découplage** : la boucle rapide tourne quand même à 100 ms.
+- ⛔ **Le compteur perd 74,5 % des drops et sur-compte le silver de 32,5 %.**
+  Mesuré par le banc d'essai sur 30 secondes de farm réel : 12 drops
+  enregistrés sur 47, et 123 409 silver comptés pour 93 161 réels. **Rien ne
+  peut être publié en l'état.** Les quatre causes sont identifiées, chiffrées et
+  aucune n'est dans l'anti-double-comptage lui-même :
+  [docs/banc-essai.md](docs/banc-essai.md).
+- La reconnaissance de texte coûte 336 ms par image sur une zone de 520 x 385,
+  et **1 100 ms** sur une zone de 780 x 575. Le découplage de la boucle absorbe
+  le premier chiffre, pas le second.
 - Le garde-fou de stabilité est **inutilisable en l'état**. Il suppose un fond
   fixe, alors que le journal est transparent sur un monde qui bouge en
   permanence. La défense contre une lecture prise en pleine animation repose
   donc entièrement sur le vote multi-images.
-- La colonne de pastilles servant de règle de mesure est validée sur deux
-  captures de scènes différentes, pas encore sur deux images consécutives d'un
-  journal qui défile vraiment.
+- ⛔ **La colonne de pastilles servant de règle de mesure ne fonctionne pas.**
+  Vérifiée enfin sur un vrai défilement : zéro détection sûre sur 299
+  transitions, et c'est la pire des quatre bandes testées. Les pastilles sont
+  identiques et espacées de 21 px, donc un défilement d'une ligne les superpose
+  et ne change rien. Le chiffre qui l'avait fait retenir comparait deux scènes
+  différentes.
+- L'alignement rejette une image entière dès qu'**une seule** ligne du
+  recouvrement passe sous le seuil. Mesuré : 8 lectures écartées sur 15.
 - Aucune interface, et aucun calibrage automatique de la zone.
