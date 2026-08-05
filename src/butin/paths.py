@@ -64,3 +64,15 @@ def catalog_path() -> Path:
 def database_path() -> Path:
     """Base SQLite des sessions de farm."""
     return data_dir() / "sessions.sqlite3"
+
+
+def calibration_path() -> Path:
+    """Fichier de calibrage de la zone du chat.
+
+    Dans les données et non dans le cache, bien qu'il soit reconstructible en
+    une commande : il décrit l'écran et la disposition d'interface de la
+    personne, pas quelque chose qu'on retélécharge. Le supprimer oblige à
+    relancer le calibrage devant le jeu, ce qui n'est pas la même chose que
+    perdre un fichier qui se répare tout seul.
+    """
+    return data_dir() / "calibrage.json"

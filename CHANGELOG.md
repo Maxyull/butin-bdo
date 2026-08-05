@@ -58,8 +58,17 @@ dans [docs/versionnage.md](docs/versionnage.md).
   Servie par la bibliothèque standard, sur la boucle locale uniquement, sans
   aucune dépendance ajoutée. Les objets sans valeur connue et les prix périmés
   y sont signalés explicitement plutôt que noyés dans le total.
-- **Interface en ligne de commande** minimale : état du catalogue et test de
-  reconnaissance d'un nom.
+- **Interface en ligne de commande** minimale : état du catalogue, test de
+  reconnaissance d'un nom, et calibrage de la zone.
+- **Calibrage automatique de la fenêtre de chat** (`butin calibrer`). Trouve
+  seul où lire le journal, le pas vertical entre deux lignes, et la bande où
+  mesurer le défilement, en cherchant la colonne de l'image qui **ressemble le
+  plus à elle-même décalée d'un cran** : les pastilles de canal sont toutes
+  identiques et espacées d'exactement un pas de ligne. Mesuré sur 12 captures
+  d'écran réelles, **12 sur 12** : les trois où le chat est lisible sont
+  trouvées et rendent leurs 16 lignes de gain entières, les neuf où il est
+  masqué sont refusées avec un message explicite.
+  [docs/calibrage.md](docs/calibrage.md).
 - **Banc d'essai sur données réelles** (`butin.bench`, `scripts/banc_essai.py`).
   Il rejoue la vraie boucle sur une rafale de captures et dit **de combien le
   compteur se trompe**, ce qui est la condition pour publier quoi que ce soit.
@@ -172,9 +181,12 @@ dans [docs/versionnage.md](docs/versionnage.md).
   fixe, alors que le journal est transparent sur un monde qui bouge en
   permanence. La défense contre une lecture prise en pleine animation repose
   donc entièrement sur le vote multi-images.
-- Aucune interface, et aucun calibrage automatique de la zone. Les bandes de
-  mesure et le pas vertical de 21,6 px sont relevés sur une seule configuration
-  d'écran, ce qui reste le vrai obstacle à un usage par quelqu'un d'autre.
+- Aucune interface graphique. **Le calibrage de la zone, lui, est fait**, mais
+  n'a été vérifié que sur une seule résolution et une seule échelle
+  d'interface : rien dans l'algorithme n'en dépend, tout y est mesuré plutôt que
+  fixé, mais ce n'est pas la même chose que l'avoir vérifié.
+- Le calibrage ne suit pas un déplacement de la fenêtre de chat en cours de
+  session. La bouger en jeu demande de relancer `butin calibrer`.
 - La reconnaissance n'est lancée que 22 fois sur 300 images, faute de pouvoir
   aller plus vite. Sans conséquence sur la rafale mesurée, mais sans marge non
   plus si un journal défilait deux fois plus vite.
