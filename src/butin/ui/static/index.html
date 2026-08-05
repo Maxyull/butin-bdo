@@ -601,6 +601,16 @@ $("bouton-session").addEventListener("click", async () => {
     return;
   }
   afficher(corps);
+
+  // ⭐ Arrêter emmène sur la session qu'on vient de finir. Sans ça, l'écran se
+  // vide d'un coup : les quatre chiffres retombent à zéro et le tableau du
+  // butin se vide, parce qu'il n'y a plus de session en cours. Du point de vue
+  // de quelqu'un qui vient de farmer deux minutes, tout ce qu'il a ramassé
+  // vient de disparaître, et rien ne dit que c'est enregistré ailleurs.
+  if (enCours && etat.session) {
+    basculer("historique");
+    await ouvrirSessionParId(etat.session.id);
+  }
 });
 
 $("bouton-calibrer").addEventListener("click", async () => {
@@ -748,9 +758,21 @@ async function chargerHistorique() {
       tr.appendChild(td);
     });
     if (session.en_cours) tr.firstChild.classList.add("en-cours");
+    // L'identifiant est porté par la ligne pour qu'on puisse la retrouver sans
+    // la position : après un arrêt, on veut ouvrir CETTE session-là.
+    tr.dataset.session = String(session.id);
     tr.addEventListener("click", () => ouvrirSession(session.id, corps, tr));
     corps.appendChild(tr);
   }
+}
+
+async function ouvrirSessionParId(id) {
+  // Recharger d'abord : la session qu'on vient de fermer n'est pas encore dans
+  // le tableau, qui n'est rafraîchi qu'à l'ouverture de l'onglet.
+  await chargerHistorique();
+  const corps = $("sessions");
+  const ligne = corps.querySelector('tr[data-session="' + id + '"]');
+  if (ligne) await ouvrirSession(id, corps, ligne);
 }
 
 async function ouvrirSession(id, corps, ligne) {

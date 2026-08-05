@@ -63,6 +63,11 @@ dans [docs/versionnage.md](docs/versionnage.md).
   saisir : le joueur sait s'il a un abonnement, il ne sait pas forcément que ça
   fait 84,5 %. Les réglages (langue, région, profil de taxe) sont désormais
   écrits dans `reglages.json`, à côté du calibrage.
+- **Arrêter une session emmène sur cette session.** L'écran du farm en cours
+  retombait à zéro dès l'arrêt, faute de session en cours : les quatre chiffres
+  et le tableau du butin se vidaient d'un coup, sans rien dire que tout était
+  enregistré dans l'onglet Historique. Du point de vue de quelqu'un qui vient de
+  farmer deux minutes, ce qu'il a ramassé venait de disparaître.
 - **L'image de chaque objet dans le récap**, à côté de son nom et de sa quantité
   totale. Un joueur reconnaît son butin à l'image avant d'avoir lu le nom,
   exactement comme il le reconnaît à la couleur de rareté. Le chemin de l'image
