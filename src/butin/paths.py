@@ -193,6 +193,17 @@ def database_path() -> Path:
     return data_dir() / "sessions.sqlite3"
 
 
+def settings_path() -> Path:
+    """Fichier des réglages de l'utilisateur (langue, région, profil de taxe).
+
+    Dans les données et non dans le cache : le profil de taxe décrit **son
+    compte** de jeu, ce qui ne se retélécharge pas. Il suit donc le dossier de
+    sessions s'il le déplace, comme le calibrage, plutôt que de rester derrière
+    dans les données d'application.
+    """
+    return data_dir() / "reglages.json"
+
+
 def calibration_path() -> Path:
     """Fichier de calibrage de la zone du chat.
 

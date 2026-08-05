@@ -21,7 +21,7 @@ from butin.capture.calibrate import Calibration
 from butin.capture.screen import Region
 from butin.capture.worker import CaptureStatus, CaptureUnavailable
 from butin.catalog import ItemCatalog
-from butin.market import PriceBook, PriceCache
+from butin.market import Price, PriceBook, PriceCache, PriceSource
 from butin.store import LootRow, SessionStore
 from butin.ui.server import HOST, AppState, build_server
 
@@ -156,6 +156,116 @@ class TestSliders:
         for absurde in (0, -1, 2.5):
             etat = post(base, "/api/reglages", {"taux_marche": absurde})
             assert etat["reglages"]["taux_marche"] != absurde
+
+
+class TestProfilDeTaxe:
+    """Le taux de taxe se règle enfin, et il tient.
+
+    C'est le seul réglage qui multiplie tout le reste : il s'applique à chaque
+    objet vendable de chaque session. Le laisser au défaut sous-estime de 23 %
+    le butin de quelqu'un qui a un abonnement, et rien à l'écran ne distingue
+    ça d'un farm pauvre.
+    """
+
+    def test_le_profil_est_dans_l_etat(self, app) -> None:
+        _, base = app
+        reglages = get(base, "/api/etat")["reglages"]
+
+        assert reglages["taxe"] == {
+            "abonnement": False,
+            "anneau_marchand": False,
+            "renommee": 0,
+        }
+        assert reglages["taux_marche"] == pytest.approx(0.65)
+
+    def test_cocher_l_abonnement_change_le_taux(self, app) -> None:
+        _, base = app
+        etat = post(base, "/api/reglages", {"taxe": {"abonnement": True}})
+
+        assert etat["reglages"]["taxe"]["abonnement"] is True
+        assert etat["reglages"]["taux_marche"] == pytest.approx(0.845)
+
+    def test_le_profil_reel_de_maxime(self, app) -> None:
+        """Le point de mesure qui valide toute la chaîne, de la page au calcul.
+
+        Relevé sur le calculateur de garmoth le 05/08/2026 : abonnement oui,
+        anneau non, renommée familiale 11952, taux affiché **85,47 %**.
+        """
+        _, base = app
+        etat = post(
+            base,
+            "/api/reglages",
+            {"taxe": {"abonnement": True, "anneau_marchand": False, "renommee": 11952}},
+        )
+
+        assert etat["reglages"]["taux_marche"] == pytest.approx(0.8547, abs=0.0001)
+
+    def test_le_taux_ne_se_regle_pas_a_la_main(self, app) -> None:
+        """Régression : deux façons de régler la même chose est un réglage qui ment.
+
+        L'API acceptait `taux_marche` en écriture. Avec les cases à cocher, la
+        prochaine case cliquée recalculerait le taux et écraserait sans rien
+        dire le pourcentage saisi à la main. Le taux est donc rendu, jamais reçu.
+        """
+        _, base = app
+        etat = post(base, "/api/reglages", {"taux_marche": 0.9})
+
+        assert etat["reglages"]["taux_marche"] == pytest.approx(0.65)
+
+    def test_le_profil_change_le_total_de_la_session(self, app) -> None:
+        """Le réglage n'est pas décoratif : il change le chiffre affiché.
+
+        Un million de silver de prix affiché, avec un abonnement : 845 000 dans
+        la poche, pas 650 000.
+        """
+        state, base = app
+        state.book.cache.put(
+            Price(item_id=16001, value=1_000_000, source=PriceSource.MARKET, fetched_at=1000.0)
+        )
+        session_id = state.start("Gyfin", now=1000.0)
+        state.store.add_loot(session_id, [LootRow(item_id=16001, qty=1, at=1001.0)])
+
+        avant = state.snapshot(now=1100.0)["stats"]["net_marche"]
+        post(base, "/api/reglages", {"taxe": {"abonnement": True}})
+        apres = state.snapshot(now=1100.0)["stats"]["net_marche"]
+
+        assert avant == 650_000
+        assert apres == 845_000
+
+    def test_le_profil_survit_au_relancement(self, app) -> None:
+        """Régression : le réglage ne vivait que dans la mémoire du serveur.
+
+        Le cas réel : on coche « abonnement », on ferme l'application, on la
+        rouvre, et elle est revenue à 0,65 sans le dire. Un réglage qu'il faut
+        ressaisir à chaque lancement est un réglage silencieusement faux la
+        plupart du temps.
+        """
+        state, base = app
+        post(base, "/api/reglages", {"taxe": {"abonnement": True, "renommee": 11952}})
+
+        # Un second AppState sur le même dossier : c'est ce que fait le
+        # prochain lancement de l'application.
+        rallume = AppState(state.store, state.book)
+
+        assert rallume.settings.market_rate == pytest.approx(0.8547, abs=0.0001)
+
+    def test_une_renommee_invalide_ne_perd_pas_l_abonnement(self, app) -> None:
+        """Régression : rejeter le lot entier pour un champ ferait perdre un
+        réglage juste à cause d'un réglage faux."""
+        _, base = app
+        etat = post(base, "/api/reglages", {"taxe": {"abonnement": True, "renommee": "beaucoup"}})
+
+        assert etat["reglages"]["taxe"]["abonnement"] is True
+        assert etat["reglages"]["taxe"]["renommee"] == 0
+
+    def test_les_champs_de_la_taxe_sont_dans_la_page(self, app) -> None:
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        assert 'id="abonnement"' in corps
+        assert 'id="anneau-marchand"' in corps
+        assert 'id="renommee"' in corps
 
 
 class TestSession:

@@ -44,9 +44,8 @@ from .. import paths
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import ItemCatalog, ItemMatcher
-from ..market import PriceBook, Region
-from ..store import SessionStore, compute
-from ..store.stats import MARKET_RATE_BASE
+from ..market import PriceBook
+from ..store import SessionStore, Settings, compute
 
 _log = logging.getLogger(__name__)
 
@@ -108,24 +107,45 @@ class AppState:
         """Sert à nommer les objets. C'est tout l'objet du sélecteur de langue :
         sans lui, il ne changerait rien de visible."""
         self.lock = threading.Lock()
-        self.language = "fr"
-        self.region = Region.EU
-        self.market_rate = MARKET_RATE_BASE
+        self.settings = Settings.load()
+        """Langue, région et profil de taxe, relus au lancement.
+
+        ⚠️ Relus et non repartis du défaut : le taux de taxe est une propriété
+        du compte du joueur, et le défaut sous-estime de 23 % ce que touche
+        quelqu'un qui a un abonnement. Une erreur systématique, invisible à
+        l'écran, et qui ressemble à un farm pauvre.
+        """
         self.session_id: int | None = None
 
     # -- lecture ---------------------------------------------------------
+
+    def _settings_dict(self) -> dict[str, Any]:
+        """Les réglages tels que la page les lit. À appeler sous verrou.
+
+        ⚠️ `taux_marche` est **rendu et jamais reçu** : il se déduit des trois
+        cases du profil de taxe. Pouvoir écrire les deux ferait un réglage qui
+        ment, la prochaine case cochée écrasant le taux saisi à la main sans
+        rien dire.
+        """
+        taxe = self.settings.tax
+        return {
+            "langue": self.settings.language,
+            "region": self.settings.region.value,
+            "taux_marche": self.settings.market_rate,
+            "taxe": {
+                "abonnement": taxe.value_pack,
+                "anneau_marchand": taxe.merchant_ring,
+                "renommee": taxe.family_fame,
+            },
+        }
 
     def snapshot(self, *, now: float | None = None) -> dict[str, Any]:
         maintenant = time.time() if now is None else now
         with self.lock:
             session_id = self.session_id
-            reglages = {
-                "langue": self.language,
-                "region": self.region.value,
-                "taux_marche": self.market_rate,
-            }
-            taux = self.market_rate
-            langue = self.language
+            reglages = self._settings_dict()
+            taux = self.settings.market_rate
+            langue = self.settings.language
 
         capture = self.worker.status().to_dict() if self.worker is not None else None
         # L'état du calibrage se lit à chaque rafraîchissement plutôt que d'être
@@ -206,7 +226,7 @@ class AppState:
         """
         maintenant = time.time()
         with self.lock:
-            taux, langue = self.market_rate, self.language
+            taux, langue = self.settings.market_rate, self.settings.language
 
         lignes: list[dict[str, Any]] = []
         for session in self.store.sessions(limit=limit):
@@ -248,7 +268,7 @@ class AppState:
             return None
         maintenant = time.time()
         with self.lock:
-            langue = self.language
+            langue = self.settings.language
         quantites = self.store.quantities(session_id)
         return {
             "id": session.id,
@@ -327,19 +347,36 @@ class AppState:
     # -- écriture --------------------------------------------------------
 
     def set_settings(self, data: dict[str, Any]) -> None:
+        """Applique ce que la page envoie, et l'écrit sur le disque.
+
+        Le tri du valide et de l'invalide est entièrement dans `Settings`, pour
+        que le fichier et l'API ne puissent pas diverger sur ce qu'ils
+        acceptent. Ici il ne reste que la traduction des noms français de l'API
+        vers les noms anglais du code.
+
+        ⚠️ L'écriture se fait **hors du verrou**. Toucher au disque en le tenant
+        bloquerait le rafraîchissement d'une seconde de la page, et le panneau
+        posé sur le jeu avec, pour un réglage qu'on change trois fois par an.
+        """
+        taxe = data.get("taxe")
+        taxe = taxe if isinstance(taxe, dict) else {}
         with self.lock:
-            langue = data.get("langue")
-            if langue in ("fr", "us"):
-                self.language = langue
-            region = data.get("region")
-            if isinstance(region, str):
-                try:
-                    self.region = Region(region)
-                except ValueError:
-                    _log.warning("région inconnue ignorée : %r", region)
-            taux = data.get("taux_marche")
-            if isinstance(taux, (int, float)) and 0 < float(taux) <= 1:
-                self.market_rate = float(taux)
+            self.settings = self.settings.updated(
+                language=data.get("langue"),
+                region=data.get("region"),
+                value_pack=taxe.get("abonnement"),
+                merchant_ring=taxe.get("anneau_marchand"),
+                family_fame=taxe.get("renommee"),
+            )
+            a_ecrire = self.settings
+        try:
+            a_ecrire.save()
+        except OSError as exc:
+            # Un disque plein ne doit pas faire échouer le réglage qui vient
+            # d'être appliqué : il tient pour cette session, et l'utilisateur le
+            # verra revenir au défaut au prochain lancement, ce que l'affichage
+            # permanent du taux rend visible.
+            _log.warning("réglages non enregistrés (%s)", exc)
 
     def set_storage(self, chemin: str) -> dict[str, Any]:
         """Retient un nouveau dossier de données, effectif au prochain lancement.
@@ -408,7 +445,7 @@ class AppState:
                 # toujours, donc une durée qui gonfle sans fin.
                 return self.session_id
             session = self.store.start_session(
-                started_at=maintenant, spot=spot, region=self.region.value
+                started_at=maintenant, spot=spot, region=self.settings.region.value
             )
             if self.worker is not None:
                 try:
