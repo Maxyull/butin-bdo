@@ -121,6 +121,14 @@ dans [docs/versionnage.md](docs/versionnage.md).
 
 ### Corrigé
 
+- ⭐ **La fenêtre principale ne réagissait plus à rien.** Une vraie fin de ligne
+  s'était glissée dans une chaîne de caractères du script de la page, ce qui est
+  une erreur de syntaxe et fait tomber le bloc entier : plus de
+  rafraîchissement, plus de bouton, plus de calibrage, plus de fil des drops.
+  La page continuait de s'afficher normalement, avec ses tableaux vides et ses
+  zéros, donc exactement comme une application qui vient de démarrer. Un
+  garde-fou vérifie désormais qu'aucune chaîne des deux pages n'est coupée par
+  une fin de ligne.
 - Le crochet fermant d'un nom d'objet, que l'OCR rend parfois en « l », faisait
   échouer le découpage et **perdait le drop en silence**. Mesuré sur une capture
   réelle : deux des six gains ratés.

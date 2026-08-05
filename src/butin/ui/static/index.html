@@ -542,9 +542,7 @@ $("bouton-calibrer").addEventListener("click", async () => {
       (corps.gains
         ? corps.gains + " lignes de gain reconnues. Vérifie que c'est bien ton chat :"
         : "AUCUNE ligne de journal dans cette zone. Si ce n'est pas ton chat, recommence :") +
-      "
-" + (corps.extrait.length ? corps.extrait.join("
-") : "(aucun texte lu)");
+      "\n" + (corps.extrait.length ? corps.extrait.join("\n") : "(aucun texte lu)");
     afficher(await (await fetch("/api/etat")).json());
   } finally {
     bouton.disabled = false;
