@@ -150,6 +150,17 @@ dans [docs/versionnage.md](docs/versionnage.md).
   reconnu **par accident**, avec un seul point de marge, et aurait désigné le
   mauvais objet si la fusion s'était faite dans l'autre sens.
 
+- **Distribution autonome** (`installeur/butin.spec`, PyInstaller) : un dossier
+  à copier, `dist/butin/`, qui n'a besoin ni de Python ni de `pip`. Jusqu'ici
+  utiliser Butin demandait de cloner le dépôt. Vérifié pour de vrai et pas
+  seulement « ça compile » : la fenêtre s'ouvre, sert la page, et le moteur de
+  reconnaissance (le morceau le plus à risque, 15 Mo de modèles `.onnx`
+  qu'aucun hook PyInstaller standard ne rapatrie tout seul) lit une vraie
+  capture et rend le bon texte une fois figé. ⚠️ Ce n'est encore qu'un dossier,
+  pas un installeur Windows au sens habituel : ni menu Démarrer, ni
+  désinstallation, ni mise à jour. Voir `installeur/LISEZ-MOI.md` pour ce qui
+  reste.
+
 ### Sécurité
 
 - Téléchargement du catalogue durci : HTTPS imposé, hôte en liste blanche
