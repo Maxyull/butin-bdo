@@ -542,20 +542,30 @@ class TestCapture:
         def __init__(self, *, refuse: str = "") -> None:
             self.refuse = refuse
             self.demarre: list[int] = []
+            self.reprises: list[int] = []
             self.arrets = 0
+            self.pauses = 0
+            self.running = False
 
-        def start(self, session_id: int) -> None:
+        def start(self, session_id: int, *, reprise: bool = False) -> None:
             if self.refuse:
                 raise CaptureUnavailable(self.refuse)
-            self.demarre.append(session_id)
+            (self.reprises if reprise else self.demarre).append(session_id)
+            self.running = True
 
         def stop(self, *, timeout: float = 5.0) -> int:
             self.arrets += 1
+            self.running = False
+            return 0
+
+        def pause(self, *, timeout: float = 5.0) -> int:
+            self.pauses += 1
+            self.running = False
             return 0
 
         def status(self) -> CaptureStatus:
             return CaptureStatus(
-                running=bool(self.demarre) and not self.arrets,
+                running=self.running,
                 ticks=12,
                 ocr_reads=3,
                 skipped_frames=0,
@@ -647,6 +657,126 @@ class TestCapture:
         etat.start("Gyfin")
 
         assert etat.snapshot()["capture"] is None
+
+
+class TestPause:
+    """Mettre en pause depuis l'interface, sans fausser le chiffre affiché."""
+
+    def _etat(self, store: SessionStore) -> tuple[AppState, TestCapture._Travailleur]:
+        travailleur = TestCapture._Travailleur()
+        return AppState(store, PriceBook(), None, travailleur), travailleur
+
+    def test_la_pause_suspend_la_capture_et_le_temps(self, store: SessionStore) -> None:
+        etat, travailleur = self._etat(store)
+        etat.start("Gyfin", now=0.0)
+
+        etat.pause(now=600.0)
+
+        assert travailleur.pauses == 1
+        vue = etat.snapshot(now=1800.0)
+        assert vue["session"]["en_pause"] is True
+        # 1800 s se sont écoulées, mais la session n'a farmé que les 600
+        # premières : le reste est de la pause.
+        assert vue["session"]["duree_s"] == pytest.approx(600.0)
+
+    def test_la_reprise_relance_la_capture_en_gardant_la_session(self, store: SessionStore) -> None:
+        """⭐ `reprise=True` est ce qui empêche d'inventer des drops.
+
+        La boucle repart neuve dans les deux cas, donc sa première lecture
+        amorce le suivi avec les dix-sept lignes encore à l'écran sans rien
+        compter. Le drapeau ne sert qu'à garder les compteurs déjà acquis.
+        """
+        etat, travailleur = self._etat(store)
+        session_id = etat.start("Gyfin", now=0.0)
+        etat.pause(now=600.0)
+
+        etat.resume(now=1200.0)
+
+        assert travailleur.reprises == [session_id]
+        assert travailleur.demarre == [session_id]
+        vue = etat.snapshot(now=1800.0)
+        assert vue["session"]["en_pause"] is False
+        assert vue["session"]["id"] == session_id
+        # 1800 s écoulées moins 600 s de pause.
+        assert vue["session"]["duree_s"] == pytest.approx(1200.0)
+
+    def test_une_reprise_refusee_laisse_la_session_en_pause(self, store: SessionStore) -> None:
+        """⭐ Régression : le pire des deux mondes serait de recompter le temps
+        sans que rien n'alimente la session.
+
+        C'est la même règle qu'au démarrage : une session qui avance sans
+        capture ressemble à un farm qui n'aurait rien donné.
+        """
+        etat, travailleur = self._etat(store)
+        etat.start("Gyfin", now=0.0)
+        etat.pause(now=600.0)
+        travailleur.refuse = "zone du chat non calibrée"
+
+        with pytest.raises(CaptureUnavailable):
+            etat.resume(now=1200.0)
+
+        vue = etat.snapshot(now=1800.0)
+        assert vue["session"]["en_pause"] is True
+        assert vue["session"]["duree_s"] == pytest.approx(600.0)
+
+    def test_le_silver_par_heure_ignore_la_pause(self, store: SessionStore) -> None:
+        """Le chiffre sur lequel tout le logiciel est jugé.
+
+        Une heure de farm puis une heure de pause : le résultat par heure doit
+        être celui d'une heure de farm, pas la moitié.
+        """
+        livre_de_prix = PriceBook(client=None, cache=None, vendor_values={43984: {"base": 1000}})
+        travailleur = TestCapture._Travailleur()
+        etat = AppState(store, livre_de_prix, None, travailleur)
+        session_id = etat.start("Gyfin", now=0.0)
+        etat.store.add_loot(session_id, [LootRow(item_id=43984, qty=100, at=10.0)])
+
+        etat.pause(now=3600.0)
+
+        assert etat.snapshot(now=7200.0)["stats"]["par_heure"] == pytest.approx(100_000)
+
+    def test_arreter_pendant_une_pause_fige_la_duree(self, store: SessionStore) -> None:
+        """Régression : la session qui rétrécit toute seule dans l'historique."""
+        etat, _ = self._etat(store)
+        etat.start("Gyfin", now=0.0)
+        etat.pause(now=600.0)
+
+        etat.stop(now=900.0)
+
+        session = store.sessions()[0]
+        assert not session.is_paused
+        assert session.duration_s(now=900.0 + 30 * 86400) == pytest.approx(600.0)
+
+    def test_le_panneau_reste_ouvert_pendant_la_pause(self, store: SessionStore) -> None:
+        """⚠️ Le fermer laisserait le joueur devant son jeu sans rien qui dise
+        que le suivi est suspendu. Une reprise oubliée est du farm perdu."""
+        panneau = TestPanneauEnSurimpression._Overlay()
+        etat = AppState(store, PriceBook(), None, TestCapture._Travailleur(), panneau)
+        etat.start("Gyfin", now=0.0)
+
+        etat.pause(now=600.0)
+
+        assert panneau.trace == ["ouvert"]
+
+    def test_pause_sans_session_ne_plante_pas(self, store: SessionStore) -> None:
+        etat, travailleur = self._etat(store)
+
+        etat.pause()
+        etat.resume()
+
+        assert travailleur.pauses == 0
+        assert travailleur.reprises == []
+
+    def test_les_routes_repondent(self, app) -> None:
+        """Le trajet complet, depuis la page : pause puis reprise."""
+        _, base = app
+        post(base, "/api/session/demarrer", {"spot": "Gyfin"})
+
+        en_pause = post(base, "/api/session/pause")
+        assert en_pause["session"]["en_pause"] is True
+
+        repris = post(base, "/api/session/reprendre")
+        assert repris["session"]["en_pause"] is False
 
 
 class TestCalibrageDepuisLInterface:
