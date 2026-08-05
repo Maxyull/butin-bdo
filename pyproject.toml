@@ -55,6 +55,11 @@ dev = [
   "types-requests",
   "pip-audit>=2.7",
 ]
+# Séparé de `dev` volontairement : personne d'autre que la personne qui
+# construit une distribution n'en a besoin, et l'intégration continue ne le
+# fait pas. L'y mettre gonflerait chaque installation de développement et
+# chaque `pip-audit` d'un outil que ni les tests ni la CI n'utilisent jamais.
+installeur = ["pyinstaller>=6.0"]
 
 [project.urls]
 Source = "https://github.com/Maxyull/butin-bdo"
