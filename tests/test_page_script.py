@@ -35,7 +35,6 @@ plutôt que de laisser passer : c'est le bon sens de l'erreur pour un garde-fou.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -43,8 +42,6 @@ import pytest
 PAGES = ("index.html", "overlay.html")
 
 STATIC = Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static"
-
-_SCRIPT = re.compile(r"<script>(.*?)</script>", re.DOTALL)
 
 # Les trois façons d'ouvrir une chaîne, et le caractère qui la referme. Seul le
 # gabarit entre accents graves accepte une vraie fin de ligne.
@@ -54,10 +51,23 @@ _COUPABLES = ("apostrophe", "guillemet")
 
 
 def script_de(page: str) -> str:
+    """Le contenu du bloc `<script>` de la page.
+
+    Découpé sur les balises littérales plutôt qu'avec une expression
+    régulière : le fichier lu est le nôtre, il en contient exactement un, et une
+    expression régulière qui prétend reconnaître des balises HTML est un piège
+    documenté qu'on n'a aucune raison de poser ici.
+
+    Le compte est vérifié plutôt que supposé. Un second bloc ajouté un jour
+    passerait sinon en silence, non vérifié, ce qui est exactement l'angle mort
+    qui a rendu ce fichier nécessaire.
+    """
     contenu = (STATIC / page).read_text(encoding="utf-8")
-    blocs = _SCRIPT.findall(contenu)
-    assert blocs, f"{page} n'a aucun bloc <script>"
-    return "\n".join(blocs)
+    morceaux = contenu.split("<script>")
+    assert len(morceaux) == 2, f"{page} : {len(morceaux) - 1} blocs <script>, le test en attend un"
+    corps, fermeture, _ = morceaux[1].partition("</script>")
+    assert fermeture, f"{page} : bloc <script> jamais refermé"
+    return corps
 
 
 def fins_de_ligne_dans_une_chaine(source: str) -> list[int]:
