@@ -148,6 +148,31 @@ Conséquence directe : la boucle ne peut lire qu'environ **une image sur onze**,
 et `LoopConfig.ocr_min_interval_s`, réglé à 0,35 s, promet une cadence que la
 machine ne sait pas tenir.
 
+⚠️ **Piste essayée le 06/08/2026, et NON retenue.** `DEFAULT_SCALE=2` est fixe,
+calé une fois pour la zone d'origine 520×385 (736/385 ≈ 1,9, donc x2 était
+« gratuit » sur cette zone précise) et jamais recalculé pour une zone
+différente. Remplacer ce facteur fixe par un facteur adaptatif qui vise le
+seuil réel du détecteur de rapidocr (736 px de petit côté) a été mesuré sur
+deux zones réelles, protocole en passes séparées pour isoler le bruit
+machine :
+
+| Zone | Gain en régime établi |
+| --- | --- |
+| 780×575 (cette rafale, cause A) | **−32,7 %** (765 → 515 ms) |
+| 560×496 (rafale Thornwood, #39) | **−1,7 %**, dans le bruit |
+
+**Ne domine pas à travers les deux conditions testées**, ce que la règle de ce
+document (partie 6 : « dominer à plusieurs cadences ») refuse justement
+d'accepter. Le mécanisme est pourtant compris : le canevas envoyé au détecteur
+passe de 2,44× trop grand à 1,82× trop grand selon la zone, une économie plus
+modeste sur 560×496 qu'une part fixe du coût total (hors détection) absorbe
+entièrement. Aucune dégradation de précision mesurée sur les deux zones (720
+lignes réelles), et un cas limite synthétique (zone déjà ≥ 736 px, facteur
+retombant à x1,0) vérifié sûr. **`DEFAULT_SCALE=2` reste inchangé.** Si le
+gain sur les zones très plates vaut la peine d'être récupéré un jour, il
+faudrait mesurer une troisième géométrie réelle avant de fixer un seuil de
+déclenchement, pas le deviner sur deux points de mesure.
+
 ### B. La mesure de défilement en pixels ne détectait rien — CORRIGÉ
 
 Zéro détection sûre sur les 299 transitions, et zéro décalage juste sur les 37
