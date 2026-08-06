@@ -9,6 +9,18 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.3.0] - 2026-08-06
+
+### Ajouté
+
+- **Numéro de version affiché à côté du titre**, dans l'en-tête de la fenêtre
+  principale, avec le bouton de mise à jour juste à côté quand une version
+  plus récente existe. Remplace le bandeau pleine largeur de la 0.2.0.
+- **Lien Discord**, dans l'application (en-tête, à côté des sliders langue et
+  région) et dans le README, pour les questions, bogues et idées.
+- **Badges au README** : état de la CI, dernière version publiée, licence,
+  version de Python requise, Discord — tous vérifiés au chargement réel.
+
 ## [0.2.0] - 2026-08-06
 
 ### Modifié
