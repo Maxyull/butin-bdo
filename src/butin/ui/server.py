@@ -46,6 +46,7 @@ from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
 from ..catalog.icons import TYPES_MIME
 from ..market import PriceBook
+from ..report import send_report as _envoyer_rapport
 from ..store import SessionStore, Settings, compute
 from ..update import UpdateInfo, check_for_update
 
@@ -665,6 +666,34 @@ class AppState:
 
             return resultat
 
+    def send_report(self, message: str) -> dict[str, Any]:
+        """Envoie un rapport de bogue au relais, avec le contexte technique.
+
+        ⚠️ **Hors verrou, volontairement.** L'envoi part sur le réseau et peut
+        durer jusqu'à dix secondes ; tenir le verrou d'`AppState` pendant ce
+        temps figerait tout le reste, dont le rafraîchissement de l'écran et
+        le bouton d'arrêt de session. Même raison que l'ouverture du panneau.
+        Le contexte est lu par `snapshot()`, qui prend le verrou pour lui seul
+        et le rend aussitôt.
+
+        Le contexte est joint parce qu'un rapport sans version ni zone
+        calibrée oblige à un aller-retour, et qu'un joueur qui vient de perdre
+        une session de farm ne le fera pas.
+        """
+        etat = self.snapshot()
+        reglages = etat.get("reglages") or {}
+        capture = etat.get("capture") or {}
+        contexte: dict[str, object] = {
+            "version": etat.get("version", "inconnue"),
+            "zone calibrée": reglages.get("calibrage") or "aucune",
+            "session en cours": "oui" if etat.get("session") else "non",
+            "capture en cours": "oui" if capture.get("en_cours") else "non",
+            "lectures": capture.get("lectures", 0),
+            "panne de capture": capture.get("erreur") or "aucune",
+        }
+        resultat = _envoyer_rapport(message, contexte=contexte)
+        return {"envoye": resultat.envoye, "message": resultat.raison}
+
 
 class Handler(BaseHTTPRequestHandler):
     """Routes de l'interface. Volontairement peu nombreuses."""
@@ -834,6 +863,14 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/session/arreter":
             self.state.stop()
             self._send_json(self.state.snapshot())
+        elif self.path == "/api/rapport":
+            message = str(self._read_json().get("message", ""))
+            # Toujours 200, même quand l'envoi échoue : le corps porte
+            # `envoye` et un message écrit pour être affiché tel quel. Un code
+            # d'erreur HTTP ferait afficher « erreur serveur » à la page alors
+            # que le serveur local a parfaitement fait son travail, et que la
+            # cause est chez le relais ou sur le réseau du joueur.
+            self._send_json(self.state.send_report(message))
         else:
             self._send_json({"erreur": "introuvable"}, status=404)
 

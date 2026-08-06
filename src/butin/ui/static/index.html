@@ -258,6 +258,25 @@
 </div>
 
 <div class="panneau" style="margin-bottom:18px">
+  <div class="etiquette" style="margin-bottom:8px">Signaler un problème</div>
+  <div style="color:var(--doux);font-size:13px;margin-bottom:8px">
+    Envoie un message dans le salon Discord. La version, la zone calibrée et
+    l'état de la capture sont joints automatiquement : rien d'autre ne part,
+    et rien ne part sans ce bouton.
+  </div>
+  <textarea id="rapport-texte" rows="4" maxlength="1800"
+            placeholder="Ce que tu faisais, ce que tu attendais, ce qui s'est passé."
+            style="width:100%;box-sizing:border-box;background:#0f1116;color:inherit;
+                   border:1px solid #2a2e39;border-radius:8px;padding:10px;
+                   font:inherit;font-size:13px;resize:vertical"></textarea>
+  <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+    <button class="action" id="bouton-rapport">Envoyer le rapport</button>
+    <span id="rapport-compteur" style="color:var(--doux);font-size:13px">0 / 1800</span>
+  </div>
+  <div id="rapport-etat" style="margin-top:8px;font-size:13px;color:var(--doux)"></div>
+</div>
+
+<div class="panneau" style="margin-bottom:18px">
   <div class="etiquette" style="margin-bottom:8px">Derniers drops</div>
   <div id="fil"><div class="vide">Rien pour l'instant.</div></div>
 </div>
@@ -891,6 +910,52 @@ $("bouton-dossier").addEventListener("click", async () => {
 
 $("onglet-session").addEventListener("click", () => basculer("session"));
 $("onglet-historique").addEventListener("click", () => basculer("historique"));
+
+// -- Rapport de bogue ------------------------------------------------------
+// Le compteur est affiche pendant la frappe plutot qu'apres l'envoi : le
+// plafond appartient au relais, et decouvrir qu'on a ecrit trop long au moment
+// du refus fait perdre le texte qu'on venait d'ecrire.
+const rapportTexte = $("rapport-texte");
+const rapportEtat = $("rapport-etat");
+const rapportBouton = $("bouton-rapport");
+
+function majCompteurRapport() {
+  $("rapport-compteur").textContent = rapportTexte.value.length + " / 1800";
+}
+rapportTexte.addEventListener("input", majCompteurRapport);
+majCompteurRapport();
+
+rapportBouton.addEventListener("click", async () => {
+  const message = rapportTexte.value.trim();
+  if (!message) {
+    rapportEtat.textContent = "Ecris d'abord ce qui ne va pas.";
+    return;
+  }
+  // Desactive pendant l'envoi : le relais peut mettre plusieurs secondes, et
+  // un second clic enverrait le meme rapport deux fois.
+  rapportBouton.disabled = true;
+  rapportEtat.textContent = "Envoi en cours...";
+  try {
+    const reponse = await fetch("/api/rapport", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: message }),
+    });
+    const corps = await reponse.json();
+    rapportEtat.textContent = corps.message || "Reponse illisible.";
+    // Le texte n'est efface QUE si l'envoi a reussi : sur un echec, le
+    // reinitialiser ferait perdre au joueur ce qu'il vient d'ecrire, au moment
+    // precis ou il est deja en train de signaler que quelque chose ne va pas.
+    if (corps.envoye) {
+      rapportTexte.value = "";
+      majCompteurRapport();
+    }
+  } catch (erreur) {
+    rapportEtat.textContent = "Le serveur local n'a pas repondu.";
+  } finally {
+    rapportBouton.disabled = false;
+  }
+});
 
 async function rafraichir() {
   try {
