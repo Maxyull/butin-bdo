@@ -18,16 +18,27 @@ Les idées et le code repris, adaptés puis réécrits ici :
 
 | Concept repris | Où il vit dans Butin | État |
 | --- | --- | --- |
-| Confusions de chiffres propres à la police du jeu | `src/butin/catalog/normalize.py` | fait |
+| Confusions de chiffres propres à la police du jeu | `src/butin/catalog/normalize.py` (réexport, code dans `bdo-ocr-core`) | fait |
 | Comparaison tolérante de deux lignes lues | `src/butin/tracking/similarity.py` | fait |
 | Alignement de deux captures par suffixe et préfixe | `src/butin/tracking/alignment.py` | fait |
 | Garde-fous image aberrante et saut invraisemblable | `src/butin/tracking/alignment.py` | fait |
-| Détection du défilement par comparaison de pixels | `src/butin/tracking/scroll.py` | fait |
-| Attente de stabilité avant lecture | `src/butin/tracking/stability.py` | fait |
+| Détection du défilement par comparaison de pixels | `src/butin/tracking/scroll.py` (réexport, code dans `bdo-ocr-core`) | fait |
+| Attente de stabilité avant lecture | `src/butin/tracking/stability.py` (réexport, code dans `bdo-ocr-core`) | fait |
 | Validation d'un drop après accord de plusieurs images | `src/butin/tracking/staging.py` | fait |
 
 La colonne « état » est tenue à jour au fur et à mesure du portage. Elle dit ce
 qui dérive réellement du travail d'origine à cet instant, pas ce qui est prévu.
+
+### Ces trois modules ont été réextraits, le 06/08/2026
+
+`normalize.py`, `tracking/scroll.py` et `tracking/stability.py` ne portent
+plus le code eux-mêmes : ils réexportent depuis
+**[Maxyull/bdo-ocr-core](https://github.com/Maxyull/bdo-ocr-core)** (MIT),
+un second dépôt qui partage ce noyau OCR avec `rubin-bdo`, l'autre projet BDO
+de ce compte. L'attribution à janhnguyen/BDO-Loot-Tracker reste exacte : elle
+suit maintenant le code jusqu'à `bdo-ocr-core/ATTRIBUTION.md`, qui la
+reproduit. Voir `D:\DEV\bdo\COORDINATION.md` pour l'historique complet de
+cette extraction, y compris pourquoi `rubin-bdo` ne branche pas tout dessus.
 
 ### Ce qui a changé en cours de portage
 
