@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+import butin
 from butin import paths
 from butin.capture.calibrate import Calibration
 from butin.capture.screen import Region
@@ -120,6 +121,26 @@ class TestPage:
         assert "Butin" in corps
         assert 'id="langue"' in corps
         assert 'id="region"' in corps
+
+
+class TestVersion:
+    def test_la_version_est_dans_l_etat(self, app) -> None:
+        """Sert à afficher `v<version>` à côté du titre dans l'interface.
+
+        Demandé par Maxime le 06/08/2026, à côté du bouton de mise à jour :
+        sans elle, l'utilisateur ne peut pas voir d'un coup d'œil sur quelle
+        version il tourne, seulement si une plus récente existe.
+        """
+        _, base = app
+        assert get(base, "/api/etat")["version"] == butin.__version__
+
+    def test_la_version_reste_dans_l_etat_pendant_une_session(self, app) -> None:
+        """Les trois points de sortie de `snapshot()` doivent la rendre,
+        pas seulement celui appelé sans session ouverte."""
+        _, base = app
+        post(base, "/api/session/demarrer", {"spot": "Sausan"})
+
+        assert get(base, "/api/etat")["version"] == butin.__version__
 
 
 class TestSliders:
