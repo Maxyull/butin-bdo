@@ -30,6 +30,10 @@ dependencies = [
   "Pillow>=10.0.0",
   "numpy>=1.26",
   "requests>=2.31.0",
+  # Normalisation FR et détection de défilement/stabilité, extraites d'ici et
+  # partagées avec rubin-bdo. Épinglé sur un tag, jamais sur une branche : voir
+  # bdo-ocr-core/README.md.
+  "bdo-ocr-core @ git+https://github.com/Maxyull/bdo-ocr-core.git@v0.1.0",
   "rapidfuzz>=3.6",
   # Moteur OCR. Choisi contre Tesseract parce qu'il s'installe entièrement par
   # pip : aucun binaire système à télécharger séparément, aucune variable PATH à
