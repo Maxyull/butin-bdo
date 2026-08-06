@@ -9,6 +9,19 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Modifié
+
+- **Le bouton de mise à jour installe désormais la nouvelle version et rouvre
+  Butin tout seul**, au lieu d'ouvrir la page GitHub et de laisser tout le
+  reste à faire à la main. Un clic, une barre d'état, et le logiciel se
+  rouvre : le même geste que dans Rubin.
+
+  L'installeur téléchargé est **vérifié avant d'être exécuté** : s'il ne
+  correspond pas exactement à ce que la version publiée annonce, rien n'est
+  écrit sur le disque et rien n'est lancé. Une mise à jour ratée le dit,
+  laisse le bouton réessayer, et le lien vers la page des versions reste
+  offert à côté pour ceux qui préfèrent lire les notes ou installer à la main.
+
 ### Ajouté
 
 - **Bouton « Envoyer le rapport »** dans les Réglages : signaler un problème

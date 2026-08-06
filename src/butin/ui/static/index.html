@@ -163,8 +163,11 @@
 <body>
 
 <div class="haut">
-  <h1>Butin <span id="version"></span><a class="bouton-maj" id="bouton-maj" hidden
-     target="_blank" rel="noopener"></a></h1>
+  <h1>Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
+     type="button"></button><a class="bouton-maj" id="lien-maj" hidden
+     target="_blank" rel="noopener">Voir la version</a>
+     <span id="maj-etat" style="margin-left:10px;font-size:13px;font-weight:normal;
+           color:var(--doux)"></span></h1>
   <div class="sliders">
     <div class="slider">
       <span>Langue</span>
@@ -462,16 +465,61 @@ const LIBELLES = {
   inconnu: ["Inconnu", "inconnu"],
 };
 
+// Vrai pendant tout le telechargement : sans ce drapeau, le rafraichissement
+// d'une seconde reecrirait le libelle du bouton par-dessus « Telechargement... »
+// et effacerait le seul retour visible d'une operation qui dure une minute.
+let majEnCours = false;
+
 function afficherLaMiseAJour(maj) {
   const bouton = $("bouton-maj");
+  const lien = $("lien-maj");
+  if (majEnCours) return;
   if (!maj || !maj.disponible) {
     bouton.hidden = true;
+    lien.hidden = true;
     return;
   }
   bouton.textContent = "Mettre à jour → " + maj.version;
-  bouton.href = maj.url;
+  bouton.disabled = false;
   bouton.hidden = false;
+  // Le lien vers la page de la version reste offert a cote : si le
+  // telechargement echoue, il faut un chemin manuel, et certains veulent lire
+  // les notes de version avant d'installer.
+  lien.href = maj.url;
+  lien.hidden = false;
 }
+
+// ⛔ Le message va dans son PROPRE element, jamais dans le libelle du bouton.
+// Ecrit dans le bouton, il etait efface par le rafraichissement d'une seconde
+// avant meme d'etre lu : verifie au navigateur, le texte revenait a « Mettre a
+// jour » en moins d'une seconde. Un message d'echec qu'on n'a pas le temps de
+// lire ne vaut pas mieux qu'un echec silencieux.
+$("bouton-maj").addEventListener("click", async () => {
+  const bouton = $("bouton-maj");
+  const etat = $("maj-etat");
+  majEnCours = true;
+  bouton.disabled = true;
+  bouton.textContent = "Téléchargement...";
+  etat.textContent = "";
+  try {
+    const reponse = await fetch("/api/maj", { method: "POST" });
+    const corps = await reponse.json();
+    etat.textContent = corps.message || "Réponse illisible.";
+    // En cas de succes le bouton reste desactive : l'installeur va fermer
+    // Butin dans les secondes qui suivent, et le rendre cliquable relancerait
+    // un second telechargement pendant la fermeture.
+    if (!corps.lance) {
+      majEnCours = false;
+      bouton.disabled = false;
+      bouton.textContent = "Réessayer";
+    }
+  } catch (erreur) {
+    etat.textContent = "Le serveur local n'a pas répondu.";
+    majEnCours = false;
+    bouton.disabled = false;
+    bouton.textContent = "Réessayer";
+  }
+});
 
 function afficher(etat) {
   if (!etat) return;
