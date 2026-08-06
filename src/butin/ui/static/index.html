@@ -35,14 +35,16 @@
                letter-spacing: .8px; margin-bottom: 6px; }
   .or { color: var(--or); }
 
-  /* Bandeau de mise à jour : une notification, jamais un blocage. Il informe
-     et laisse l'utilisateur cliquer, il ne l'empêche de rien faire d'autre.
-     Voir update.py pour pourquoi ce n'est jamais automatique. */
-  .bandeau-maj { display: block; margin-bottom: 18px; padding: 10px 14px;
-                 border: 1px solid var(--or); border-radius: 8px;
-                 background: rgba(212, 169, 85, .08); color: var(--or);
-                 text-decoration: none; font-size: 14px; }
-  .bandeau-maj:hover { background: rgba(212, 169, 85, .16); }
+  /* Bouton de mise à jour, à côté du numéro de version : une notification
+     discrète, jamais un blocage. Il informe et laisse l'utilisateur
+     cliquer, il ne l'empêche de rien faire d'autre. Voir update.py pour
+     pourquoi ce n'est jamais un téléchargement automatique. */
+  .bouton-maj { display: inline-block; margin-left: 10px; padding: 3px 10px;
+                border: 1px solid var(--or); border-radius: 999px;
+                background: rgba(212, 169, 85, .10); color: var(--or);
+                text-decoration: none; font-size: 12px; font-weight: 600;
+                vertical-align: middle; }
+  .bouton-maj:hover { background: rgba(212, 169, 85, .20); }
 
   /* Les deux sliders. Un vrai interrupteur a deux positions, pas une liste
      deroulante : le choix est binaire et doit se voir sans ouvrir quoi que ce soit. */
@@ -149,10 +151,9 @@
 </head>
 <body>
 
-<a class="bandeau-maj" id="bandeau-maj" hidden target="_blank" rel="noopener"></a>
-
 <div class="haut">
-  <h1>Butin <span id="version">suivi de butin, Black Desert Online</span></h1>
+  <h1>Butin <span id="version"></span><a class="bouton-maj" id="bouton-maj" hidden
+     target="_blank" rel="noopener"></a></h1>
   <div class="sliders">
     <div class="slider">
       <span>Langue</span>
@@ -428,19 +429,20 @@ const LIBELLES = {
 };
 
 function afficherLaMiseAJour(maj) {
-  const bandeau = $("bandeau-maj");
+  const bouton = $("bouton-maj");
   if (!maj || !maj.disponible) {
-    bandeau.hidden = true;
+    bouton.hidden = true;
     return;
   }
-  bandeau.textContent = "Nouvelle version disponible : " + maj.version + " — cliquer pour l'obtenir";
-  bandeau.href = maj.url;
-  bandeau.hidden = false;
+  bouton.textContent = "Mettre à jour → " + maj.version;
+  bouton.href = maj.url;
+  bouton.hidden = false;
 }
 
 function afficher(etat) {
   if (!etat) return;
 
+  if (etat.version) $("version").textContent = "v" + etat.version;
   afficherLaMiseAJour(etat.maj);
 
   for (const [id, champ] of [["langue", "langue"], ["region", "region"]]) {

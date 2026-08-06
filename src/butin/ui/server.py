@@ -191,6 +191,7 @@ class AppState:
                 "derniers": [],
                 "capture": capture,
                 "maj": self._update_dict(),
+                "version": __version__,
             }
 
         session = self.store.get_session(session_id)
@@ -203,6 +204,7 @@ class AppState:
                 "derniers": [],
                 "capture": capture,
                 "maj": self._update_dict(),
+                "version": __version__,
             }
 
         quantites = self.store.quantities(session_id)
@@ -239,6 +241,7 @@ class AppState:
             "derniers": self._recent_rows(session_id, maintenant, langue),
             "capture": capture,
             "maj": self._update_dict(),
+            "version": __version__,
         }
 
     def icon(self, item_id: int) -> Path | None:
