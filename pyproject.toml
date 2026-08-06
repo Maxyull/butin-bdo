@@ -40,7 +40,7 @@ dependencies = [
   # raison de s'appliquer une règle plus faible à lui-même.
   # La version reste en commentaire, sinon le SHA est illisible.
   # Vérifié par tests/test_dependances.py.
-  "bdo-ocr-core @ git+https://github.com/Maxyull/bdo-ocr-core.git@c6c4e8effed838905777086a8adc9b9b7bb5707f",  # v0.1.0
+  "bdo-ocr-core @ git+https://github.com/Maxyull/bdo-ocr-core.git@6b465fd2c856ce276c5b8763dde173614a7e2aee",  # v0.2.0
   "rapidfuzz>=3.6",
   # Moteur OCR. Choisi contre Tesseract parce qu'il s'installe entièrement par
   # pip : aucun binaire système à télécharger séparément, aucune variable PATH à
