@@ -29,7 +29,7 @@ Les idées et le code repris, adaptés puis réécrits ici :
 La colonne « état » est tenue à jour au fur et à mesure du portage. Elle dit ce
 qui dérive réellement du travail d'origine à cet instant, pas ce qui est prévu.
 
-### Ces trois modules ont été réextraits, le 06/08/2026
+### Ces modules ont été réextraits, le 06/08/2026
 
 `normalize.py`, `tracking/scroll.py` et `tracking/stability.py` ne portent
 plus le code eux-mêmes : ils réexportent depuis
@@ -39,6 +39,12 @@ de ce compte. L'attribution à janhnguyen/BDO-Loot-Tracker reste exacte : elle
 suit maintenant le code jusqu'à `bdo-ocr-core/ATTRIBUTION.md`, qui la
 reproduit. Voir `D:\DEV\bdo\COORDINATION.md` pour l'historique complet de
 cette extraction, y compris pourquoi `rubin-bdo` ne branche pas tout dessus.
+
+`catalog/matcher.py` a suivi le même chemin le même jour, mais pour une
+raison différente : ce module n'est pas dérivé de janhnguyen, il est de
+Butin. Seule sa **politique de décision** (seuil, marge d'ambiguïté) est
+partie dans `bdo_ocr_core.matcher.fuzzy_resolve` ; `ItemMatcher` et `Scope`,
+couplés à `ItemCatalog`, restent ici.
 
 ### Ce qui a changé en cours de portage
 
