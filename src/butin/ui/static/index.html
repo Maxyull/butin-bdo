@@ -15,24 +15,97 @@
     --vert: #6fdc6f;
     --rouge: #e0715f;
     --bleu: #7ea6ff;
+
+    /* Un seul rythme d'espacement pour toute la page. Avant, chaque bloc
+       portait ses marges en style en ligne : vingt-huit au total, avec sept
+       valeurs différentes pour la même intention. Rien ne s'alignait vraiment,
+       et corriger un écart demandait de le corriger partout. */
+    --espace-1: 6px;
+    --espace-2: 8px;
+    --espace-3: 10px;
+    --espace-4: 14px;
+    --espace-5: 18px;
+    --espace-6: 24px;
+    --rayon: 10px;
+    --rayon-petit: 8px;
+    --rayon-pilule: 999px;
+    /* Fond des champs de saisie : plus sombre que le panneau, pour que la
+       zone où l'on écrit se distingue de celle où l'on lit. */
+    --fond-champ: #0f1116;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 24px;
+    margin: 0; padding: var(--espace-6);
     background: var(--fond); color: var(--texte);
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* ⭐ Un seul anneau de focus, pour TOUT ce qui se manipule. La page comptait
+     dix-neuf éléments interactifs et deux règles de focus : quelqu'un qui
+     navigue au clavier ne voyait pas où il se trouvait dans les dix-sept
+     autres. `:where` garde une spécificité nulle, donc une règle plus précise
+     peut toujours reprendre la main sans se battre. */
+  :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--bleu);
+    outline-offset: 2px;
+  }
+
+  /* Une note sous un contrôle : ce qui explique, jamais ce qui commande. */
+  .note { margin-top: var(--espace-2); color: var(--doux); font-size: 13px; }
+  .note-avant { margin: 0 0 var(--espace-2); color: var(--doux); font-size: 13px; }
+  /* Un cran plus lisible, pour les deux notes qu'on lit en farmant : l'état de
+     la capture et celui du calibrage. Ce sont les seules qui disent si le
+     compteur travaille vraiment. */
+  .note-large { font-size: 14px; }
+
+  /* Une rangée de contrôles alignés, qui passe à la ligne sur une fenêtre
+     étroite plutôt que de déborder. */
+  .rangee { display: flex; align-items: center; gap: var(--espace-3); flex-wrap: wrap; }
+  .rangee-aeree { gap: 22px; }
+
+  /* Tous les champs de saisie se ressemblent, quelle que soit leur taille. */
+  .champ {
+    background: var(--fond-champ); color: var(--texte);
+    border: 1px solid var(--bord); border-radius: var(--rayon-petit);
+    padding: 8px 10px; font: inherit; font-size: 14px;
+  }
+  .champ-large { flex: 1; min-width: 320px; }
+  .champ-etroit { width: 110px; }
+  .champ-pleine-largeur { width: 100%; resize: vertical; font-size: 13px; }
+
+  /* Un état posé à côté d'un contrôle plutôt qu'en dessous, quand la place le
+     permet : le message reste sur la même ligne que ce qu'il commente. */
+  .etat-en-ligne { margin-left: var(--espace-4); color: var(--doux);
+                   font-size: 13px; font-weight: 400; }
+  .compteur { color: var(--doux); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  /* Ce que la reconnaissance a réellement lu dans la zone calibrée. Du texte
+     brut, présenté comme tel : c'est une preuve, pas une phrase. */
+  .extrait {
+    margin-top: var(--espace-2); padding: var(--espace-3);
+    white-space: pre-wrap; background: var(--fond-champ);
+    border: 1px solid var(--bord); border-radius: var(--rayon-petit);
+    font-size: 13px; color: var(--doux);
+  }
+  .apercu {
+    margin-top: var(--espace-2); max-width: 100%;
+    border: 1px solid var(--bord); border-radius: var(--rayon-petit);
   }
   h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
   h1 span { color: var(--doux); font-weight: 400; font-size: 13px; margin-left: 10px; }
   .haut { display: flex; align-items: center; justify-content: space-between;
           flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+  /* Le panneau porte sa propre marge basse : c'est une propriété du bloc, pas
+     une décision à reprendre à chaque endroit où on en pose un. */
   .panneau { background: var(--panneau); border: 1px solid var(--bord);
-             border-radius: 10px; padding: 18px; }
+             border-radius: var(--rayon); padding: var(--espace-5);
+             margin-bottom: var(--espace-5); }
+  .panneau:last-child { margin-bottom: 0; }
   .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 14px; margin-bottom: 18px; }
+            gap: var(--espace-4); margin-bottom: var(--espace-5); }
   .chiffre { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .etiquette { color: var(--doux); font-size: 12px; text-transform: uppercase;
-               letter-spacing: .8px; margin-bottom: 6px; }
+               letter-spacing: .8px; margin-bottom: var(--espace-2); }
   .or { color: var(--or); }
 
   /* Bouton de mise à jour, à côté du numéro de version : une notification
@@ -166,8 +239,7 @@
   <h1>Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
      type="button"></button><a class="bouton-maj" id="lien-maj" hidden
      target="_blank" rel="noopener">Voir la version</a>
-     <span id="maj-etat" style="margin-left:10px;font-size:13px;font-weight:normal;
-           color:var(--doux)"></span></h1>
+     <span id="maj-etat" class="etat-en-ligne"></span></h1>
   <div class="sliders">
     <div class="slider">
       <span>Langue</span>
@@ -216,71 +288,62 @@
 
 <div class="page" id="page-session">
 
-<div class="panneau" style="margin-bottom:18px">
-  <div class="etiquette" style="margin-bottom:8px">Dossier des sessions</div>
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <input id="dossier" type="text" spellcheck="false"
-           style="flex:1;min-width:320px;background:#0f1116;color:var(--texte);
-                  border:1px solid #2a2e39;border-radius:8px;padding:9px 11px;font-size:14px">
+<div class="panneau">
+  <div class="etiquette">Dossier des sessions</div>
+  <div class="rangee">
+    <input id="dossier" class="champ champ-large" type="text" spellcheck="false">
     <button class="action" id="bouton-dossier">Changer</button>
   </div>
-  <div id="etat-dossier" style="margin-top:8px;color:var(--doux);font-size:13px"></div>
+  <div id="etat-dossier" class="note"></div>
 </div>
 
-<div class="panneau" style="margin-bottom:18px">
-  <div class="etiquette" style="margin-bottom:8px">Taxe de l'hôtel des ventes</div>
+<div class="panneau">
+  <div class="etiquette">Taxe de l'hôtel des ventes</div>
   <!--
     Des cases à cocher et non un pourcentage : le joueur sait s'il a un
     abonnement, il ne sait pas forcément que ça fait 84,5 %. Lui demander le
     taux reviendrait à lui demander de faire le calcul, donc de se tromper.
   -->
-  <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+  <div class="rangee rangee-aeree">
     <label class="case"><input id="abonnement" type="checkbox"> Abonnement</label>
     <label class="case"><input id="anneau-marchand" type="checkbox"> Anneau de marchand</label>
     <label class="case">Renommée familiale
-      <input id="renommee" type="number" min="0" step="1"
-             style="width:110px;background:#0f1116;color:var(--texte);
-                    border:1px solid #2a2e39;border-radius:8px;padding:7px 9px;
-                    font:inherit;font-size:14px"></label>
+      <input id="renommee" class="champ champ-etroit" type="number"
+             min="0" step="1"></label>
   </div>
-  <div id="etat-taxe" style="margin-top:10px;color:var(--doux);font-size:13px"></div>
+  <div id="etat-taxe" class="note"></div>
 </div>
 
-<div class="panneau" style="margin-bottom:18px">
+<div class="panneau">
   <button class="action demarrer" id="bouton-session">Commencer le grind</button>
   <button class="action" id="bouton-pause" hidden>Pause</button>
   <button class="action" id="bouton-calibrer">Calibrer la zone</button>
-  <span id="etat-session" style="margin-left:14px;color:var(--doux)">Aucune session en cours</span>
-  <div id="etat-capture" style="margin-top:10px;color:var(--doux);font-size:14px"></div>
-  <div id="etat-calibrage" style="margin-top:8px;color:var(--doux);font-size:14px"></div>
-  <pre id="extrait-calibrage" style="margin-top:8px;display:none;white-space:pre-wrap;
-       background:#0f1116;border:1px solid #2a2e39;border-radius:8px;padding:10px;
-       font-size:13px;color:var(--doux)"></pre>
-  <img id="apercu-calibrage" alt="Zone calibrée, cadre en surbrillance" style="margin-top:8px;
-       display:none;max-width:100%;border:1px solid #2a2e39;border-radius:8px">
+  <span id="etat-session" class="etat-en-ligne">Aucune session en cours</span>
+  <div id="etat-capture" class="note note-large"></div>
+  <div id="etat-calibrage" class="note note-large"></div>
+  <pre id="extrait-calibrage" class="extrait" hidden></pre>
+  <img id="apercu-calibrage" class="apercu" alt="Zone calibrée, cadre en surbrillance" hidden>
 </div>
 
-<div class="panneau" style="margin-bottom:18px">
-  <div class="etiquette" style="margin-bottom:8px">Signaler un problème</div>
-  <div style="color:var(--doux);font-size:13px;margin-bottom:8px">
+<div class="panneau">
+  <div class="etiquette">Signaler un problème</div>
+  <div class="note-avant">
     Envoie un message dans le salon Discord. La version, la zone calibrée et
     l'état de la capture sont joints automatiquement : rien d'autre ne part,
     et rien ne part sans ce bouton.
   </div>
   <textarea id="rapport-texte" rows="4" maxlength="1800"
             placeholder="Ce que tu faisais, ce que tu attendais, ce qui s'est passé."
-            style="width:100%;box-sizing:border-box;background:#0f1116;color:inherit;
-                   border:1px solid #2a2e39;border-radius:8px;padding:10px;
-                   font:inherit;font-size:13px;resize:vertical"></textarea>
-  <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+            class="champ champ-pleine-largeur"></textarea>
+  <div class="rangee note">
     <button class="action" id="bouton-rapport">Envoyer le rapport</button>
-    <span id="rapport-compteur" style="color:var(--doux);font-size:13px">0 / 1800</span>
+    <span id="rapport-compteur" class="compteur">0 / 1800</span>
   </div>
-  <div id="rapport-etat" style="margin-top:8px;font-size:13px;color:var(--doux)"></div>
+  <div id="rapport-etat" class="note"></div>
 </div>
 
-<div class="panneau" style="margin-bottom:18px">
-  <div class="etiquette" style="margin-bottom:8px">Derniers drops</div>
+<div class="panneau">
+  <div class="etiquette">Derniers drops</div>
   <div id="fil"><div class="vide">Rien pour l'instant.</div></div>
 </div>
 
@@ -305,7 +368,7 @@
 </div>
 
 <div class="page" id="page-historique" hidden>
-  <div class="panneau" style="margin-bottom:18px">
+  <div class="panneau">
     <table>
       <thead>
         <tr>
@@ -324,7 +387,7 @@
   </div>
 
   <div class="panneau" id="detail-session" hidden>
-    <div class="etiquette" id="detail-titre" style="margin-bottom:8px"></div>
+    <div class="etiquette" id="detail-titre"></div>
     <table>
       <thead>
         <tr>
@@ -559,11 +622,11 @@ function afficher(etat) {
   // farm calme : c'est la seule chose qui permette de faire la différence.
   const capture = etat.capture;
   const ligneCapture = $("etat-capture");
-  ligneCapture.className = "";
+  ligneCapture.classList.remove("avertissement");
   if (!capture) {
     ligneCapture.textContent = "";
   } else if (capture.erreur) {
-    ligneCapture.className = "avertissement";
+    ligneCapture.classList.add("avertissement");
     ligneCapture.textContent = "La capture s'est arrêtée : " + capture.erreur;
   } else if (capture.en_cours || enPause) {
     // Les compteurs restent affichés pendant la pause. Les faire disparaître
@@ -663,7 +726,7 @@ $("bouton-pause").addEventListener("click", async () => {
       // Une reprise refusée laisse la session EN PAUSE, et il faut le dire :
       // sinon le joueur repart farmer en croyant que ça recompte.
       const ligne = $("etat-capture");
-      ligne.className = "avertissement";
+      ligne.classList.add("avertissement");
       ligne.textContent = "Reprise impossible : " + (corps.erreur || "raison inconnue");
       return;
     }
@@ -706,7 +769,7 @@ $("bouton-session").addEventListener("click", async () => {
     // l'utilisateur peut lever, typiquement un calibrage jamais fait. Le
     // message le dit, il faut donc l'afficher plutôt que l'avaler.
     const ligne = $("etat-capture");
-    ligne.className = "avertissement";
+    ligne.classList.add("avertissement");
     ligne.textContent = corps.erreur || "impossible de démarrer la capture";
     return;
   }
@@ -729,8 +792,10 @@ $("bouton-calibrer").addEventListener("click", async () => {
   const extrait = $("extrait-calibrage");
   const apercu = $("apercu-calibrage");
   bouton.disabled = true;
-  extrait.style.display = "none";
-  apercu.style.display = "none";
+  // `hidden` plutot que `style.display` : c'est deja la facon dont le reste
+  // de la page cache un element, et ca laisse la mise en forme dans le CSS.
+  extrait.hidden = true;
+  apercu.hidden = true;
 
   // Le décompte est affiché ici plutôt que côté serveur : la requête reste
   // courte, et l'utilisateur voit combien de temps il lui reste pour basculer
@@ -749,16 +814,16 @@ $("bouton-calibrer").addEventListener("click", async () => {
     });
     const corps = await reponse.json();
     if (!reponse.ok) {
-      ligne.className = "avertissement";
+      ligne.classList.add("avertissement");
       ligne.textContent = corps.erreur || "calibrage impossible";
       return;
     }
-    ligne.className = "";
+    ligne.classList.remove("avertissement");
     ligne.textContent = "Zone calibrée : " + corps.zone;
     // Montrer ce qui a été lu, et pas seulement « c'est calibré » : la
     // détection ne sait pas d'où vient l'image, et un essai réel a calibré
     // proprement sur une capture du chat ouverte dans une visionneuse.
-    extrait.style.display = "block";
+    extrait.hidden = false;
     extrait.textContent =
       (corps.gains
         ? corps.gains + " lignes de gain reconnues. Vérifie que c'est bien ton chat :"
@@ -769,7 +834,7 @@ $("bouton-calibrer").addEventListener("click", async () => {
     // l'œil, un cadre sur sa propre capture d'écran ne laisse aucun doute.
     if (corps.apercu) {
       apercu.src = corps.apercu;
-      apercu.style.display = "block";
+      apercu.hidden = false;
     }
     afficher(await (await fetch("/api/etat")).json());
   } finally {
