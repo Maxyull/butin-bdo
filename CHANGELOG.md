@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.4.0] - 2026-08-06
+
 ### Ajouté
 
 - **Bouton « Recalibrer » dans le panneau posé sur le jeu**, utilisable
