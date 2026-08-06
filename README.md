@@ -230,7 +230,7 @@ Butin suit [Semantic Versioning](https://semver.org/), et son journal des
 modifications suit [Keep a Changelog](https://keepachangelog.com/) :
 [CHANGELOG.md](CHANGELOG.md).
 
-La version actuelle est `0.3.0`. Le `0.` du début a un sens précis et n'est pas
+La version actuelle est `0.4.0`. Le `0.` du début a un sens précis et n'est pas
 de la modestie : **rien n'est stable, tout peut changer d'une version à
 l'autre**, y compris le format de la base de sessions.
 

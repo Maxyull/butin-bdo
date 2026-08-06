@@ -15,4 +15,4 @@ Aucune couche n'importe une couche située au-dessus d'elle.
 # deux sources de vérité qui divergent produisent un numéro faux à l'exécution,
 # ce que personne ne remarque avant un rapport de bogue. Voir
 # docs/versionnage.md pour la politique de version.
-__version__ = "0.3.0"
+__version__ = "0.4.0"
