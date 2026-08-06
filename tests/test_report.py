@@ -155,6 +155,27 @@ class TestEnvoi:
         assert not resultat.envoye
         assert session.appels == []
 
+    def test_un_message_vide_ne_part_pas_MEME_AVEC_UN_CONTEXTE(self, tmp_path: Path) -> None:
+        """⛔ Régression : le contexte rendait la garde de vacuité inopérante.
+
+        La vérification portait sur le corps COMPOSÉ, or le contexte technique
+        est ajouté systématiquement : le corps n'était donc jamais vide, et un
+        clic sur un champ resté blanc envoyait au salon une fiche technique
+        sans la moindre phrase. Illisible pour qui la reçoit, et impossible à
+        rattacher à quoi que ce soit.
+
+        Trouvé en écrivant le test de la route, pas en relisant le module.
+        """
+        session = FausseSession(FausseReponse(202))
+        resultat = report.send_report(
+            "   ",
+            contexte={"version": "0.4.0", "zone calibrée": "476x567"},
+            session=session,
+            root=tmp_path,
+        )
+        assert not resultat.envoye
+        assert session.appels == [], "un rapport sans texte est parti quand même"
+
     def test_un_hote_non_autorise_est_refuse_avant_la_requete(self, tmp_path: Path) -> None:
         """Régression : la liste blanche vaut aussi pour l'URL demandée.
 
