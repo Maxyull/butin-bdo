@@ -9,7 +9,10 @@ Deux chemins, dans cet ordre :
 
 Le score flou est le composant le plus dangereux du projet. Il trouve toujours
 quelque chose : sur 8000 noms, n'importe quel bruit ressemble à au moins un
-objet. Deux garde-fous encadrent donc son usage.
+objet. Deux garde-fous encadrent donc son usage, portés par
+`bdo_ocr_core.matcher.fuzzy_resolve` depuis le 06/08/2026 (politique de
+décision extraite, partagée avec rubin-bdo — voir ATTRIBUTION.md) : ce module
+ne fait plus que la brancher sur `ItemCatalog`.
 
 **Le seuil.** En dessous, aucun résultat n'est rendu. Réglé haut par défaut :
 rater un drop est un chiffre légèrement bas, inventer un drop est un chiffre
@@ -17,11 +20,12 @@ faux. Les deux erreurs ne coûtent pas la même chose, le réglage n'est donc pa
 symétrique.
 
 **La marge d'ambiguïté.** Si les deux meilleurs candidats sont à quelques
-points l'un de l'autre, la ligne est rejetée même quand le meilleur dépasse le
-seuil. Le français rend ce cas fréquent : beaucoup de noms ne diffèrent que par
-un qualificatif final (« Cristal noir tranchant » contre « Cristal noir dur »).
-Sans cette marge, une lecture abîmée de l'un se résout silencieusement en
-l'autre, et l'écart de prix entre les deux peut être d'un ordre de grandeur.
+points l'un de l'autre, la ligne est rejetée même quand le meilleur dépasse
+le seuil. Le français rend ce cas fréquent : beaucoup de noms ne diffèrent
+que par un qualificatif final (« Cristal noir tranchant » contre « Cristal
+noir dur »). Sans cette marge, une lecture abîmée de l'un se résout
+silencieusement en l'autre, et l'écart de prix entre les deux peut être d'un
+ordre de grandeur.
 
 **La restriction par zone** (`scope`) est le levier de précision le plus
 efficace du projet. Un spot de farm fait tomber quelques dizaines d'objets
@@ -43,9 +47,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from enum import Enum
 
-from rapidfuzz import fuzz, process
+from bdo_ocr_core.matcher import (
+    DEFAULT_AMBIGUITY_MARGIN,
+    DEFAULT_THRESHOLD,
+    SCOPED_THRESHOLD,
+    MatchMethod,
+    fuzzy_resolve,
+)
 
 from .catalog import ItemCatalog
 from .models import Item
@@ -53,25 +62,15 @@ from .normalize import fold, is_meaningful
 
 _log = logging.getLogger(__name__)
 
-# Seuil par défaut, sur 100. Mesuré comme un bon compromis sur des noms
-# français longs : en dessous de 88, les paires ne différant que par leur
-# dernier mot commencent à se confondre.
-DEFAULT_THRESHOLD = 88.0
-
-# Écart minimal entre le meilleur et le deuxième candidat pour accepter un
-# résultat flou.
-DEFAULT_AMBIGUITY_MARGIN = 4.0
-
-# Seuil abaissé quand les candidats sont restreints à une zone : sur quelques
-# dizaines de noms, le risque de collision s'effondre.
-SCOPED_THRESHOLD = 80.0
-
-
-class MatchMethod(str, Enum):
-    """Comment la correspondance a été obtenue."""
-
-    EXACT = "exact"
-    FUZZY = "flou"
+__all__ = [
+    "DEFAULT_AMBIGUITY_MARGIN",
+    "DEFAULT_THRESHOLD",
+    "SCOPED_THRESHOLD",
+    "ItemMatcher",
+    "Match",
+    "MatchMethod",
+    "Scope",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,36 +170,14 @@ class ItemMatcher:
             choices = self.catalog.folded_names
             threshold = self.threshold
 
-        if not choices:
-            return None
-
-        # limit=2 : le deuxième candidat sert uniquement au contrôle
-        # d'ambiguïté ci-dessous, il n'est jamais retenu comme résultat.
-        results = process.extract(
-            folded,
-            choices,
-            scorer=fuzz.WRatio,
-            limit=2,
-            score_cutoff=threshold,
+        resolved = fuzzy_resolve(
+            folded, choices, threshold=threshold, ambiguity_margin=self.ambiguity_margin
         )
-        if not results:
+        if resolved is None:
             return None
-
-        best_name, best_score, _ = results[0]
-        if len(results) > 1:
-            second_score = results[1][1]
-            if best_score - second_score < self.ambiguity_margin:
-                _log.debug(
-                    "ligne rejetée pour ambiguïté : %r entre %r (%.1f) et %r (%.1f)",
-                    text,
-                    best_name,
-                    best_score,
-                    results[1][0],
-                    second_score,
-                )
-                return None
+        best_name, best_score = resolved
 
         item = self.catalog.item_for_folded(best_name)
         if item is None:
             return None
-        return Match(item=item, score=float(best_score), method=MatchMethod.FUZZY)
+        return Match(item=item, score=best_score, method=MatchMethod.FUZZY)
