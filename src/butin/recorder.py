@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 
 from .capture.loop import CaptureLoop, TickResult
-from .catalog.zones import detect_spot, load_zones
+from .catalog.zones import detect_spot, load_zone_translations, load_zones
 from .store import LootRow, SessionStore
 
 _log = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ class SessionRecorder:
         self.recorded_silver = 0
         self._seen_ids: set[int] = set()
         self._zones = load_zones()
+        self._zone_translations = load_zone_translations()
         self.skipped_frames = 0
         """Images écartées par les garde-fous. Une valeur qui grimpe signale un
         problème de calibrage, pas une absence de butin, et c'est la seule façon
@@ -84,8 +85,17 @@ class SessionRecorder:
 
         Le trash loot est propre à son spot : c'est lui qui permet de nommer une
         session sans rien demander à l'utilisateur, qui oublierait de le faire.
+
+        Rendu en français quand la traduction existe : le produit est pensé
+        pour le client français dès la première ligne, un nom de session en
+        anglais serait la seule chose de tout le produit à ne pas l'être.
+        Repli sur l'anglais quand la zone n'a pas encore de traduction, plutôt
+        que de rendre None : un nom en anglais reste plus utile qu'aucun nom.
         """
-        return detect_spot(self._seen_ids, self._zones)
+        zone_en = detect_spot(self._seen_ids, self._zones)
+        if zone_en is None:
+            return None
+        return self._zone_translations.get(zone_en, zone_en)
 
     def _persist(self, resultat: TickResult, now: float) -> None:
         if resultat.events:

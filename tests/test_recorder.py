@@ -215,3 +215,35 @@ class TestSessionsSeparees:
 
         assert store.loot_count(une.session_id) > 0
         assert store.loot_count(deux.session_id) == 0
+
+
+class TestSpotDetecteEnFrancais:
+    """detect_spot() rend un nom anglais (clé de regroupement de zones.py) ;
+    detected_spot doit le traduire avant de nommer une session, sinon un
+    produit pensé pour le client français en jeu depuis la première ligne
+    nommerait ses sessions en anglais.
+
+    Manipule `_seen_ids`/`_zones`/`_zone_translations` directement plutôt que
+    de faire vraiment tomber un objet : ce qui est en jeu ici est la
+    traduction, pas la détection elle-même, déjà couverte par test_zones.py.
+    """
+
+    def test_le_spot_detecte_est_traduit(self, monte) -> None:
+        construire, _ = monte
+        enregistreur = construire([["rien"]])
+        enregistreur._zones = {43984: ("Abandoned Iron Mine",)}
+        enregistreur._zone_translations = {"Abandoned Iron Mine": "Mine de fer abandonnée"}
+        enregistreur._seen_ids = {43984}
+
+        assert enregistreur.detected_spot == "Mine de fer abandonnée"
+
+    def test_une_zone_sans_traduction_connue_reste_en_anglais(self, monte) -> None:
+        """Un nom anglais reste plus utile qu'aucun nom : voir la docstring
+        de `detected_spot`."""
+        construire, _ = monte
+        enregistreur = construire([["rien"]])
+        enregistreur._zones = {43984: ("Zone Toute Neuve",)}
+        enregistreur._zone_translations = {}
+        enregistreur._seen_ids = {43984}
+
+        assert enregistreur.detected_spot == "Zone Toute Neuve"

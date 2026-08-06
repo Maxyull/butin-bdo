@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from butin.catalog import zones as zones_module
-from butin.catalog.zones import detect_spot, known_zones, load_zones, zones_for
+from butin.catalog.zones import (
+    detect_spot,
+    known_zones,
+    load_zone_translations,
+    load_zones,
+    zones_for,
+)
 
 # Indicateurs réels, relevés dans data/butin-connu.json.
 CHAINES_BRISEES = 43984  # mine de fer abandonnée
@@ -102,6 +108,47 @@ class TestFichierLivre:
             encoding="utf-8",
         )
         assert load_zones(chemin) == {1: ("Bonne Zone",)}
+
+
+class TestTraductionDesZones:
+    """zone_fr, ajoutée le 06/08/2026 : `detect_spot` rend un nom anglais,
+    mais nommer une session en anglais serait la seule chose de tout le
+    produit à ne pas être pensée pour le client français."""
+
+    def test_une_zone_connue_se_traduit(self, tmp_path: Path) -> None:
+        chemin = tmp_path / "zones.json"
+        chemin.write_text(
+            json.dumps(
+                {"items": {"1": {"zone_en": "Sausan Garrison", "zone_fr": "Garnison des sausans"}}}
+            ),
+            encoding="utf-8",
+        )
+        assert load_zone_translations(chemin) == {"Sausan Garrison": "Garnison des sausans"}
+
+    def test_une_zone_sans_traduction_connue_est_absente(self, tmp_path: Path) -> None:
+        """Absente et non mappée sur elle-même : à l'appelant de choisir le
+        repli, comme `load_zones` le documente déjà pour un fichier absent."""
+        chemin = tmp_path / "zones.json"
+        chemin.write_text(
+            json.dumps({"items": {"1": {"zone_en": "Zone Inconnue", "zone_fr": ""}}}),
+            encoding="utf-8",
+        )
+        assert load_zone_translations(chemin) == {}
+
+    def test_fichier_absent_sans_erreur(self, tmp_path: Path) -> None:
+        assert load_zone_translations(tmp_path / "rien.json") == {}
+
+    def test_fichier_corrompu_sans_erreur(self, tmp_path: Path) -> None:
+        chemin = tmp_path / "casse.json"
+        chemin.write_text("{pas du json", encoding="utf-8")
+        assert load_zone_translations(chemin) == {}
+
+    def test_le_fichier_du_depot_traduit_un_indicateur_connu(self) -> None:
+        """Même objet que `test_un_indicateur_connu_pointe_sur_sa_zone` :
+        `load_zones` rend l'anglais (clé de regroupement), cette fonction
+        rend la traduction de ce même anglais."""
+        traductions = load_zone_translations()
+        assert traductions["Abandoned Iron Mine"] == "Mine de fer abandonnée"
 
 
 class TestPourquoiPasUnPerimetre:

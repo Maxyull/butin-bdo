@@ -94,6 +94,133 @@ ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / "cache"
 OUTPUT = ROOT / "data" / "butin-connu.json"
 
+# Traduction des zones de farm, recoupée le 06/08/2026. bdocodex n'a pas de
+# pages de zone dédiées ; sa carte du monde (bdocodex.com/{fr,us}/worldmap/)
+# expose ses marqueurs par un même identifiant numérique en anglais et en
+# français, ce qui vaut jointure directe. garmoth s'est révélé inutilisable
+# comme source de zones : son contenu reste en anglais quel que soit le
+# paramétrage. bdolytics.com (même principe que bdocodex : extraction directe
+# des chaînes du client de jeu, déjà une source de `data/noms-verifies.json`)
+# a servi de deuxième référence, recoupée avec bdocodex, et a comblé les
+# zones absentes de la carte de bdocodex (petits camps non marqués comme
+# nœud de carte).
+#
+# 66 des 94 zones sont recoupées par bdocodex ET bdolytics (accord mot pour
+# mot). Les 28 suivantes ne reposent que sur bdolytics seul, faute de
+# marqueur correspondant sur la carte de bdocodex — moins solide que la règle
+# à deux sources de `noms-verifies.json`, mais bdolytics a le même statut de
+# source primaire (extraction du client) que bdocodex, pas une traduction
+# tierce : Centaurus Herd, Cyclops Land, Dark Energy Floodlands, Erethea's
+# Limbo, Fadus Habitat, Forest Ronaros Area, Fortunate Golden Pig Cave, Gyfin
+# Rhasia Temple (Under), Hystria Ruins, Kratuga Ancient Ruins, Murrowak's
+# Labyrinth, Sherekhan Necropolis (Day)/(Night), Sycraia Ruins (Lower)/
+# (Upper), Traitor's Graveyard, Vessel of Inquisition, Winter Tree Fossil,
+# [Dehkia] Cyclops Land, [Dehkia] Hystria Ruins, [Elvia] Altar Imps, [Elvia]
+# Swamp Fogans, [Elvia] Swamp Nagas.
+#
+# Les préfixes [Dehkia] / [Dekhia] / [Elvia] sont des noms propres non
+# traduits en français, confirmés par le forum officiel NA/EU FR et par
+# bdolytics lui-même (qui les écrit tels quels dans ses chaînes françaises).
+# « [Dekhia] Aakman » reproduit une coquille déjà présente dans zone_en
+# (« Dekhia » pour « Dehkia ») : gardée à l'identique plutôt que corrigée en
+# silence, ce n'est pas le rôle de cette table.
+ZONE_FR: dict[str, str] = {
+    "Abandoned Iron Mine": "Mine de fer abandonnée",
+    "Abandoned Monastery": "Monastère abandonné",
+    "Aetherion Castle": "Château d'Aetherion",
+    "Ash Forest": "Forêt de cendres",
+    "Bashim Base": "Camp Bashim",
+    "Basilisk Den": "Tanière des basilics",
+    "Blood Wolf Settlement": "Repaire des Loups sanglants",
+    "Bumblin' Buccaneers": "Pirates bric-à-brac",
+    "Cadry Ruins": "Ruines de Cadry",
+    "Catfishman Camp": "Camp des hommes poissons-chats",
+    "Centaurus Herd": "Horde Centaure",
+    "City of the Dead": "Cité des morts",
+    "Crescent Shrine": "Sanctuaire du croissant",
+    "Crypt of Resting Thoughts": "Crypte des pensées endormies",
+    "Cyclops Land": "Terres des cyclopes",
+    "Dark Energy Floodlands": "Zone débordant d'énergie noire",
+    "Darkseekers' Retreat": "Refuge des disciples des ténèbres",
+    "Desert Naga Temple": "Temple des nagas du désert",
+    "Dokkebi Forest": "Forêt des Dokkebis",
+    "Elric Shrine": "Sanctuaire d'Elric",
+    "Erethea's Limbo": "Oubli d'Erethea",
+    "Fadus Habitat": "Territoire des Fadus",
+    "Forest Ronaros Area": "Zone des Ronaros forestiers",
+    "Fortunate Golden Pig Cave": "Grotte des cochons dorés de la chance",
+    "Gahaz Bandit's Lair": "Repaire des bandits de Gahaz",
+    "Golden Pig Cave": "Grotte des cochons dorés",
+    "Gyfin Rhasia Temple (Under)": "Temple de Gyfin Rhasia (sous-sol)",
+    "Gyfin Rhasia Temple (Upper)": "Temple de Gyfin Rhasia",
+    "Hasrah Cliff": "Falaise d'Hasrah",
+    "Helms Post": "Poste des helms",
+    "Hexe Sanctuary": "Sanctuaire d'Hexe",
+    "Honglim Base": "Base de Honglim",
+    "Hystria Ruins": "Ruines d'Hystria",
+    "Kratuga Ancient Ruins": "Ruines anciennes de Kratuga",
+    "Manes Hideout": "Planque des Manes",
+    "Mansha Forest": "Forêt des Manshas",
+    "Manshaum Forest": "Forêt Manshaum",
+    "Mirumok Ruins": "Ruines Mirumok",
+    "Murrowak's Labyrinth": "Dédale de Murrowak",
+    "Navarn Steppe": "Steppe de Navarn",
+    "Nymphamaré Castle": "Château de Nymphamaré",
+    "Olun's Valley": "Vallée d'Olun",
+    "Orbita Castle": "Château d'Orbita",
+    "Orzekea": "Orzekea",
+    "Padix Island": "Île de Padix",
+    "Polly's Forest": "Forêt de Polly",
+    "Protty Cave": "Grotte aux Prottys",
+    "Rhutum Outstation": "Poste avancé des rhutums",
+    "Roud Sulfur Mine": "Mine de soufre de Roud",
+    "Sausan Garrison": "Garnison des sausans",
+    "Sherekhan Necropolis (Day)": "Nécropole des Sherekhans (jour)",
+    "Sherekhan Necropolis (Night)": "Nécropole des Sherekhans (nuit)",
+    "Soldier's Cemetery": "Cimetière des soldats",
+    "Star's End": "Astralle",
+    "Sycraia Ruins (Lower)": "Zone inférieure des Ruines de Sycraia",
+    "Sycraia Ruins (Upper)": "Zone supérieure des Ruines de Sycraia",
+    "Tenebraum Castle": "Château de Tenebraum",
+    "Thornwood Forest": "Forêt d'Arbrépine",
+    "Titium Valley": "Vallée de Titium",
+    "Traitor's Graveyard": "Cimetière du Traître",
+    "Tshira Ruins": "Ruines de Tshira",
+    "Tungrad Ruins": "Ruines de Tungrad",
+    "Tunkuta": "Tunkuta",
+    "Vessel of Inquisition": "Socle de l'inquisition",
+    "Wandering Rogue Den": "Repaire des bandits errants",
+    "Waragon Nest": "Nid de waragons",
+    "Winter Tree Fossil": "Fossile d'arbre d'hiver",
+    "Yzrahid Highlands": "Hautes terres d'Yzrahid",
+    "Zephyros Castle": "Château de Zephyros",
+    "[Dehkia] Ash Forest": "[Dehkia] Forêt de cendres",
+    "[Dehkia] Cadry Ruins": "[Dehkia] Ruines de Cadry",
+    "[Dehkia] Crescent Shrine": "[Dehkia] Sanctuaire du croissant",
+    "[Dehkia] Cyclops Land": "[Dehkia] Terres des cyclopes",
+    "[Dehkia] Gyfin Rhasia Temple (Upper)": "[Dehkia] Temple de Gyfin Rhasia",
+    "[Dehkia] Hystria Ruins": "[Dehkia] Ruines d'Hystria",
+    "[Dehkia] Mirumok Ruins": "[Dehkia] Ruines Mirumok",
+    "[Dehkia] Olun's Valley": "[Dehkia] Vallée d'Olun",
+    "[Dehkia] Pila Ku Jail": "[Dehkia] Prison de Pila Ku",
+    "[Dehkia] Thornwood Forest": "[Dehkia] Forêt d'Arbrépine",
+    "[Dehkia] Tunkuta": "[Dehkia] Tunkuta",
+    "[Dekhia] Aakman": "[Dekhia] Aakman",
+    "[Elvia] Altar Imps": "[Elvia] Éfrit de l'autel",
+    "[Elvia] Biraghi Den": "[Elvia] Repaire de Biraghi",
+    "[Elvia] Bloody Monastery": "[Elvia] Monastère sanglant",
+    "[Elvia] Castle Ruins": "[Elvia] Ruines du château",
+    "[Elvia] Hexe Sanctuary": "[Elvia] Sanctuaire d'Hexe",
+    "[Elvia] Orc Camp": "[Elvia] Camp des Orcs",
+    "[Elvia] Primal Giant Post": "[Elvia] Poste des géants originels",
+    "[Elvia] Quint Hill": "[Elvia] Colline de Quint",
+    "[Elvia] Rhutum Outstation": "[Elvia] Poste avancé des rhutums",
+    "[Elvia] Roud Sulfur Mine": "[Elvia] Mine de soufre de Roud",
+    "[Elvia] Saunil Camp": "[Elvia] Camp des saunils",
+    "[Elvia] Swamp Fogans": "[Elvia] Fogan des marais",
+    "[Elvia] Swamp Nagas": "[Elvia] Naga des marais",
+}
+
 
 def telecharger(lang: str, *, rafraichir: bool) -> Path:
     """Récupère la base bdocodex d'une langue, en cache local.
@@ -209,11 +336,19 @@ def joindre(
         # s'écraser : voir le commentaire de _LEVEL_RE.
         fiche = joints.setdefault(
             str(item_id),
-            {"en": nom, "fr": nom_fr, "zone_en": "", "valeurs": {}, "ambigu": len(ids) > 1},
+            {
+                "en": nom,
+                "fr": nom_fr,
+                "zone_en": "",
+                "zone_fr": "",
+                "valeurs": {},
+                "ambigu": len(ids) > 1,
+            },
         )
         fiche["valeurs"][niveau or "base"] = _entier(entree["valeur"])
         if entree["zone"] and not fiche["zone_en"]:
             fiche["zone_en"] = entree["zone"]
+            fiche["zone_fr"] = ZONE_FR.get(entree["zone"], "")
     return joints, absents, ambigus
 
 
@@ -258,6 +393,11 @@ def main(argv: list[str] | None = None) -> int:
     avec_zone = sum(1 for v in joints.values() if v["zone_en"])
     zones = Counter(v["zone_en"] for v in joints.values() if v["zone_en"])
     print(f"avec zone : {avec_zone} objets, {len(zones)} zones distinctes")
+    non_traduites = sorted(z for z in zones if z not in ZONE_FR)
+    if non_traduites:
+        print(f"zones sans traduction dans ZONE_FR ({len(non_traduites)}) :")
+        for zone in non_traduites:
+            print(f"   {zone}")
 
     if absents:
         print("\npremiers absents :")
@@ -274,7 +414,10 @@ def main(argv: list[str] | None = None) -> int:
                     "Généré par scripts/joindre_butin.py, ne pas éditer à la main.",
                     "Valeur et zone viennent de janhnguyen/BDO-Loot-Tracker (MIT),",
                     "les noms de bdocodex. Voir ATTRIBUTION.md.",
-                    "Les zones sont en anglais : leur traduction reste à faire.",
+                    "zone_fr vient de la table ZONE_FR du script (bdocodex + bdolytics,",
+                    "recoupées le 06/08/2026, voir son commentaire pour la couverture",
+                    "exacte des 94 zones). Vide si aucune traduction n'est encore",
+                    "connue pour cette zone.",
                 ],
                 "items": dict(sorted(joints.items(), key=lambda kv: int(kv[0]))),
             },
