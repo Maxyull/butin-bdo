@@ -9,6 +9,27 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Ajouté
+
+- **Bouton « Envoyer le rapport »** dans les Réglages : signaler un problème
+  part directement dans le salon Discord, avec la date et un pseudonyme, sans
+  quitter l'application. La version, la zone calibrée et l'état de la capture
+  sont joints automatiquement — un rapport sans ces informations oblige à un
+  aller-retour que personne ne fera après avoir perdu une session de farm.
+  Rien d'autre ne part, et rien ne part sans ce bouton.
+
+  Le message passe par un relais sur `rubin.maxyull.fr` : **Butin ne connaît
+  jamais l'adresse du salon Discord**. C'est délibéré. L'application est
+  distribuée publiquement, donc une adresse d'envoi embarquée dedans serait
+  lisible par n'importe quel joueur, le salon deviendrait ouvert au spam, et
+  la refermer obligerait à republier l'application entière.
+
+  Tant que le relais n'est pas configuré côté serveur, le bouton le dit
+  franchement plutôt que d'échouer en silence. Un identifiant anonyme, tiré au
+  sort une fois et gardé sur cette machine, permet de reconnaître deux
+  rapports du même joueur ; il ne contient rien qui identifie la personne ni
+  la machine.
+
 ## [0.4.0] - 2026-08-06
 
 ### Ajouté
