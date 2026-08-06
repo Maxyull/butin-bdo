@@ -11,6 +11,7 @@ from __future__ import annotations
 import builtins
 import json
 import threading
+import time
 import urllib.request
 from pathlib import Path
 
@@ -156,6 +157,72 @@ class TestVerificationDeMiseAJour:
         libere.set()
 
         assert ouverte.is_set(), "la fenêtre a attendu la vérification de mise à jour"
+
+    def test_elle_se_repete_tant_que_la_fenetre_reste_ouverte(self, store: SessionStore) -> None:
+        """Demandé par Maxime le 06/08/2026 : une seule vérification au
+        lancement ne suffit pas sur une session de farm de plusieurs heures,
+        une Release publiée entre-temps ne serait jamais signalée.
+
+        État fourni directement (catalogue `None`), comme dans
+        `TestFermeture` : `build_state` ferait un vrai appel réseau pour
+        charger le catalogue (isolation `BUTIN_HOME` de `conftest.py` oblige,
+        aucun cache local à trouver), bien trop lent pour un intervalle de
+        vérification de 0,02 s.
+        """
+        etat = AppState(store, PriceBook(), None, None)
+        appels: list[int] = []
+        ouverte = threading.Event()
+        fermer = threading.Event()
+
+        def fenetre(url: str) -> None:
+            ouverte.set()
+            fermer.wait(timeout=3.0)
+
+        def verification() -> None:
+            appels.append(1)
+
+        fil = threading.Thread(
+            target=app.run,
+            kwargs={
+                "state": etat,
+                "window": fenetre,
+                "preload": lambda: 0,
+                "check_update": verification,
+                "check_update_interval_s": 0.02,
+            },
+        )
+        fil.start()
+        assert ouverte.wait(timeout=3.0), "la fenêtre n'a jamais ouvert"
+        time.sleep(0.3)
+        fermer.set()
+        fil.join(timeout=3.0)
+
+        assert len(appels) >= 3, f"seulement {len(appels)} appel(s) en 0,3 s à 0,02 s d'intervalle"
+
+    def test_elle_s_arrete_quand_la_fenetre_se_ferme(self, store: SessionStore) -> None:
+        """⭐ Régression à ne pas réintroduire : un fil de fond qui survit à
+        `run()`. Attrapé une première fois sur le préchargement des images
+        (#37) — même piège possible ici avec un intervalle court."""
+        etat = AppState(store, PriceBook(), None, None)
+        appels: list[int] = []
+
+        def fenetre(url: str) -> None:
+            pass
+
+        def verification() -> None:
+            appels.append(1)
+
+        app.run(
+            state=etat,
+            window=fenetre,
+            preload=lambda: 0,
+            check_update=verification,
+            check_update_interval_s=0.02,
+        )
+        apres_fermeture = len(appels)
+        time.sleep(0.3)
+
+        assert len(appels) == apres_fermeture, "un fil de fond a survécu à la fermeture"
 
 
 class TestFermeture:

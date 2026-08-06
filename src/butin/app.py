@@ -136,6 +136,34 @@ def build_state(store: SessionStore | None = None) -> AppState:
     return AppState(magasin, PriceBook(), catalog, CaptureWorker(magasin, matcher=matcher))
 
 
+CHECK_UPDATE_INTERVAL_S = 300.0
+"""Cinq minutes. Butin peut rester ouvert des heures pendant une session de
+farm ; sans revérification périodique, une Release publiée pendant ce temps
+ne serait jamais signalée avant le prochain lancement. Compromis entre
+utilité (assez fréquent) et discrétion réseau (assez espacé) — aucune mesure
+derrière ce chiffre, juste du bon sens, contrairement aux seuils mesurés
+ailleurs dans ce dépôt (voir CLAUDE.md section 4sexies)."""
+
+
+def _reverifier_periodiquement(
+    verifier: Callable[[], object], *, intervalle_s: float, arret: threading.Event
+) -> None:
+    """Appelle `verifier` tout de suite, puis à intervalles réguliers, jusqu'à
+    ce qu'`arret` soit positionné.
+
+    `Event.wait(timeout=...)` et non `time.sleep(...)` : le premier rend la
+    main DÈS QUE `arret` est positionné, même en plein milieu de l'attente. Un
+    `sleep` bloquerait ce fil jusqu'au bout de l'intervalle, donc jusqu'à cinq
+    minutes après la fermeture de la fenêtre — exactement le genre de fil qui
+    survit à `run()` que ce projet a déjà payé cher une fois (voir la note
+    d'en-tête de `run`).
+    """
+    while True:
+        verifier()
+        if arret.wait(timeout=intervalle_s):
+            return
+
+
 def run(
     *,
     port: int = 0,
@@ -144,6 +172,7 @@ def run(
     window: Any = None,
     preload: Callable[[], object] | None = None,
     check_update: Callable[[], object] | None = None,
+    check_update_interval_s: float = CHECK_UPDATE_INTERVAL_S,
 ) -> int:
     """Ouvre la fenêtre et ne rend la main qu'à sa fermeture.
 
@@ -162,6 +191,12 @@ def run(
     processus. Dans une suite de tests, le processus continue : le fil
     écrivait alors sur le disque pendant un autre test, qui échouait sur un
     dossier qu'il n'avait pas créé.
+
+    ⚠️ `check_update` se répète toutes les `check_update_interval_s` secondes
+    tant que la fenêtre reste ouverte, pas une seule fois au lancement : voir
+    `_reverifier_periodiquement`. Le fil qui la porte est arrêté explicitement
+    dans le `finally`, pour la même raison que `preload` ne doit jamais
+    survivre à cet appel.
     """
     state = state or build_state(store)
     serveur = build_server(state, port=port)
@@ -184,13 +219,24 @@ def run(
     ).start()
     # ⚠️ Même raison : un aller-retour réseau, jamais devant. Une notification
     # de mise à jour en retard d'une minute ne coûte rien ; retarder
-    # l'ouverture de la fenêtre pour l'attendre coûterait tout.
+    # l'ouverture de la fenêtre pour l'attendre coûterait tout. Répétée tant
+    # que la fenêtre reste ouverte, voir `_reverifier_periodiquement`.
+    arret_maj = threading.Event()
     threading.Thread(
-        target=check_update or state.check_update, daemon=True, name="butin-maj"
+        target=_reverifier_periodiquement,
+        args=(check_update or state.check_update,),
+        kwargs={"intervalle_s": check_update_interval_s, "arret": arret_maj},
+        daemon=True,
+        name="butin-maj",
     ).start()
     try:
         (window or _open_window)(adresse)
     finally:
+        # Réveille immédiatement le fil de revérification s'il attendait
+        # l'intervalle, avant même d'arrêter quoi que ce soit d'autre :
+        # sinon il continuerait d'appeler GitHub jusqu'à cinq minutes après
+        # la fermeture de la fenêtre.
+        arret_maj.set()
         # Dans cet ordre, et jamais dans l'autre : arrêter la capture enregistre
         # le butin encore en attente, et refermer la session fige sa durée.
         state.stop()
