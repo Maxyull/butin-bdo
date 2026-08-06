@@ -18,7 +18,7 @@ import pytest
 
 import butin
 from butin import paths
-from butin.capture.calibrate import Calibration
+from butin.capture.calibrate import Calibration, CalibrationError
 from butin.capture.screen import Region
 from butin.capture.worker import CaptureStatus, CaptureUnavailable
 from butin.catalog import ItemCatalog
@@ -798,6 +798,81 @@ class TestPause:
 
         repris = post(base, "/api/session/reprendre")
         assert repris["session"]["en_pause"] is False
+
+
+class TestRecalibrage:
+    """Recalibrer PENDANT une session, sans perdre le butin ni la redémarrer.
+
+    Demandé le 06/08/2026 : le calibrage ne suit pas un déplacement de la
+    fenêtre de chat en cours de farm, et jusqu'ici il fallait arrêter la
+    session pour recalibrer depuis les Réglages.
+    """
+
+    def _etat(self, store: SessionStore) -> tuple[AppState, TestCapture._Travailleur]:
+        travailleur = TestCapture._Travailleur()
+        return AppState(store, PriceBook(), None, travailleur), travailleur
+
+    def test_recalibrer_suspend_puis_relance_sans_perdre_les_compteurs(
+        self, store: SessionStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """⭐ Le total affiché ne doit jamais repartir à zéro."""
+        etat, travailleur = self._etat(store)
+        session_id = etat.start("Gyfin", now=0.0)
+        # calibrate() lui-même (écran, OCR) est testé ailleurs. Ici la
+        # question est : suspendre puis relancer préserve-t-il la session.
+        monkeypatch.setattr(etat, "calibrate", lambda **_: {"zone": "480x600"})
+
+        resultat = etat.recalibrate()
+
+        assert resultat == {"zone": "480x600"}
+        assert travailleur.pauses == 1
+        assert travailleur.reprises == [session_id]
+        assert etat.session_id == session_id  # la session n'a jamais été redémarrée
+
+    def test_recalibrer_sans_session_est_refuse(self, store: SessionStore) -> None:
+        etat, _ = self._etat(store)
+        with pytest.raises(CaptureUnavailable):
+            etat.recalibrate()
+
+    def test_recalibrer_pendant_une_pause_ne_relance_pas_la_capture(
+        self, store: SessionStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """⭐ Piège trouvé en lisant le code : relancer ici recréditerait la
+        base sans que `resume_session` n'ait rouvert la session, donc une
+        session marquée en pause qui capture quand même, sans rien à l'écran
+        pour le dire.
+        """
+        etat, travailleur = self._etat(store)
+        etat.start("Gyfin", now=0.0)
+        etat.pause(now=10.0)
+        monkeypatch.setattr(etat, "calibrate", lambda **_: {"zone": "480x600"})
+
+        etat.recalibrate()
+
+        assert travailleur.pauses == 1  # seulement celle du pause() explicite
+        assert travailleur.reprises == []  # recalibrer n'a rien relancé
+        assert etat.snapshot(now=20.0)["session"]["en_pause"] is True
+
+    def test_l_echec_du_calibrage_relance_quand_meme_la_capture(
+        self, store: SessionStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """⭐ Régression : une tentative ratée ne doit pas laisser la session
+        ouverte sans rien qui l'alimente, en silence — le mode de défaillance
+        que la section 1 du CLAUDE.md refuse partout ailleurs.
+        """
+        etat, travailleur = self._etat(store)
+        session_id = etat.start("Gyfin", now=0.0)
+
+        def _echoue(**_: Any) -> dict[str, Any]:
+            raise CalibrationError("fenêtre de chat introuvable")
+
+        monkeypatch.setattr(etat, "calibrate", _echoue)
+
+        with pytest.raises(CalibrationError):
+            etat.recalibrate()
+
+        assert travailleur.reprises == [session_id]  # relancée malgré l'échec
+        assert etat.snapshot()["capture"]["en_cours"] is True
 
 
 class TestApresLArret:

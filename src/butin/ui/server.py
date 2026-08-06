@@ -608,6 +608,63 @@ class AppState:
                 self.worker.start(self.session_id, reprise=True)
             self.store.resume_session(self.session_id, at=maintenant)
 
+    def recalibrate(self, *, monitor: int = 1) -> dict[str, Any]:
+        """Recalibre la zone PENDANT une session, sans perdre le butin déjà
+        compté ni redémarrer la session.
+
+        ⭐ Compose deux mécanismes qui existent déjà et sont déjà testés
+        séparément : `pause()` verse les compteurs de la tranche qui s'achève
+        dans les totaux sans y toucher, `resume()`-style relance avec une
+        boucle NEUVE (`reprise=True`), dont la première lecture amorce le
+        suivi avec ce que la zone affiche à l'écran sans rien compter.
+        Recalibrer, c'est juste écrire une nouvelle zone entre les deux :
+        `calibrate()` la sauve sur disque, et `CaptureWorker.start()` la
+        relit à cet instant via son `calibration_loader`.
+
+        ⚠️ Ne touche NI à `session.is_paused` NI à la durée : ce n'est pas une
+        pause, c'est une coupure de quelques secondes de la même farme,
+        traitée comme n'importe quel autre trou de cadence de la boucle.
+
+        ⚠️ Si la session était DÉJÀ en pause au moment du clic, la capture
+        n'est PAS relancée : la relancer ferait tourner le fil en écrivant du
+        butin alors que `session.is_paused` resterait vrai en base, une
+        session qui capture en croyant être en pause. La zone neuve est
+        quand même enregistrée sur disque, prête pour la prochaine reprise
+        explicite (bouton Reprendre), exactement comme aujourd'hui pour
+        « Calibrer la zone » utilisé avant de farmer.
+
+        ⚠️ Tenu sous verrou de bout en bout, écran compris (~2 à 4 s) : c'est
+        ce qui empêche un `pause()`/`stop()` concurrent de s'intercaler entre
+        la suspension et la relance et de retomber dans le même piège. Les
+        autres méthodes de cycle de vie (`start`, `stop`, `pause`, `resume`)
+        font déjà ce compromis pour la même raison.
+        """
+        with self.lock:
+            if self.session_id is None:
+                raise CaptureUnavailable("aucune session en cours : rien à recalibrer")
+            session_id = self.session_id
+            capture_active = self.worker is not None and self.worker.running
+
+            if capture_active and self.worker is not None:
+                self.worker.pause()
+
+            try:
+                resultat = self.calibrate(monitor=monitor)
+            finally:
+                # Que le calibrage réussisse ou non, la capture qui tournait
+                # avant doit repartir : une tentative ratée ne doit pas
+                # laisser la session ouverte sans rien qui l'alimente, en
+                # silence — le mode de défaillance que la section 1 du
+                # CLAUDE.md refuse partout ailleurs. `not self.worker.running`
+                # protège le cas (rare) où `pause()` n'aurait pas vraiment
+                # arrêté le fil dans son délai : on ne tente alors pas de
+                # relancer par-dessus un fil déjà vivant, comme `resume()`
+                # le fait déjà.
+                if capture_active and self.worker is not None and not self.worker.running:
+                    self.worker.start(session_id, reprise=True)
+
+            return resultat
+
 
 class Handler(BaseHTTPRequestHandler):
     """Routes de l'interface. Volontairement peu nombreuses."""
@@ -767,6 +824,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"erreur": str(exc)}, status=409)
                 return
             self._send_json(self.state.snapshot())
+        elif self.path == "/api/session/recalibrer":
+            try:
+                self._send_json(self.state.recalibrate())
+            except (CaptureUnavailable, CalibrationError) as exc:
+                # 409 comme les autres refus explicables : pas de session en
+                # cours, ou la fenêtre de chat introuvable cette fois-ci.
+                self._send_json({"erreur": str(exc)}, status=409)
         elif self.path == "/api/session/arreter":
             self.state.stop()
             self._send_json(self.state.snapshot())

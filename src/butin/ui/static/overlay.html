@@ -39,9 +39,9 @@
     padding: 2px 9px; cursor: pointer; font-size: 12px;
   }
   /* Sur le PREMIER bouton seulement. Mise sur la règle générale, la marge
-     automatique s'appliquerait aux deux et se partagerait l'espace libre au
+     automatique s'appliquerait à tous et se partagerait l'espace libre au
      lieu de les pousser ensemble à droite. */
-  #pause { margin-left: auto; }
+  #recalibrer { margin-left: auto; }
   #barre button:hover { color: #ff8b3d; border-color: #ff8b3d; }
 
   /* ⚠️ La pause doit se voir de loin, et pas seulement dans le libellé d'un
@@ -92,6 +92,7 @@
   <div id="barre">
     <span class="titre">Butin — en direct</span>
     <span id="etat"></span>
+    <button id="recalibrer" title="Recalibre la zone si le chat a bougé, sans perdre le butin déjà compté">Recalibrer</button>
     <button id="pause" title="Suspend la capture et arrête de compter le temps">Pause</button>
     <button id="fermer" title="Arrête la session et referme le panneau">Arrêter</button>
   </div>
@@ -219,6 +220,35 @@ $("pause").addEventListener("click", async () => {
     afficher(corps);
   } finally {
     bouton.disabled = false;
+  }
+});
+
+$("recalibrer").addEventListener("click", async () => {
+  const bouton = $("recalibrer");
+  // Comme Pause : désactivé le temps de l'aller-retour. Le recalibrage
+  // suspend puis relance la capture, quelques secondes pendant lesquelles un
+  // second clic n'aurait pas de sens.
+  bouton.disabled = true;
+  const texteInitial = bouton.textContent;
+  bouton.textContent = "Recalibrage…";
+  try {
+    const reponse = await fetch("/api/session/recalibrer", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: "{}",
+    });
+    const corps = await reponse.json();
+    if (!reponse.ok) {
+      // Même canal que l'échec de reprise : un message qui reste visible
+      // jusqu'au prochain rafraîchissement d'une seconde.
+      $("panne").style.display = "block";
+      $("panne").textContent = "Recalibrage impossible : " + (corps.erreur || "raison inconnue");
+      return;
+    }
+    afficher(await (await fetch("/api/etat")).json());
+  } finally {
+    bouton.disabled = false;
+    bouton.textContent = texteInitial;
   }
 });
 

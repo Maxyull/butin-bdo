@@ -11,6 +11,17 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Ajouté
 
+- **Bouton « Recalibrer » dans le panneau posé sur le jeu**, utilisable
+  PENDANT une session sans avoir à l'arrêter. Jusqu'ici, si le joueur
+  déplaçait la fenêtre de chat du jeu en cours de farm, la zone calibrée
+  restait fausse jusqu'à la fin de la session — recalibrer demandait de
+  quitter le panneau et de revenir aux Réglages. Recalibrer suspend la
+  capture, enregistre la nouvelle zone, puis relance avec une boucle neuve
+  (même garantie que la reprise après pause : la première lecture n'invente
+  rien de ce qui est déjà à l'écran), sans jamais faire repartir le total à
+  zéro. Pas de détection automatique d'un déplacement : uniquement un geste
+  explicite du joueur, conformément au principe qui tranche tout dans ce
+  projet (rater un drop est acceptable, en inventer ne l'est jamais).
 - **Les zones de farm sont traduites en français**, et une session est
   désormais nommée automatiquement dans cette langue (`Mine de fer
   abandonnée`, pas `Abandoned Iron Mine`) : la seule chose du produit qui

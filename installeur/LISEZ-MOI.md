@@ -77,23 +77,37 @@ générée en interne (PIL, aucun actif téléchargé) en sept résolutions de 1
 256 px, embarquée à la fois dans `butin.exe` (via `butin.spec`) et dans
 l'installeur lui-même (`SetupIconFile` dans `butin.iss`).
 
-## Ce qui manque encore, dans l'ordre
+## La construction en une commande : FAIT (06/08/2026)
 
-1. **Vérifier sur une machine sans Python ni Visual C++ Redistributable
-   installés.** Toutes les vérifications ci-dessus ont eu lieu sur la machine
-   de développement, où tout est déjà présent. `onnxruntime` a des
-   dépendances natives ; rien n'indique qu'il en manque, mais rien ne l'a
-   testé sur un poste vraiment vierge (pas de VM disponible ici).
-2. **Automatiser la construction.** Pour l'instant, construire dist/butin/,
-   compiler l'installeur, ET tenir `MyAppVersion` synchrone avec
-   `pyproject.toml` sont trois gestes manuels. Un script ou une étape
-   d'intégration continue viendra une fois le format de distribution
-   éprouvé sur plusieurs publications réelles.
-La vérification de mise à jour au lancement (`src/butin/update.py`) est faite,
-demandée par Maxime le 06/08/2026 : Butin signale une nouvelle version
-disponible par un bandeau, sans jamais la télécharger ni l'installer seul.
-Depuis la publication de `0.1.0` le même jour, elle a quelque chose à
-comparer.
+```
+installeur\construire.ps1
+```
+
+Enchaîne PyInstaller puis ISCC, et **refuse de construire** si `MyAppVersion`
+dans `butin.iss` diverge de la version dans `pyproject.toml`, plutôt que de
+produire un installeur qui affiche le mauvais numéro en silence. Testé pour
+de vrai : code de sortie 0, installeur produit et daté fraîchement, message
+d'erreur clair et actionnable si Inno Setup est introuvable ou si les deux
+versions divergent.
+
+Les deux gestes qu'il remplace restent utilisables séparément si besoin
+(`.venv\Scripts\pyinstaller installeur\butin.spec --noconfirm` puis
+`iscc installeur\butin.iss`), mais `MyAppVersion` reste alors à vérifier à
+la main.
+
+La vérification de mise à jour au lancement (`src/butin/update.py`) est
+faite aussi, demandée par Maxime le 06/08/2026 : Butin signale une nouvelle
+version disponible par un bouton à côté du numéro de version, sans jamais la
+télécharger ni l'installer seul. Trois versions sont publiées depuis
+(`v0.1.0`, `v0.2.0`, `v0.3.0`), elle a donc quelque chose à comparer.
+
+## Ce qui manque encore
+
+**Vérifier sur une machine sans Python ni Visual C++ Redistributable
+installés.** Toutes les vérifications ci-dessus ont eu lieu sur la machine de
+développement, où tout est déjà présent. `onnxruntime` a des dépendances
+natives ; rien n'indique qu'il en manque, mais rien ne l'a testé sur un poste
+vraiment vierge (pas de VM disponible ici).
 
 ## Fichiers de ce dossier
 
@@ -104,3 +118,5 @@ comparer.
   (installation sans droits administrateur, données utilisateur jamais
   supprimées à la désinstallation, version à resynchroniser à la main).
 - `butin.ico` : l'icône de l'application et de l'installeur, sept résolutions.
+- `construire.ps1` : enchaîne PyInstaller et Inno Setup, vérifie la
+  synchronisation de version avant de construire.
