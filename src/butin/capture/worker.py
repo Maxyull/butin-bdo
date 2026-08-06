@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..catalog.matcher import ItemMatcher, Scope
+from ..diagnostic import SessionJournal
 from ..recorder import SessionRecorder
 from ..store import SessionStore
 from .calibrate import Calibration
@@ -166,6 +167,10 @@ class CaptureWorker:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._recorder: SessionRecorder | None = None
+        self._journal = SessionJournal(session_id=0)
+        """Journal de la tranche en cours. Un journal « vide » (sans chemin)
+        avale tout ce qu'on lui donne, ce qui évite un test de nullité à
+        chaque tour de boucle sur le chemin le plus chaud."""
         self._compteurs = _Compteurs()
         self._acquis = _Acquis()
 
@@ -243,6 +248,21 @@ class CaptureWorker:
         # d'avant la pause est déjà compté, et le refuser évite de le recompter.
         boucle = self._construire(calibrage, reglage, self._clock_of_day())
         self._recorder = SessionRecorder(boucle, self._store, session_id)
+        # ⭐ Un journal de diagnostic par tranche de capture. Ouvert ici et pas
+        # plus tôt : c'est le seul point où le calibrage est connu ET où la
+        # capture est certaine de démarrer. Une reprise après pause ouvre un
+        # nouveau fichier, ce qui est voulu — chaque tranche a ses conditions,
+        # et une zone recalibrée entre les deux ne se lit pas dans le même
+        # fichier que celle d'avant.
+        self._journal = SessionJournal.ouvrir(
+            session_id,
+            entete={
+                "reprise": reprise,
+                "zone": calibrage.describe(),
+                "cadence_s": reglage.capture_interval_s,
+                "ocr_min_interval_s": reglage.ocr_min_interval_s,
+            },
+        )
         self._compteurs = _Compteurs()
         self._stop.clear()
         self._thread = threading.Thread(
@@ -277,9 +297,31 @@ class CaptureWorker:
         if enregistreur is None:
             return 0
         ecrites = enregistreur.flush(time.time())
+        # ⛔ Le journal se ferme ICI et pas dans `_reporter` : celui-ci n'est
+        # appelé que sur une PAUSE, donc un arrêt normal laissait le fichier
+        # sans son bilan — c'est-à-dire sans les totaux, qui sont la première
+        # chose qu'on lit. Trouvé par le test de bout en bout, pas en relisant.
+        self._fermer_le_journal(enregistreur)
         if garder_les_compteurs:
             self._reporter(enregistreur)
         return ecrites
+
+    def _fermer_le_journal(self, enregistreur: SessionRecorder) -> None:
+        with self._compteurs.lock:
+            tours, lectures = self._compteurs.ticks, self._compteurs.ocr_reads
+            panne = self._compteurs.error
+        self._journal.fermer(
+            {
+                "tours": tours,
+                "lectures_ocr": lectures,
+                "images_ecartees": enregistreur.skipped_frames,
+                "drops_enregistres": enregistreur.recorded_events,
+                "silver_enregistre": enregistreur.recorded_silver,
+                "lignes_perdues": enregistreur.loop.stager.lost_resolved,
+                "panne": panne,
+            }
+        )
+        self._journal = SessionJournal(session_id=0)
 
     def pause(self, *, timeout: float = 5.0) -> int:
         """Arrête la capture sans perdre ce que la session a déjà compté.
@@ -341,10 +383,15 @@ class CaptureWorker:
         enregistreur = self._recorder
         if enregistreur is None:
             return
+        journal = self._journal
         try:
             while not self._stop.is_set():
                 debut = self._clock()
                 resultat = enregistreur.tick(debut)
+                # Écrit AVANT les compteurs : si le fil meurt sur le tour
+                # suivant, la dernière lecture est déjà sur le disque. C'est
+                # justement celle-là qu'on voudra lire.
+                journal.lecture(resultat.trace)
                 with self._compteurs.lock:
                     self._compteurs.ticks += 1
                     if resultat.ocr_ran:

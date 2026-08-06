@@ -113,6 +113,27 @@
                letter-spacing: .8px; margin-bottom: var(--espace-2); }
   .or { color: var(--or); }
 
+  /* Le contrôle du joueur contre son inventaire. Trois états, et le troisième
+     n'est PAS un défaut : « pas encore contrôlé » se distingue de « c'était
+     juste », sans quoi une session que personne n'a regardée passerait pour
+     vérifiée. */
+  .verdict { display: inline-flex; align-items: center; gap: 6px;
+             padding: 3px 10px; border-radius: var(--rayon-pilule);
+             font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .verdict-exact  { background: rgba(111, 220, 111, .14); color: var(--vert);
+                    border: 1px solid rgba(111, 220, 111, .40); }
+  .verdict-ecart  { background: rgba(224, 113, 95, .14); color: var(--rouge);
+                    border: 1px solid rgba(224, 113, 95, .40); }
+  .verdict-vide   { color: var(--doux); }
+  .verdict-vide button {
+    background: transparent; border: 1px solid var(--bord); color: var(--doux);
+    border-radius: var(--rayon-pilule); padding: 3px 10px; cursor: pointer;
+    font: inherit; font-size: 12px; font-weight: 600;
+  }
+  .verdict-vide button:hover { border-color: var(--doux); color: var(--texte); }
+  .verdict-vide button.bon:hover { border-color: var(--vert); color: var(--vert); }
+  .verdict-vide button.mauvais:hover { border-color: var(--rouge); color: var(--rouge); }
+
   /* Bouton de mise à jour, à côté du numéro de version : une notification
      discrète, jamais un blocage. Il informe et laisse l'utilisateur
      cliquer, il ne l'empêche de rien faire d'autre. Voir update.py pour
@@ -391,10 +412,11 @@
           <th class="num">Objets</th>
           <th class="num">Silver/heure</th>
           <th class="num">Total net</th>
+          <th>Contrôle</th>
         </tr>
       </thead>
       <tbody id="sessions">
-        <tr><td colspan="6">Aucune session enregistrée.</td></tr>
+        <tr><td colspan="7">Aucune session enregistrée.</td></tr>
       </tbody>
     </table>
   </div>
@@ -922,6 +944,91 @@ function duree(secondes) {
   return h ? h + " h " + String(m).padStart(2, "0") : m + " min";
 }
 
+// -- Controle du joueur contre son inventaire ------------------------------
+//
+// C'est la SEULE mesure de ce logiciel qui ne passe par aucune reconnaissance
+// d'ecran, donc la seule qui puisse contredire a la fois le compteur et le
+// banc d'essai : les deux lisent les memes pixels avec le meme moteur, et
+// peuvent donc se tromper ensemble.
+function celluleControle(session) {
+  const td = document.createElement("td");
+  if (session.verdict === "exact") {
+    const p = document.createElement("span");
+    p.className = "verdict verdict-exact";
+    p.textContent = "Exact";
+    td.appendChild(p);
+    return td;
+  }
+  if (session.verdict === "ecart") {
+    const p = document.createElement("span");
+    p.className = "verdict verdict-ecart";
+    const n = session.ecart || 0;
+    p.textContent = (n > 0 ? "+" : "") + n + (n > 0 ? " de trop" : " de moins");
+    td.appendChild(p);
+    return td;
+  }
+  // Pas encore controle : deux boutons, et rien qui ressemble a un verdict.
+  const zone = document.createElement("span");
+  zone.className = "verdict verdict-vide";
+  const bon = document.createElement("button");
+  bon.type = "button";
+  bon.className = "bon";
+  bon.textContent = "Exact";
+  bon.title = "Le compte correspond a mon inventaire";
+  const mauvais = document.createElement("button");
+  mauvais.type = "button";
+  mauvais.className = "mauvais";
+  mauvais.textContent = "Ecart";
+  mauvais.title = "Le compte ne correspond pas : dire de combien";
+  // `stopPropagation` : la ligne entiere ouvre le detail de la session, et
+  // cliquer un bouton de controle ne doit pas faire les deux a la fois.
+  bon.addEventListener("click", (e) => { e.stopPropagation(); envoyerVerdict(session.id, "exact", null, td); });
+  mauvais.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Une seule ligne, sans retour a la ligne echappe. Un retour ecrit comme
+    // une VRAIE fin de ligne est une erreur de syntaxe qui fait tomber tout le
+    // bloc de script : voila ce qui a rendu la fenetre inerte pendant six PR
+    // (numero 34). Le test du script vient de rattraper exactement ce cas.
+    const saisi = prompt(
+      "Combien d'unités d'écart ? Positif si Butin a compté TROP, négatif s'il en a compté moins. Exemple : 1413 si Butin annonce 2113 et que ton inventaire en a 700."
+    );
+    if (saisi === null) return;
+    const n = parseInt(saisi, 10);
+    if (!Number.isInteger(n) || n === 0) {
+      alert("Il faut un nombre entier non nul.");
+      return;
+    }
+    envoyerVerdict(session.id, "ecart", n, td);
+  });
+  zone.appendChild(bon);
+  zone.appendChild(mauvais);
+  td.appendChild(zone);
+  return td;
+}
+
+async function envoyerVerdict(id, verdict, ecart, td) {
+  td.textContent = "Enregistrement...";
+  try {
+    const reponse = await fetch("/api/historique/" + id + "/verdict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verdict: verdict, ecart: ecart }),
+    });
+    const corps = await reponse.json();
+    if (corps.erreur) { td.textContent = corps.erreur; return; }
+    // Le verdict est enregistre meme si l'envoi au salon echoue : on redessine
+    // donc a partir de ce qui est en base, et on ne mentionne l'envoi que
+    // quand il a rate.
+    td.replaceWith(celluleControle({ id: id, verdict: verdict, ecart: ecart }));
+    if (!corps.envoye && corps.message) {
+      const ligne = $("etat-dossier");
+      if (ligne) ligne.textContent = "Contrôle enregistré, mais pas envoyé : " + corps.message;
+    }
+  } catch (erreur) {
+    td.textContent = "Le serveur local n'a pas repondu.";
+  }
+}
+
 async function chargerHistorique() {
   const corps = $("sessions");
   const reponse = await (await fetch("/api/historique")).json();
@@ -930,7 +1037,7 @@ async function chargerHistorique() {
   if (!sessions.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 6;
+    td.colSpan = 7;
     td.textContent = "Aucune session enregistrée.";
     tr.appendChild(td);
     corps.appendChild(tr);
@@ -954,6 +1061,7 @@ async function chargerHistorique() {
       td.textContent = valeur;
       tr.appendChild(td);
     });
+    tr.appendChild(celluleControle(session));
     if (session.en_cours) tr.firstChild.classList.add("en-cours");
     // L'identifiant est porté par la ligne pour qu'on puisse la retrouver sans
     // la position : après un arrêt, on veut ouvrir CETTE session-là.

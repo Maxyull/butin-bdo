@@ -304,3 +304,79 @@ class TestPanne:
 
         vivants = [fil.name for fil in threading.enumerate() if fil.name == "butin-capture"]
         assert vivants == []
+
+
+class TestJournalDeDiagnostic:
+    """⭐ Le journal doit exister sur le disque APRÈS une vraie tranche de
+    capture, pas seulement se construire sans erreur.
+
+    Demandé par Maxime le 07/08/2026 : un fichier par session, contenant ce
+    qu'il faut pour comprendre et réparer. La valeur du fichier est nulle si
+    on découvre au moment d'en avoir besoin qu'il n'a jamais été écrit.
+    """
+
+    def test_une_tranche_de_capture_laisse_un_fichier_lisible(
+        self, store: SessionStore, matcher: ItemMatcher, tmp_path, monkeypatch
+    ) -> None:
+        import json
+
+        from butin import diagnostic
+
+        monkeypatch.setattr(diagnostic.paths, "storage_root", lambda: tmp_path)
+
+        avant = [gain("Pierre noire (arme)")]
+        apres = [gain("Pierre noire (arme)"), gain("Pierre noire (arme)", 2)]
+        travailleur = _worker(store, matcher, LecteurFactice([avant] + [apres] * 12))
+        session = store.start_session(started_at=time.time())
+        travailleur.start(session.id)
+        assert _attendre(lambda: travailleur.status().ocr_reads >= 1)
+        travailleur.stop()
+
+        rapports = list(diagnostic.dossier_des_rapports(tmp_path).glob("*.jsonl"))
+        assert len(rapports) == 1, "aucun journal écrit pour cette session"
+
+        contenu = [
+            json.loads(ligne)
+            for ligne in rapports[0].read_text(encoding="utf-8").splitlines()
+            if ligne.strip()
+        ]
+        types = [objet["type"] for objet in contenu]
+        assert types[0] == "entete"
+        assert types[-1] == "bilan"
+        assert "lecture" in types, "aucune lecture consignée alors que l'OCR a tourné"
+
+    def test_le_journal_porte_les_chiffres_de_l_alignement(
+        self, store: SessionStore, matcher: ItemMatcher, tmp_path, monkeypatch
+    ) -> None:
+        """⭐ Ce sont EUX qui ont trouvé le sur-comptage du 05/08.
+
+        Le tableau « précédentes / courantes / recouvrement / neuves » est ce
+        qui a permis de voir vingt-trois lignes déclarées neuves quatre fois de
+        suite. Un journal qui ne les porterait pas serait joli et inutile.
+        """
+        import json
+
+        from butin import diagnostic
+
+        monkeypatch.setattr(diagnostic.paths, "storage_root", lambda: tmp_path)
+
+        avant = [gain("Pierre noire (arme)")]
+        apres = [gain("Pierre noire (arme)"), gain("Pierre noire (arme)", 2)]
+        travailleur = _worker(store, matcher, LecteurFactice([avant] + [apres] * 12))
+        session = store.start_session(started_at=time.time())
+        travailleur.start(session.id)
+        assert _attendre(lambda: travailleur.status().ocr_reads >= 3)
+        travailleur.stop()
+
+        rapport = next(iter(diagnostic.dossier_des_rapports(tmp_path).glob("*.jsonl")))
+        lectures = [
+            objet
+            for ligne in rapport.read_text(encoding="utf-8").splitlines()
+            if ligne.strip()
+            for objet in [json.loads(ligne)]
+            if objet["type"] == "lecture"
+        ]
+        alignees = [ligne for ligne in lectures if ligne.get("etape") != "amorce"]
+        assert alignees, "aucune lecture alignée consignée"
+        for cle in ("precedentes", "courantes", "recouvrement", "neuves", "lues"):
+            assert cle in alignees[0], f"« {cle} » manque à la trace"

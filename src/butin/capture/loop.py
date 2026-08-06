@@ -70,7 +70,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field, replace
-from typing import Protocol
+from typing import Any, Protocol
 
 from ..catalog.matcher import ItemMatcher, Scope
 from ..tracking.alignment import (
@@ -325,6 +325,20 @@ class TickResult:
     """Renseigné quand une image a été écartée. Une image écartée sans trace
     serait indiscernable d'une image sans butin."""
 
+    trace: dict[str, Any] | None = None
+    """De quoi reconstituer la décision, pour le journal de diagnostic.
+
+    ⭐ Ce champ existe parce que TROIS hypothèses fausses ont été tuées par une
+    trace d'exécution et AUCUNE par le raisonnement, en cherchant le
+    sur-comptage du 05/08. Le tableau « précédentes=4, courantes=23,
+    recouvrement=0, neuves=23 » répété quatre fois se lit en une seconde et
+    vaut mieux que trois heures de relecture.
+
+    Rempli à chaque lecture, jamais pendant les tours sans OCR : c'est quelques
+    entiers et les lignes déjà lues, donc négligeable devant la seconde que
+    coûte la reconnaissance elle-même.
+    """
+
 
 class CaptureLoop:
     """Assemble capture, défilement, reconnaissance et validation."""
@@ -480,14 +494,32 @@ class CaptureLoop:
             self.stager.seed(current)
             self._previous_lines = current
             self._seeded = True
-            return TickResult(ocr_ran=True, expected_new=expected)
+            return TickResult(
+                ocr_ran=True,
+                expected_new=expected,
+                trace={"etape": "amorce", "lues": [ligne.raw for ligne in current]},
+            )
 
         result = align(self._previous_lines, current, cfg=self.config.match, expected_new=expected)
+
+        base_trace: dict[str, Any] = {
+            "precedentes": len(self._previous_lines),
+            "courantes": len(current),
+            "recouvrement": result.overlap,
+            "neuves": len(current) - result.overlap,
+            "attendues": expected,
+            "lues": [ligne.raw for ligne in current],
+        }
 
         motif = self._rejection_reason(result, expected, elapsed_s)
         if motif:
             self._consecutive_skips += 1
-            return TickResult(ocr_ran=True, expected_new=expected, skipped_reason=motif)
+            return TickResult(
+                ocr_ran=True,
+                expected_new=expected,
+                skipped_reason=motif,
+                trace={**base_trace, "etape": "ecartee", "motif": motif},
+            )
 
         self._consecutive_skips = 0
         self._previous_lines = current
@@ -507,7 +539,29 @@ class CaptureLoop:
         # fois, et le tranche au vote pondéré sur toutes ses lectures.
         silver = self.stager.drain_silver()
         self.total_silver += silver
-        return TickResult(ocr_ran=True, events=evenements, silver=silver, expected_new=expected)
+        return TickResult(
+            ocr_ran=True,
+            events=evenements,
+            silver=silver,
+            expected_new=expected,
+            trace={
+                **base_trace,
+                "etape": "comptee",
+                "credites": [
+                    {
+                        "item_id": e.item.item_id,
+                        "nom": e.item.name(),
+                        "qty": e.qty,
+                        # Le nombre d'observations dit si le drop a été
+                        # confirmé de justesse : c'est la première chose qu'on
+                        # regarde quand un objet apparaît en trop.
+                        "vues": e.sightings,
+                    }
+                    for e in evenements
+                ],
+                "silver": silver,
+            },
+        )
 
     # -- mode asynchrone ---------------------------------------------------
 

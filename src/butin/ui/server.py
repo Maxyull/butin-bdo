@@ -325,6 +325,8 @@ class AppState:
                     "par_heure": round(stats.per_hour),
                     "objets": sum(quantites.values()),
                     "complet": stats.is_complete,
+                    "verdict": session.verdict,
+                    "ecart": session.ecart,
                 }
             )
         _ = langue
@@ -695,6 +697,48 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def set_verdict(self, session_id: int, verdict: str, ecart: int | None) -> dict[str, Any]:
+        """Enregistre le contrôle du joueur, et le remonte au salon Discord.
+
+        ⭐ Pourquoi l'envoyer et pas seulement l'écrire : un écart constaté chez
+        quelqu'un est la SEULE mesure qui puisse contredire à la fois le
+        compteur et le banc d'essai, qui lisent les mêmes pixels avec le même
+        moteur et peuvent donc se tromper ensemble. Gardée sur sa machine, elle
+        ne sert à personne.
+
+        ⚠️ L'envoi peut échouer sans que ça remette en cause l'enregistrement :
+        le verdict est écrit d'abord, et il le reste. Perdre le constat parce
+        que le réseau a hoqueté serait perdre la seule donnée qui vaut.
+        """
+        self.store.set_verdict(session_id, verdict, ecart)
+
+        session = self.store.get_session(session_id)
+        if session is None:
+            return {"verdict": verdict, "ecart": ecart, "envoye": False, "message": ""}
+
+        quantites = self.store.quantities(session_id)
+        compte = sum(quantites.values())
+        if verdict == "exact":
+            titre = f"Contrôle : EXACT ({compte} unités)"
+        else:
+            signe = "de trop" if (ecart or 0) > 0 else "de moins"
+            titre = f"Contrôle : ÉCART de {abs(ecart or 0)} unités {signe} (compté {compte})"
+
+        contexte: dict[str, object] = {
+            "spot": session.spot or "inconnu",
+            "durée": f"{session.duration_s(time.time()) / 60:.1f} min",
+            "objets distincts": len(quantites),
+            "unités comptées": compte,
+            "écart annoncé": "aucun" if verdict == "exact" else ecart,
+        }
+        resultat = _envoyer_rapport(titre, contexte=contexte)
+        return {
+            "verdict": verdict,
+            "ecart": ecart,
+            "envoye": resultat.envoye,
+            "message": resultat.raison,
+        }
+
     def install_update(self) -> dict[str, Any]:
         """Télécharge et lance l'installeur de la version disponible.
 
@@ -808,6 +852,47 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(corps)
 
+    def _verdict(self) -> None:
+        """`POST /api/historique/<id>/verdict`.
+
+        Un verdict inconnu ou un identifiant illisible rend 400 : c'est une
+        requête malformée, pas une panne. Un écart nul avec le verdict
+        « ecart » est refusé aussi — annoncer un écart de zéro veut dire
+        « exact », et laisser passer les deux façons de dire la même chose
+        rendrait les relevés incomparables entre eux.
+        """
+        brut = self.path[len("/api/historique/") : -len("/verdict")]
+        try:
+            session_id = int(brut)
+        except ValueError:
+            self._send_json({"erreur": "identifiant de session invalide"}, status=400)
+            return
+
+        corps = self._read_json()
+        verdict = str(corps.get("verdict", ""))
+        if verdict not in ("exact", "ecart"):
+            self._send_json({"erreur": "verdict attendu : exact ou ecart"}, status=400)
+            return
+
+        ecart: int | None = None
+        if verdict == "ecart":
+            valeur = corps.get("ecart")
+            if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur == 0:
+                self._send_json(
+                    {
+                        "erreur": "écart attendu : un entier non nul, positif si le "
+                        "compteur a annoncé trop"
+                    },
+                    status=400,
+                )
+                return
+            ecart = valeur
+
+        if self.state.store.get_session(session_id) is None:
+            self._send_json({"erreur": "session introuvable"}, status=404)
+            return
+        self._send_json(self.state.set_verdict(session_id, verdict, ecart))
+
     def _read_json(self) -> dict[str, Any]:
         try:
             taille = int(self.headers.get("Content-Length") or 0)
@@ -897,6 +982,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/session/arreter":
             self.state.stop()
             self._send_json(self.state.snapshot())
+        elif self.path.startswith("/api/historique/") and self.path.endswith("/verdict"):
+            self._verdict()
         elif self.path == "/api/maj":
             # Toujours 200, comme /api/rapport : le corps porte `lance` et un
             # message affichable. Le serveur local a fait son travail même

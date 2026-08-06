@@ -35,7 +35,7 @@ from pathlib import Path
 
 from .. import paths
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -50,7 +50,13 @@ CREATE TABLE IF NOT EXISTS sessions (
     ended_at      REAL,
     silver_direct INTEGER NOT NULL DEFAULT 0,
     paused_s      REAL    NOT NULL DEFAULT 0,
-    paused_at     REAL
+    paused_at     REAL,
+    -- Contrôle du joueur contre son inventaire. NULL tant qu'il n'a rien dit,
+    -- ce qui n'est PAS « c'était juste » : ne pas savoir et savoir que c'est
+    -- bon sont deux états différents, et les confondre ferait passer pour
+    -- vérifiées des sessions que personne n'a regardées.
+    verdict       TEXT,
+    ecart         INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS loot (
@@ -90,6 +96,21 @@ class Session:
     heure de s'effondrer sous les yeux de quelqu'un qui a justement mis en pause
     pour ne pas être compté.
     """
+
+    verdict: str | None = None
+    """Ce que le joueur a constaté en comparant au jeu : `"exact"`, `"ecart"`,
+    ou `None` tant qu'il n'a rien dit.
+
+    ⚠️ `None` n'est PAS « c'était juste ». Ne pas savoir et savoir que c'est
+    bon sont deux états différents, et les confondre ferait passer pour
+    vérifiées des sessions que personne n'a regardées — exactement le genre de
+    faux positif que ce projet refuse partout ailleurs.
+    """
+
+    ecart: int | None = None
+    """Combien d'unités de trop (positif) ou de moins (négatif), quand le
+    joueur l'a chiffré. C'est la SEULE vérité terrain de ce logiciel : elle ne
+    passe par aucune reconnaissance d'écran."""
 
     @property
     def is_open(self) -> bool:
@@ -192,6 +213,8 @@ class SessionStore:
             # Une migration par palier, jamais en sautant des versions.
             if version < 2:
                 self._vers_v2(connection)
+            if version < 3:
+                self._vers_v3(connection)
             connection.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
 
     @staticmethod
@@ -214,6 +237,26 @@ class SessionStore:
             connection.execute("ALTER TABLE sessions ADD COLUMN paused_s REAL NOT NULL DEFAULT 0")
         if "paused_at" not in colonnes:
             connection.execute("ALTER TABLE sessions ADD COLUMN paused_at REAL")
+
+    @staticmethod
+    def _vers_v3(connection: sqlite3.Connection) -> None:
+        """v2 -> v3 : le contrôle du joueur contre son inventaire.
+
+        Même raison qu'en v2 : `CREATE TABLE IF NOT EXISTS` ne touche pas une
+        table déjà là, il faut ajouter les colonnes à la main sous peine de
+        rendre illisible l'historique de farm de quelqu'un.
+
+        `NULL` sur les anciennes sessions dit la vérité : personne ne les a
+        contrôlées. C'est différent de « c'était juste », et les confondre
+        ferait compter comme vérifiées des sessions que personne n'a regardées.
+        """
+        colonnes = {
+            str(ligne["name"]) for ligne in connection.execute("PRAGMA table_info(sessions)")
+        }
+        if "verdict" not in colonnes:
+            connection.execute("ALTER TABLE sessions ADD COLUMN verdict TEXT")
+        if "ecart" not in colonnes:
+            connection.execute("ALTER TABLE sessions ADD COLUMN ecart INTEGER")
 
     # -- écriture --------------------------------------------------------
 
@@ -318,6 +361,26 @@ class SessionStore:
 
     # -- lecture ---------------------------------------------------------
 
+    def set_verdict(self, session_id: int, verdict: str, ecart: int | None) -> None:
+        """Enregistre ce que le joueur a constaté en comparant à son inventaire.
+
+        ⭐ C'est la seule mesure de ce logiciel qui ne passe par AUCUNE
+        reconnaissance d'écran, donc la seule qui puisse arbitrer quand le
+        compteur et le banc d'essai disent la même chose et se trompent
+        ensemble. Les deux lisent les mêmes pixels avec le même moteur ; un
+        inventaire compté à la main, non.
+
+        `ecart` est signé : positif quand le compteur a annoncé PLUS que la
+        réalité (il a inventé), négatif quand il en a annoncé moins.
+        """
+        if verdict not in ("exact", "ecart"):
+            raise ValueError(f"verdict inconnu : {verdict!r}")
+        with self._transaction() as connection:
+            connection.execute(
+                "UPDATE sessions SET verdict = ?, ecart = ? WHERE id = ?",
+                (verdict, None if verdict == "exact" else ecart, session_id),
+            )
+
     def get_session(self, session_id: int) -> Session | None:
         with self._reading() as connection:
             ligne = connection.execute(
@@ -396,4 +459,6 @@ def _to_session(ligne: sqlite3.Row) -> Session:
         silver_direct=int(ligne["silver_direct"]),
         paused_s=float(ligne["paused_s"]),
         paused_at=float(ligne["paused_at"]) if ligne["paused_at"] is not None else None,
+        verdict=str(ligne["verdict"]) if ligne["verdict"] is not None else None,
+        ecart=int(ligne["ecart"]) if ligne["ecart"] is not None else None,
     )
