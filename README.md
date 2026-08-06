@@ -1,5 +1,11 @@
 # Butin
 
+[![CI](https://img.shields.io/github/actions/workflow/status/Maxyull/butin-bdo/ci.yml?branch=main&label=CI&logo=github)](https://github.com/Maxyull/butin-bdo/actions/workflows/ci.yml)
+[![Dernière version](https://img.shields.io/github/v/release/Maxyull/butin-bdo?label=version&color=d4a955)](https://github.com/Maxyull/butin-bdo/releases/latest)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](pyproject.toml)
+[![Discord](https://img.shields.io/badge/Discord-Rejoindre-5865F2?logo=discord&logoColor=white)](https://discord.gg/qCuvN2Zna7)
+
 **Le suivi de butin pour Black Desert Online, enfin en français.**
 
 Butin lit le journal d'acquisition pendant que vous farmez, reconnaît chaque
@@ -9,10 +15,15 @@ silver par heure.
 Les outils équivalents existent déjà. Aucun ne parle français. Butin est écrit
 pour le client français dès la première ligne, pas traduit après coup.
 
-> ⚠️ **Projet en construction.** Le noyau de reconnaissance française fonctionne
-> et est testé. La capture d'écran, l'interface et le calcul de session ne sont
-> pas encore terminés. Voir [État d'avancement](#état-davancement) pour ce qui
-> marche vraiment aujourd'hui. Il n'y a pas encore de version téléchargeable.
+> ⚠️ **Projet en version `0.y.z`** au sens de [Semantic
+> Versioning](https://semver.org/) : rien n'est encore promis stable d'une
+> version à l'autre, y compris le format de la base de sessions. Voir
+> [État d'avancement](#état-davancement) pour ce qui marche aujourd'hui, et
+> [Versions](#versions) pour ce que ça engage. Un installeur Windows est
+> téléchargeable sur la [page des
+> Releases](https://github.com/Maxyull/butin-bdo/releases/latest).
+
+Une question, un bug, une idée : [le Discord](https://discord.gg/qCuvN2Zna7).
 
 ---
 
@@ -172,9 +183,11 @@ Une ligne de commande existe à côté, et ne sert qu'à ça :
 | Interface web locale | ✅ fait | FR/EN, EU/NA, démarrage de la capture |
 | Banc d'essai sur données réelles | ✅ fait | mesure la justesse du compteur |
 | Noms vérifiés à la main | ⚙️ mécanisme prêt | recoupement bdocodex/garmoth, objet par objet |
-| Installeur | ⛔ à faire | il faut cloner et lancer `pip` |
+| Application de bureau | ✅ fait | fenêtre principale + panneau posé sur le jeu, `butin-app` |
+| Installeur Windows | ✅ fait | [Releases](https://github.com/Maxyull/butin-bdo/releases/latest), sans droits administrateur |
+| Vérification de mise à jour | ✅ fait | notification seule, jamais d'installation automatique |
 
-486 tests automatisés.
+685 tests automatisés.
 
 ### Ce que le compteur vaut sur du vrai farm
 
