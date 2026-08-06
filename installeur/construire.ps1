@@ -142,6 +142,31 @@ $cheminInstalleur = Join-Path $racineDepot "dist\butin-$versionPyproject-install
 if (Test-Path $cheminInstalleur) {
     $tailleMo = [Math]::Round((Get-Item $cheminInstalleur).Length / 1MB, 1)
     Write-Output "Installeur produit : $cheminInstalleur ($tailleMo Mo)"
+
+    # --- 6. Publier l'empreinte à côté de l'installeur --------------------
+    #
+    # ⛔ Ce fichier n'est pas un à-côté : sans lui, la mise à jour en un clic
+    # REFUSE de s'installer. `autoupdate.download_installer` télécharge
+    # l'installeur ET son `.sha256`, compare en mémoire, et n'écrit rien si
+    # les deux ne correspondent pas.
+    #
+    # TLS garantit que le fichier vient bien de GitHub ; il ne garantit pas
+    # que c'est le BON fichier. Une construction interrompue ou une release
+    # mal publiée produirait un binaire corrompu qu'on s'apprêterait à
+    # exécuter avec les droits de l'utilisateur.
+    #
+    # ⚠️ Les deux fichiers doivent être joints à la Release GitHub, pas
+    # seulement l'exécutable. Format `sha256sum` : empreinte, deux espaces,
+    # nom du fichier.
+    $empreinte = (Get-FileHash -Path $cheminInstalleur -Algorithm SHA256).Hash.ToLower()
+    $nomFichier = Split-Path $cheminInstalleur -Leaf
+    $cheminEmpreinte = "$cheminInstalleur.sha256"
+    "$empreinte  $nomFichier" | Out-File -FilePath $cheminEmpreinte -Encoding ascii -NoNewline
+    Write-Output "Empreinte publiée : $cheminEmpreinte"
+    Write-Output "  $empreinte"
+    Write-Output ""
+    Write-Output "Joindre LES DEUX fichiers a la Release GitHub :"
+    Write-Output "  gh release upload v<version> `"$cheminInstalleur`" `"$cheminEmpreinte`""
 } else {
     # ISCC a rendu un code de sortie 0 mais le fichier attendu n'est pas là :
     # signaler plutôt que de laisser croire que tout s'est bien passé.

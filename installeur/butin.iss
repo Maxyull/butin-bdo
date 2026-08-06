@@ -47,6 +47,21 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+; ⛔ Ces deux lignes sont ce qui rend la mise à jour en un clic possible, et
+; elles portent la responsabilité ENTIÈRE du cycle fermeture-réouverture.
+;
+; `CloseApplications=force` fait fermer Butin par le Gestionnaire de
+; redémarrage de Windows, et `RestartApplications=yes` le fait rouvrir une
+; fois les fichiers remplacés. Sans elles, l'installeur échouerait à écrire
+; par-dessus un exécutable en cours d'exécution.
+;
+; ⛔ Corollaire à ne jamais défaire : l'application ne doit PAS se fermer
+; elle-même après avoir lancé l'installeur. Se fermer avant que le
+; Gestionnaire de redémarrage ait enregistré le processus lui retire l'objet
+; qu'il devait rouvrir, et plus rien ne se relance. C'est le bogue que Rubin a
+; trouvé en jouant, pas en relisant. Voir `src/butin/autoupdate.py`.
+CloseApplications=force
+RestartApplications=yes
 OutputDir=..\dist
 OutputBaseFilename=butin-{#MyAppVersion}-installation
 SetupIconFile=butin.ico
