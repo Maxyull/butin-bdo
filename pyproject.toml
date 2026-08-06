@@ -31,9 +31,16 @@ dependencies = [
   "numpy>=1.26",
   "requests>=2.31.0",
   # Normalisation FR et détection de défilement/stabilité, extraites d'ici et
-  # partagées avec rubin-bdo. Épinglé sur un tag, jamais sur une branche : voir
-  # bdo-ocr-core/README.md.
-  "bdo-ocr-core @ git+https://github.com/Maxyull/bdo-ocr-core.git@v0.1.0",
+  # partagées avec rubin-bdo. Voir bdo-ocr-core/README.md.
+  #
+  # Épinglé sur le SHA du commit, PAS sur l'étiquette `v0.1.0` qui le désigne.
+  # Une étiquette git reste déplaçable (`git tag -f` puis `push -f`) : elle dit
+  # quelle version on VOULAIT, jamais quel code on obtient. Ce dépôt épingle
+  # déjà ses actions GitHub par SHA pour cette raison exacte, et n'a pas de
+  # raison de s'appliquer une règle plus faible à lui-même.
+  # La version reste en commentaire, sinon le SHA est illisible.
+  # Vérifié par tests/test_dependances.py.
+  "bdo-ocr-core @ git+https://github.com/Maxyull/bdo-ocr-core.git@c6c4e8effed838905777086a8adc9b9b7bb5707f",  # v0.1.0
   "rapidfuzz>=3.6",
   # Moteur OCR. Choisi contre Tesseract parce qu'il s'installe entièrement par
   # pip : aucun binaire système à télécharger séparément, aucune variable PATH à
