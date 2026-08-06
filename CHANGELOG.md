@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.2.0] - 2026-08-06
+
 ### Modifié
 
 - **La vérification de mise à jour se répète toutes les cinq minutes** tant

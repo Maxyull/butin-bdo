@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "butin"
-# Première version publiée le 06/08/2026. Voir docs/versionnage.md pour ce
-# que 0.y.z promet (et ne promet pas) et CHANGELOG.md pour le détail.
-version = "0.1.0"
+# Voir docs/versionnage.md pour ce que 0.y.z promet (et ne promet pas) et
+# CHANGELOG.md pour le détail de chaque version.
+version = "0.2.0"
 description = "Suivi de butin pour Black Desert Online, pensé pour le client français"
 readme = "README.md"
 requires-python = ">=3.10"
