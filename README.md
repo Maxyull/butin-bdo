@@ -4,7 +4,7 @@
 [![Dernière version](https://img.shields.io/github/v/release/Maxyull/butin-bdo?label=version&color=d4a955)](https://github.com/Maxyull/butin-bdo/releases/latest)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](pyproject.toml)
-[![Discord](https://img.shields.io/badge/Discord-Rejoindre-5865F2?logo=discord&logoColor=white)](https://discord.gg/qCuvN2Zna7)
+[![Discord](https://img.shields.io/badge/Discord-Communaut%C3%A9-5865F2?logo=discord&logoColor=white)](https://discord.gg/qCuvN2Zna7)
 
 **Le suivi de butin pour Black Desert Online, enfin en français.**
 

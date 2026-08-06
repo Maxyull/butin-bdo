@@ -788,7 +788,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"erreur": "introuvable"}, status=404)
             return
         corps = chemin.read_bytes()
-        types = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript"}
+        # ⚠️ `X-Content-Type-Options: nosniff` est envoyé plus bas : un type
+        # inconnu part donc en `application/octet-stream` et le navigateur
+        # REFUSE de l'afficher, au lieu de deviner. C'est le bon comportement,
+        # mais ça veut dire que tout nouveau format servi ici doit être déclaré
+        # dans cette table, sinon il se télécharge au lieu de s'afficher.
+        types = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css",
+            ".js": "text/javascript",
+            ".png": "image/png",
+            ".svg": "image/svg+xml",
+            ".ico": "image/x-icon",
+        }
         self.send_response(200)
         self.send_header("Content-Type", types.get(chemin.suffix, "application/octet-stream"))
         self.send_header("Content-Length", str(len(corps)))
@@ -816,6 +828,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_file("index.html")
         elif self.path == "/overlay":
             self._send_file("overlay.html")
+        elif self.path == "/butin.png":
+            # La marque du logiciel : favicon des deux fenêtres, et logo dans
+            # l'en-tête. Servie depuis `static/` comme les pages, donc elle
+            # suit la distribution figée sans réglage supplémentaire.
+            self._send_file("butin.png")
         elif self.path == "/api/etat":
             self._send_json(self.state.snapshot())
         elif self.path == "/api/historique":
