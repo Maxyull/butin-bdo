@@ -69,14 +69,20 @@ jobs:
       # règle rien : avec --strict, un paquet ignoré compte comme un échec, les
       # deux options se contredisent.
       #
+      # Même chose pour « bdo-ocr-core » depuis qu'il est une dépendance : lui
+      # aussi vit sur GitHub, pas sur PyPI (voir bdo-ocr-core/README.md pour
+      # pourquoi), donc pip-audit ne peut pas non plus l'auditer lui-même.
+      # Sa propre CI l'audite déjà côté bdo-ocr-core ; ce job-ci audite les
+      # dépendances QUE bdo-ocr-core amène (numpy), pas bdo-ocr-core lui-même.
+      #
       # L'installation reste le moyen de résoudre les dépendances déclarées
       # dans pyproject.toml : elles restent en place après la désinstallation
-      # de notre seul paquet, et la liste ne peut pas se désynchroniser comme
-      # le ferait un requirements.txt tenu à la main.
+      # de nos deux seuls paquets non publiés, et la liste ne peut pas se
+      # désynchroniser comme le ferait un requirements.txt tenu à la main.
       - name: Installation des dépendances
         run: |
           pip install -e ".[dev]"
-          pip uninstall --yes butin
+          pip uninstall --yes butin bdo-ocr-core
 
       # Job séparé de la matrice : une alerte de vulnérabilité ne dépend pas de
       # la version de Python, la répéter trois fois n'apprendrait rien et
