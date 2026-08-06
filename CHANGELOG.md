@@ -9,6 +9,14 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Modifié
+
+- **La vérification de mise à jour se répète toutes les cinq minutes** tant
+  que Butin reste ouvert, plutôt qu'une seule fois au lancement. Sur une
+  session de farm de plusieurs heures, une Release publiée entre-temps
+  n'aurait sinon jamais été signalée avant le prochain lancement. Toujours
+  une notification seule.
+
 ## [0.1.0] - 2026-08-06
 
 Première version publiée. Butin reste en `0.y.z`, ce qui veut dire, au sens de
