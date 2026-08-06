@@ -22,6 +22,14 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   zéro. Pas de détection automatique d'un déplacement : uniquement un geste
   explicite du joueur, conformément au principe qui tranche tout dans ce
   projet (rater un drop est acceptable, en inventer ne l'est jamais).
+- **Les zones de farm sont traduites en français**, et une session est
+  désormais nommée automatiquement dans cette langue (`Mine de fer
+  abandonnée`, pas `Abandoned Iron Mine`) : la seule chose du produit qui
+  restait en anglais malgré lui. 94 zones recoupées entre bdocodex et
+  bdolytics, 66 par les deux sources, 28 par bdolytics seul faute de
+  marqueur correspondant sur la carte de bdocodex (source primaire au même
+  titre, pas une traduction tierce). Une zone sans traduction connue reste
+  affichée en anglais plutôt que de ne rien afficher.
 
 ## [0.3.0] - 2026-08-06
 

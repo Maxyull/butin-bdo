@@ -156,3 +156,39 @@ def known_zones(zones: dict[int, tuple[str, ...]] | None = None) -> tuple[str, .
     """Toutes les zones connues, triées. Sert à peupler un choix dans l'interface."""
     table = load_zones() if zones is None else zones
     return tuple(sorted({zone for liste in table.values() for zone in liste}))
+
+
+def load_zone_translations(path: Path | None = None) -> dict[str, str]:
+    """Charge `zone anglaise -> zone française`, pour traduire ce que
+    `detect_spot` rend avant de nommer une session.
+
+    Séparée de `load_zones()` plutôt que fusionnée : `load_zones()` reste la
+    clé de regroupement interne (zone_en, invariante), traduite seulement au
+    moment d'être montrée à l'utilisateur. Mélanger les deux forcerait à
+    retoucher `detect_spot`, `zones_for` et leurs tests, qui n'ont aucune
+    raison de connaître une langue.
+
+    Une zone sans traduction connue est absente du résultat plutôt que
+    mappée sur elle-même : à l'appelant de décider du repli (garder
+    l'anglais plutôt que de planter est le bon choix pour un confort, pas
+    une condition de fonctionnement — voir `load_zones`).
+    """
+    chemin = path or default_path()
+    if not chemin.exists():
+        return {}
+    try:
+        brut = json.loads(chemin.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _log.warning("butin connu illisible (%s), traduction de zone désactivée", exc)
+        return {}
+
+    traductions: dict[str, str] = {}
+    for fiche in (brut.get("items") or {}).values():
+        if not isinstance(fiche, dict):
+            continue
+        zone_en = fiche.get("zone_en")
+        zone_fr = fiche.get("zone_fr")
+        if isinstance(zone_en, str) and zone_en and isinstance(zone_fr, str) and zone_fr:
+            traductions[zone_en] = zone_fr
+
+    return traductions
