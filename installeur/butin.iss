@@ -134,11 +134,26 @@ Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: RelancementDemande
 ; lui-même) est retiré, comportement par défaut d'Inno Setup.
 
 [Code]
-{ Vrai quand la mise à jour en un clic a demandé le relancement.
+{ ⚠️ Inno Setup n'a PAS de `CmdLineParamExists`, contrairement à ce qu'une
+  première version de ce fichier affirmait en commentaire. ISCC l'a refusée
+  net : « Unknown identifier ». Le parcours de `ParamStr` ci-dessous est
+  l'idiome habituel, et il faut l'écrire soi-même.
 
-  `CmdLineParamExists` compare sans tenir compte de la casse et accepte la
-  forme `/RELANCER` comme `-relancer` : c'est la même fonction qu'Inno Setup
-  utilise pour ses propres commutateurs, donc pas une convention à nous.
+  `CompareText` ignore la casse, donc `/relancer` marche aussi. }
+function ParametrePresent(const Valeur: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), Valeur) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+{ Vrai quand la mise à jour en un clic a demandé le relancement.
 
   ⛔ Ne pas remplacer par `WizardSilent()`. Toute installation silencieuse
   relancerait alors l'application, y compris celle que `construire.ps1` fait
@@ -147,5 +162,5 @@ Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: RelancementDemande
   ce qu'un joueur exécute. }
 function RelancementDemande(): Boolean;
 begin
-  Result := CmdLineParamExists('/RELANCER');
+  Result := ParametrePresent('/RELANCER');
 end;

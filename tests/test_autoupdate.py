@@ -234,8 +234,7 @@ class TestLInstalleurRouvreVraimentButin:
         """
         source = Path(autoupdate.__file__).read_text(encoding="utf-8")
         assert f'"{RELANCER}"' in source, f"{RELANCER} n'est plus passé par autoupdate.py"
-        iss = ISS.read_text(encoding="utf-8")
-        assert f"CmdLineParamExists('{RELANCER}')" in iss, (
+        assert f"ParametrePresent('{RELANCER}')" in _directives(ISS), (
             f"butin.iss ne teste plus {RELANCER} : le commutateur a été renommé d'un seul côté"
         )
 
