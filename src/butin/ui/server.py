@@ -46,6 +46,7 @@ from ..bundle import decrire_le_contenu as _decrire_archive
 from ..bundle import ouvrir_le_dossier as _ouvrir_le_dossier
 from ..bundle import preparer as _preparer_archive
 from ..capture.calibrate import Calibration, CalibrationError
+from ..capture.inventaire import capturer as _capturer_inventaire
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
 from ..catalog.icons import TYPES_MIME
@@ -722,6 +723,35 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def capturer_l_inventaire(self, session_id: int | None = None) -> dict[str, Any]:
+        """Fige l'écran, pour garder la seule vérité qui n'est pas de l'OCR.
+
+        ⚠️ **Hors verrou**, comme le reste de ce qui touche à l'écran.
+
+        ⛔ Elle prend l'écran **tel qu'il est**. Si l'inventaire n'est pas
+        ouvert, l'image n'en contiendra pas — c'est écrit à côté du bouton
+        plutôt que découvert en ouvrant le fichier trois jours plus tard.
+
+        Sans session précisée, on rattache à la dernière : le geste normal est
+        « j'arrête, je compare », donc juste après.
+        """
+        cible = session_id if session_id is not None else self._derniere_session()
+        if cible is None:
+            return {
+                "capture": False,
+                "message": "Aucune session à rattacher : lance un farm d'abord.",
+            }
+        resultat = _capturer_inventaire(cible)
+        return {"capture": resultat.reussie, "message": resultat.message, "session": cible}
+
+    def _derniere_session(self) -> int | None:
+        """L'identifiant de la session la plus récente, ou `None`."""
+        with self.lock:
+            if self.session_id is not None:
+                return self.session_id
+        sessions = self.store.sessions(limit=1)
+        return int(sessions[0].id) if sessions else None
+
     def redimensionner_le_panneau(self, hauteur: int) -> dict[str, Any]:
         """Fait suivre au panneau la hauteur de son contenu.
 
@@ -1231,6 +1261,10 @@ class Handler(BaseHTTPRequestHandler):
             # que le serveur local a parfaitement fait son travail, et que la
             # cause est chez le relais ou sur le réseau du joueur.
             self._send_json(self.state.send_report(message))
+        elif self.path == "/api/inventaire":
+            # Toujours 200 : le corps porte `capture` et un message
+            # affichable tel quel, comme /api/rapport et /api/archive.
+            self._send_json(self.state.capturer_l_inventaire())
         elif self.path == "/api/panneau/taille":
             hauteur = self._read_json().get("hauteur", 0)
             try:

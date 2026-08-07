@@ -1,0 +1,144 @@
+"""Garder une image de l'inventaire, pour pouvoir contredire le compteur.
+
+Pourquoi une image, et pas une lecture
+---------------------------------------
+
+⭐ L'inventaire est la **seule** vérité de ce logiciel qui ne passe par aucune
+reconnaissance d'écran. Le compteur et le banc d'essai lisent les mêmes pixels
+avec le même moteur : ils peuvent se tromper ensemble, et seul un inventaire
+compté à la main peut les contredire tous les deux.
+
+Jusqu'ici, cette vérité n'existait que dans la tête du joueur, recopiée à la
+main dans le bouton « Écart ». Une session finie sans ce geste était perdue
+pour toujours : l'inventaire, lui, continue de bouger.
+
+Ce module ne fait donc qu'une chose, et il la fait bien : **il fige l'image**.
+
+⛔ Ce qu'il ne fait PAS, et pourquoi
+-------------------------------------
+
+**Il ne lit pas la grille.** Reconnaître quel objet occupe quelle case demande
+de reconnaître les icônes. C'est faisable — `catalog/icons.py` télécharge déjà
+les vraies icônes du jeu, donc la recherche se limite aux quelques objets que
+la session a comptés — mais ça se met au point contre de **vraies** captures
+d'inventaire, et il n'en existe aucune sur disque tant que ce module n'a pas
+tourné. C'est la marche suivante, pas celle-ci.
+
+⛔ **Il ne touche jamais au jeu.** Pas de frappe clavier dans la barre de
+recherche du jeu, pas de clic, rien. Injecter des entrées dans un client de
+Black Desert est sanctionné par un bannissement, et aucun confort ne vaut le
+compte de quelqu'un.
+
+⛔ **Il n'envoie rien.** L'image part avec l'archive de diagnostic si le joueur
+la dépose, et pas autrement. Une capture d'écran entier montre bien plus qu'un
+inventaire : le nom du personnage, la position, ce qui traîne à l'écran.
+
+⚠️ La capture ne peut pas deviner
+----------------------------------
+
+Elle prend l'écran tel qu'il est. Si l'inventaire n'est pas ouvert, l'image ne
+contiendra pas d'inventaire, et c'est écrit à l'écran avant de cliquer plutôt
+que découvert après coup en ouvrant le fichier.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..diagnostic import dossier_des_rapports
+
+_log = logging.getLogger(__name__)
+
+#: Préfixe des captures d'inventaire, à côté des journaux de session.
+#: Le même dossier que tout le reste du diagnostic : le joueur n'a qu'un seul
+#: endroit à connaître, et l'archive n'a qu'un seul endroit à balayer.
+PREFIXE = "inventaire"
+
+
+@dataclass(frozen=True)
+class Capture:
+    """Ce que l'interface doit afficher après la capture."""
+
+    chemin: Path | None
+    octets: int
+    message: str
+
+    @property
+    def reussie(self) -> bool:
+        return self.chemin is not None
+
+
+def chemin_pour(session_id: int, racine: Path | None = None) -> Path:
+    """Où vit la capture d'une session donnée.
+
+    Une par session et pas une par clic : recapturer après avoir rangé son
+    inventaire doit **remplacer** la précédente, sinon l'archive emporterait
+    trois images dont personne ne saurait laquelle fait foi.
+    """
+    return dossier_des_rapports(racine) / f"{PREFIXE}-{session_id:04d}.png"
+
+
+def capturer(
+    session_id: int,
+    *,
+    racine: Path | None = None,
+    monitor: int = 1,
+) -> Capture:
+    """Enregistre l'écran entier dans le dossier des rapports. **Ne lève jamais.**
+
+    Même garantie que partout ailleurs : c'est un confort de diagnostic, il ne
+    doit pas pouvoir interrompre quoi que ce soit. Une machine sans écran, un
+    pilote graphique fâché, un disque plein descendent en message affichable.
+    """
+    destination = chemin_pour(session_id, racine)
+    try:
+        from PIL import Image
+
+        from .screen import ScreenCapture
+
+        with ScreenCapture(monitor=monitor) as capture:
+            ecran = capture.target_monitor()
+            # ⚠️ On passe par mss directement plutôt que par `grab`, qui rend
+            # du niveau de gris. Les icônes d'objets se distinguent surtout par
+            # leur COULEUR : les aplatir maintenant rendrait la lecture
+            # automatique de la grille beaucoup plus difficile plus tard, pour
+            # une place disque qu'on a.
+            brut = capture._require_session().grab(ecran.to_mss())
+            image = Image.frombytes("RGB", brut.size, brut.bgra, "raw", "BGRX")
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        image.save(destination, format="PNG", optimize=True)
+    except Exception as exc:
+        # Volontairement large : mss, PIL et le système de fichiers lèvent
+        # chacun leur propre famille, et aucune ne justifie d'interrompre le
+        # joueur qui vient de finir sa session.
+        _log.warning("capture d'inventaire impossible : %s", exc)
+        return Capture(None, 0, f"Capture impossible : {exc}")
+
+    try:
+        octets = destination.stat().st_size
+    except OSError:
+        octets = 0
+    return Capture(
+        destination,
+        octets,
+        f"Inventaire enregistré ({max(octets // 1024, 1)} Ko). "
+        "Il part avec l'archive de diagnostic.",
+    )
+
+
+def captures_existantes(racine: Path | None = None) -> list[Path]:
+    """Les captures d'inventaire, de la plus récente à la plus ancienne.
+
+    Sert à `bundle.py` : sans ça, l'image serait écrite sur le disque et
+    n'atteindrait jamais personne, ce qui est le sort de tout diagnostic qu'on
+    range sans le joindre.
+    """
+    dossier = dossier_des_rapports(racine)
+    if not dossier.is_dir():
+        return []
+    fichiers = [f for f in dossier.glob(f"{PREFIXE}-*.png") if f.is_file()]
+    fichiers.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+    return fichiers
