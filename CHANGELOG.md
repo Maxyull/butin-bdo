@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.5.0] - 2026-08-07
+
 ### Modifié
 
 - **Le bouton de mise à jour installe désormais la nouvelle version et rouvre
@@ -21,6 +23,18 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   écrit sur le disque et rien n'est lancé. Une mise à jour ratée le dit,
   laisse le bouton réessayer, et le lien vers la page des versions reste
   offert à côté pour ceux qui préfèrent lire les notes ou installer à la main.
+
+- **Le bouton Discord porte enfin le logo de Discord.** Celui d'avant était un
+  dessin fait à la main qui ne ressemblait à rien de reconnaissable. Il est
+  aussi devenu un vrai bouton plein, au lieu d'un contour si discret qu'il se
+  confondait avec les réglages posés à côté.
+
+- **Butin a son icône**, dans la barre des tâches, dans l'explorateur de
+  fichiers et dans les deux fenêtres du logiciel.
+
+- **La fenêtre principale se manipule au clavier.** Chaque bouton, chaque case
+  et chaque champ montre désormais où l'on se trouve quand on navigue à la
+  touche de tabulation ; il n'y en avait que deux qui le faisaient.
 
 ### Ajouté
 
@@ -37,11 +51,52 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   lisible par n'importe quel joueur, le salon deviendrait ouvert au spam, et
   la refermer obligerait à republier l'application entière.
 
-  Tant que le relais n'est pas configuré côté serveur, le bouton le dit
-  franchement plutôt que d'échouer en silence. Un identifiant anonyme, tiré au
-  sort une fois et gardé sur cette machine, permet de reconnaître deux
-  rapports du même joueur ; il ne contient rien qui identifie la personne ni
-  la machine.
+  Un identifiant anonyme, tiré au sort une fois et gardé sur cette machine,
+  permet de reconnaître deux rapports du même joueur ; il ne contient rien qui
+  identifie la personne ni la machine.
+
+- **Une colonne « Contrôle » dans l'Historique.** Après une session, deux
+  boutons : le compte était **exact**, ou il y avait un **écart** — et dans ce
+  cas, de combien d'unités. C'est comparé à votre inventaire dans le jeu, donc
+  à quelque chose que le logiciel ne peut pas lire lui-même, et c'est la seule
+  façon de savoir s'il compte juste. Le constat part dans le salon Discord
+  avec le contexte de la session.
+
+  Une session non contrôlée reste marquée comme telle : ne pas savoir n'est
+  pas la même chose que savoir que c'était bon.
+
+- **Un fichier de diagnostic par session**, dans `Documents\BDO Tracker\rapports`.
+  Il note ce que la reconnaissance a lu et ce qui en a été compté, ligne par
+  ligne. Quand un chiffre paraît faux, tout ce qu'il faut pour comprendre est
+  déjà écrit, sans qu'on ait eu à prévoir le problème.
+
+  Il reste **sur votre machine** et n'est jamais envoyé tout seul : le
+  logiciel lit la zone de chat telle qu'elle est, donc un message d'un autre
+  joueur qui y passerait s'y retrouverait aussi. C'est à vous de le joindre à
+  un rapport si vous le voulez.
+
+### Connu et non résolu
+
+- ⛔ **Un sur-comptage a été signalé le 07/08 et n'est PAS résolu dans cette
+  version.** Sur une session de deux minutes, le compteur a annoncé 2 113
+  unités d'un même objet, pour un total de 6,78 milliards de silver par heure
+  qui n'est pas crédible. La lecture montrait la même ligne trois fois de
+  suite ; on ne sait pas encore si le jeu l'a réellement affichée trois fois
+  ou si c'est la lecture qui l'a dupliquée.
+
+  **C'est justement ce que la colonne « Contrôle » et le fichier de diagnostic
+  de cette version servent à trancher.** En attendant, un total qui vous
+  paraît trop élevé l'est probablement : comparez à votre inventaire avant de
+  vous fier au chiffre.
+
+- **L'envoi de rapports vers Discord n'est pas encore branché côté serveur.**
+  Le bouton existe et le dit franchement quand vous cliquez, plutôt que de
+  faire semblant.
+
+- **La mise à jour en un clic ne fonctionnera qu'à partir de cette version.**
+  Les versions 0.1.0 à 0.4.0 ne publiaient pas l'empreinte qui permet de
+  vérifier l'installeur avant de l'exécuter : mettre à jour depuis l'une
+  d'elles se fait à la main, une dernière fois.
 
 ## [0.4.0] - 2026-08-06
 
