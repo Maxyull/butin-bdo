@@ -9,6 +9,42 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.6.0] - 2026-08-07
+
+### Ajouté
+
+- **Un bouton « Préparer une archive », sous le rapport de bogue.** Écrire
+  « le compteur se trompe » ne suffit pas à comprendre pourquoi : la réponse
+  est dans le journal de lecture, ligne par ligne, et personne ne va copier
+  quinze mille lignes dans un salon. Le bouton rassemble les trois derniers
+  journaux, tes réglages, ton calibrage, un contexte technique et une image de
+  la zone lue, puis ouvre le dossier sur l'archive.
+
+  **Elle n'est envoyée à personne.** Elle contient les messages des autres
+  joueurs, parce que la reconnaissance lit la zone de chat telle quelle : c'est
+  à toi de décider si tu la déposes, et son contenu s'affiche avant pour que tu
+  saches ce qu'il y a dedans. Ton identifiant de contributeur n'y entre jamais.
+
+- **Un bouton « Se connecter à Discord », à côté du lien vers le salon.** Une
+  fois le compte rattaché, l'en-tête affiche « Connecté en tant que … », et tes
+  rapports de bogue portent ton pseudonyme au lieu d'un numéro anonyme.
+
+  Le pseudonyme vient toujours du serveur, jamais d'un champ à remplir : sans
+  ça, n'importe qui pourrait signaler un problème sous le nom d'un autre joueur.
+
+  ⚠️ L'écran d'autorisation de Discord annonce « Rubin » : les deux logiciels
+  partagent le même serveur, et c'est lui qui est enregistré.
+
+### Corrigé
+
+- **⛔ Butin se relance après une mise à jour.** Il ne revenait pas :
+  l'application se fermait, les fichiers étaient remplacés, et plus rien. Vu de
+  l'extérieur, une mise à jour qui fait disparaître le logiciel pour de bon.
+
+  La réouverture était confiée au Gestionnaire de redémarrage de Windows, qui
+  ne la faisait pas. Elle est maintenant demandée explicitement à l'installeur,
+  et vérifiée sur une vraie installation.
+
 ## [0.5.1] - 2026-08-07
 
 ### Modifié
