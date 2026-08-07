@@ -9,6 +9,36 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.8.0] - 2026-08-07
+
+### Corrigé
+
+- **⛔ Butin n'invente plus de drop quand la reconnaissance rabote une
+  quantité.** Sur une vraie session, il a compté **492 objets pour 477
+  réellement ramassés**. Sept de ces quinze unités de trop viennent d'ici.
+
+  Le jeu n'écrit jamais « x1 » : il indique 1 en n'écrivant **aucune**
+  quantité. Quand la lecture coupe la fin d'une ligne, elle produit exactement
+  la même chose — et cette ligne amputée ressemblait alors à un second drop,
+  d'une unité, qui n'avait jamais eu lieu.
+
+  Une ligne dont la quantité a disparu est désormais reconnue comme la même
+  ligne, pas comme une nouvelle.
+
+  ⚠️ Ce que ça coûte, dit franchement : un vrai drop d'un seul exemplaire qui
+  suit un drop du même objet dans la même minute peut maintenant être fondu
+  dans le précédent, donc manqué. C'est voulu. Un chiffre un peu bas se
+  rattrape, un chiffre inventé ne se voit pas.
+
+  ⚠️ Et ça n'explique pas tout : sur les quinze unités d'écart de cette
+  session, huit restent inexpliquées.
+
+### Retiré
+
+- **Le lien « Voir la version » de l'en-tête.** Il ne servait que si la mise à
+  jour automatique échouait ; dans ce cas il reste le message d'erreur et le
+  bouton « Réessayer ».
+
 ## [0.7.0] - 2026-08-07
 
 ### Corrigé
