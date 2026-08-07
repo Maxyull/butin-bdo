@@ -93,9 +93,11 @@
     border: 1px solid var(--bord); border-radius: var(--rayon-petit);
   }
   h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
-  /* La marque a la hauteur des majuscules du titre, alignee sur leur
-     ligne de base : plus grande, elle deviendrait le sujet de la page. */
-  .marque { width: 22px; height: 22px; vertical-align: -4px;
+  /* Portee a 30 px le 07/08/2026 : a 22 px, calee sur la hauteur des
+     majuscules du titre, elle se lisait mal — le trait de la marque est fin,
+     c'est le meme defaut qui rendait l'icone illisible en petit dans la barre
+     des taches. Elle depasse donc volontairement la ligne de base du texte. */
+  .marque { width: 30px; height: 30px; vertical-align: -8px;
             margin-right: var(--espace-2); }
   h1 span { color: var(--doux); font-weight: 400; font-size: 13px; margin-left: 10px; }
   .haut { display: flex; align-items: center; justify-content: space-between;
@@ -568,23 +570,54 @@ const LIBELLES = {
 // et effacerait le seul retour visible d'une operation qui dure une minute.
 let majEnCours = false;
 
+// ⛔ Un message a une DUREE DE VIE, et il en faut une des deux cotes.
+//
+// Sans effacement, « Aucune mise a jour disponible » restait affiche
+// indefiniment, bien apres que sa cause avait disparu. Mais en effacant a
+// chaque rafraichissement, le message d'echec disparaissait en 400 ms, avant
+// d'avoir pu etre lu. Les deux defauts ont ete vus dans un navigateur, a dix
+// minutes d'intervalle, et c'est le meme arbitrage vu de ses deux bouts.
+//
+// Le rafraichissement n'efface donc que ce qui a depasse son temps.
+let majMessageJusqua = 0;
+const MAJ_MESSAGE_MS = 8000;
+
+function poserMessageMaj(texte) {
+  $("maj-etat").textContent = texte;
+  majMessageJusqua = Date.now() + MAJ_MESSAGE_MS;
+}
+
 function afficherLaMiseAJour(maj) {
   const bouton = $("bouton-maj");
   const lien = $("lien-maj");
+  const etat = $("maj-etat");
   if (majEnCours) return;
   if (!maj || !maj.disponible) {
+    // ⛔ Le message est EFFACE ici, et pas seulement les boutons. Sans ça,
+    // « Aucune mise à jour disponible » restait affiché indéfiniment, bien
+    // après que sa cause a disparu. Vérifié dans un navigateur : les boutons
+    // se cachaient bien, la phrase non — et une phrase qui survit à ce
+    // qu'elle décrit dit quelque chose de faux.
     bouton.hidden = true;
     lien.hidden = true;
+    if (Date.now() > majMessageJusqua) {
+      etat.textContent = "";
+      lien.hidden = true;
+    }
     return;
   }
+  // ⭐ UN seul élément à côté du numéro de version quand une mise à jour
+  // existe, et RIEN quand il n'y en a pas. Demandé par Maxime le 07/08/2026 :
+  // un bouton, un lien et une phrase pour annoncer qu'il n'y a rien à faire,
+  // c'est trois fois trop pour une information nulle.
+  //
+  // Le lien vers la page de la version n'apparaît donc plus d'emblée : il ne
+  // sert que si le téléchargement échoue, comme chemin de repli. C'est là
+  // qu'il compte, et seulement là.
   bouton.textContent = "Mettre à jour → " + maj.version;
   bouton.disabled = false;
   bouton.hidden = false;
-  // Le lien vers la page de la version reste offert a cote : si le
-  // telechargement echoue, il faut un chemin manuel, et certains veulent lire
-  // les notes de version avant d'installer.
   lien.href = maj.url;
-  lien.hidden = false;
 }
 
 // ⛔ Le message va dans son PROPRE element, jamais dans le libelle du bouton.
@@ -599,20 +632,24 @@ $("bouton-maj").addEventListener("click", async () => {
   bouton.disabled = true;
   bouton.textContent = "Téléchargement...";
   etat.textContent = "";
+  majMessageJusqua = 0;
   try {
     const reponse = await fetch("/api/maj", { method: "POST" });
     const corps = await reponse.json();
-    etat.textContent = corps.message || "Réponse illisible.";
+    poserMessageMaj(corps.message || "Réponse illisible.");
     // En cas de succes le bouton reste desactive : l'installeur va fermer
     // Butin dans les secondes qui suivent, et le rendre cliquable relancerait
     // un second telechargement pendant la fermeture.
     if (!corps.lance) {
+      // Le chemin manuel n'apparait qu'ICI, quand il sert vraiment : le
+      // telechargement a echoue et il faut pouvoir installer a la main.
+      $("lien-maj").hidden = false;
       majEnCours = false;
       bouton.disabled = false;
       bouton.textContent = "Réessayer";
     }
   } catch (erreur) {
-    etat.textContent = "Le serveur local n'a pas répondu.";
+    poserMessageMaj("Le serveur local n'a pas répondu.");
     majEnCours = false;
     bouton.disabled = false;
     bouton.textContent = "Réessayer";

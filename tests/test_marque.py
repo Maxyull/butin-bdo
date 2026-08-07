@@ -219,3 +219,46 @@ class TestSoutien:
 
         with Image.open(BANNIERE_DON) as image:
             assert image.size == (560, 120), f"gabarit inattendu : {image.size}"
+
+
+class TestEnteteDeMiseAJour:
+    """L'en-tête ne montre RIEN quand il n'y a rien à montrer.
+
+    Demandé par Maxime le 07/08/2026, sur une capture où trois éléments
+    cohabitaient — un bouton, un lien et une phrase — pour annoncer qu'aucune
+    mise à jour n'était disponible. Trois fois trop pour une information nulle.
+    """
+
+    def test_le_message_est_efface_quand_il_n_y_a_pas_de_mise_a_jour(self) -> None:
+        """⛔ Régression : une phrase qui survit à ce qu'elle décrit ment.
+
+        « Aucune mise à jour disponible » restait affichée indéfiniment : la
+        fonction cachait bien les boutons, mais ne vidait jamais le message.
+        Vérifié dans un navigateur, pas déduit.
+        """
+        texte = INDEX.read_text(encoding="utf-8")
+        assert 'etat.textContent = "";' in texte
+
+    def test_le_message_a_une_DUREE_DE_VIE(self) -> None:
+        """⛔ Le même arbitrage, vu par son autre bout.
+
+        Effacer à chaque rafraîchissement corrigeait le message éternel, mais
+        faisait disparaître le message d'ÉCHEC en 400 ms, avant qu'on ait pu le
+        lire. Les deux défauts ont été vus dans un navigateur à dix minutes
+        d'intervalle. Le rafraîchissement n'efface donc que ce qui a dépassé
+        son temps.
+        """
+        texte = INDEX.read_text(encoding="utf-8")
+        assert "majMessageJusqua" in texte
+        assert "MAJ_MESSAGE_MS" in texte
+        assert "if (Date.now() > majMessageJusqua)" in texte
+
+    def test_la_marque_de_l_entete_est_assez_grande(self) -> None:
+        """22 px calés sur la hauteur des majuscules se lisaient mal.
+
+        Le trait de la marque est fin : c'est le même défaut qui la rendait
+        illisible en petit dans la barre des tâches. Elle dépasse donc
+        volontairement la ligne de base du texte.
+        """
+        texte = INDEX.read_text(encoding="utf-8")
+        assert ".marque { width: 30px; height: 30px;" in texte

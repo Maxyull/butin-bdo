@@ -11,6 +11,16 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Corrigé
 
+- **L'en-tête n'affiche plus rien quand il n'y a rien à afficher.** Il montrait
+  jusqu'à trois éléments — un bouton, un lien et une phrase — pour annoncer
+  qu'aucune mise à jour n'était disponible. La phrase, en particulier, restait
+  affichée indéfiniment, bien après que sa cause avait disparu. Quand une
+  version existe, il n'y a plus qu'un seul bouton à côté du numéro ; le lien
+  vers la page de la version n'apparaît qu'en cas d'échec, là où il sert.
+
+- **La marque de l'en-tête est plus grande.** À 22 px, son trait fin se lisait
+  mal — le même défaut qui la rendait illisible dans la barre des tâches.
+
 - **Des drops étaient perdus quand la reconnaissance collait deux mots.** Le
   jeu écrit « Sceau de l'Agent » ; la lecture rend parfois « Sceau del'Agent »,
   ou remplace le `l` par un `I` majuscule. Le nom recollé ne correspondait plus
