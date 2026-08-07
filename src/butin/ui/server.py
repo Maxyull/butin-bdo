@@ -46,7 +46,10 @@ from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
 from ..catalog.icons import TYPES_MIME
+from ..discord_link import fetch_account as _compte_discord
+from ..discord_link import open_login as _ouvrir_connexion_discord
 from ..market import PriceBook
+from ..report import contributor_id as _identifiant_contributeur
 from ..report import send_report as _envoyer_rapport
 from ..store import SessionStore, Settings, compute
 from ..update import UpdateInfo, check_for_update
@@ -697,6 +700,45 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def compte_discord(self) -> dict[str, Any]:
+        """L'état du rattachement Discord, tel qu'il doit s'afficher.
+
+        ⚠️ **Hors verrou**, comme `send_report` : c'est un appel réseau, et
+        tenir le verrou d'`AppState` pendant plusieurs secondes figerait le
+        rafraîchissement de l'écran et le bouton d'arrêt de session.
+
+        ⛔ `inconnu` n'est pas `rattache: false`. L'interface doit garder ce
+        qu'elle affichait plutôt que d'annoncer « pas connecté » à quelqu'un
+        qui l'est : une coupure réseau lui ferait sinon refaire une
+        autorisation pour rien, et douter que le rattachement tienne.
+        """
+        compte = _compte_discord(_identifiant_contributeur())
+        return {"rattache": compte.rattache, "nom": compte.nom, "inconnu": compte.inconnu}
+
+    def connecter_discord(self) -> dict[str, Any]:
+        """Ouvre le navigateur du système sur la page de rattachement.
+
+        Le navigateur du système, pas la fenêtre de Butin : une page
+        d'autorisation sans barre d'adresse est exactement ce qu'on apprend aux
+        gens à ne pas remplir. Là, la personne voit `discord.com` et son
+        cadenas.
+
+        Rien n'est attendu ici : le rattachement se termine dans le navigateur,
+        et c'est `compte_discord()` qui l'apprendra ensuite. Bloquer sur une
+        réponse qui n'arrive jamais est le défaut que la session rubin a
+        constaté le 06/08/2026 et corrigé en ajoutant `/v1/discord/compte`.
+        """
+        ouvert = _ouvrir_connexion_discord(_identifiant_contributeur())
+        if ouvert:
+            return {
+                "ouvert": True,
+                "message": "Autorise Butin dans ton navigateur, puis reviens ici.",
+            }
+        return {
+            "ouvert": False,
+            "message": "Impossible d'ouvrir le navigateur. Vérifie ta connexion, puis réessaie.",
+        }
+
     def loot_a_controler(self, session_id: int) -> list[dict[str, Any]]:
         """Ce que la session a compté, objet par objet, pour le contrôle.
 
@@ -1015,6 +1057,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(self.state.snapshot())
         elif self.path == "/api/historique":
             self._send_json({"sessions": self.state.history()})
+        elif self.path == "/api/discord":
+            self._send_json(self.state.compte_discord())
         elif self.path.startswith("/api/historique/") and self.path.endswith("/objets"):
             self._objets_a_controler()
         elif self.path.startswith("/api/historique/"):
@@ -1092,6 +1136,10 @@ class Handler(BaseHTTPRequestHandler):
             # que le serveur local a parfaitement fait son travail, et que la
             # cause est chez le relais ou sur le réseau du joueur.
             self._send_json(self.state.send_report(message))
+        elif self.path == "/api/discord/connexion":
+            # Toujours 200, même raison que /api/rapport : le corps porte
+            # `ouvert` et un message affichable tel quel.
+            self._send_json(self.state.connecter_discord())
         else:
             self._send_json({"erreur": "introuvable"}, status=404)
 
