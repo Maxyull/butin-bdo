@@ -62,7 +62,16 @@
   .chiffres .etiquette { font-size: 10px; color: #97a0b5; letter-spacing: .06em; }
   .chiffres .valeur { font-size: 19px; font-variant-numeric: tabular-nums; }
 
-  #drops { max-height: 260px; overflow: hidden; }
+  /* ⛔ Plus de hauteur fixe. Elle valait 260 px avec `overflow: hidden`, donc
+     les objets au-dela etaient simplement INVISIBLES — pas coupes a moitie,
+     pas signales : absents. Signale par Maxime le 07/08/2026, sa derniere
+     ligne etait tronquee alors qu'il avait neuf objets distincts.
+
+     La liste pousse maintenant les bords de la fenetre (voir
+     `ajusterLaHauteur`), et ne defile QUE lorsque la fenetre a atteint sa
+     borne haute : defiler dans un panneau pose sur le jeu est le dernier
+     recours, pas le comportement normal. */
+  #drops { max-height: calc(100vh - 200px); overflow-y: auto; }
   .drop { display: flex; gap: 9px; align-items: center; padding: 2px 0; font-size: 14px; }
   .drop .qte { color: #97a0b5; font-variant-numeric: tabular-nums; }
   .drop .valeur { margin-left: auto; font-variant-numeric: tabular-nums; color: #cfd4e0; }
@@ -87,6 +96,17 @@
 
   #vide { color: #97a0b5; font-size: 13px; padding: 4px 0; }
   #panne { color: #ff8b3d; font-size: 13px; padding: 4px 0; display: none; }
+
+  /* ⛔ « Je ne vois plus le chat ». Plus voyant que la panne, parce que c'est
+     la seule chose qui ne se voit PAS autrement : un compteur qui n'augmente
+     plus ressemble a un farm calme. Le 07/08/2026, quatre minutes de menu
+     Echap ont coute 560 objets sur 4 080, sans un mot a l'ecran. */
+  #masque {
+    display: none; color: #ffd7c2; background: rgba(224, 113, 95, .22);
+    border: 1px solid rgba(224, 113, 95, .65); border-radius: 6px;
+    font-size: 13px; padding: 6px 9px; margin: 4px 0; line-height: 1.35;
+  }
+  #cadre.masque #masque { display: block; }
 </style>
 
 <div id="cadre">
@@ -105,6 +125,7 @@
   </div>
 
   <div id="en-pause">EN PAUSE — le temps ne compte plus, rien n'est enregistré.</div>
+  <div id="masque"></div>
   <div id="panne"></div>
   <div id="drops"><div id="vide">En attente du premier drop…</div></div>
 </div>
@@ -146,6 +167,21 @@ function afficher(etat) {
   $("panne").style.display = capture && capture.erreur ? "block" : "none";
   if (capture && capture.erreur) $("panne").textContent = "Capture arrêtée : " + capture.erreur;
   $("etat").textContent = capture ? capture.drops_enregistres + " drops" : "";
+
+  // ⛔ La zone calibree ne rend plus une seule ligne. C'est la panne qui ne se
+  // voit PAS : le fil tourne, le total reste, et tout ressemble a un farm
+  // calme. Le 07/08/2026, quatre minutes de menu Echap ont coute 560 objets
+  // sur 4 080 sans un mot a l'ecran.
+  const masque = !!(capture && capture.chat_masque);
+  $("cadre").classList.toggle("masque", masque);
+  if (masque) {
+    // La duree est dite : « depuis 4 min » se lit autrement que « depuis 31 s ».
+    const s = Math.round(capture.secondes_sans_texte || 0);
+    const duree = s >= 60 ? Math.floor(s / 60) + " min " + (s % 60) + " s" : s + " s";
+    $("masque").textContent =
+      "⚠️ Le chat n'est plus visible depuis " + duree +
+      " — rien n'est compté. Un menu le recouvre, ou la fenêtre a bougé.";
+  }
 
   // ⭐ Le RÉCAP CUMULÉ, et non le fil des drops un par un. Sur des heures de
   // farm, « combien j'ai ramassé de Pierres noires » est la question ; « quel
@@ -263,9 +299,52 @@ $("fermer").addEventListener("click", async () => {
   // session. Rien à faire de plus ici.
 });
 
+// ---------------------------------------------- Le panneau suit son contenu
+//
+// Demande par Maxime : « on prend de plus en plus d'items en grindant », et la
+// derniere ligne etait coupee. La fenetre fait 380 px de haut au depart et ne
+// bougeait jamais.
+//
+// ⛔ On ne redemande une taille QUE si elle a change d'assez pour se voir. La
+// hauteur du contenu bouge d'un pixel a chaque rafraichissement (nombres qui
+// changent de largeur, animations) : redimensionner la fenetre du systeme une
+// fois par seconde la ferait vibrer sous les yeux du joueur.
+let hauteurDemandee = 0;
+const PAS_DE_REDIMENSION = 24;
+
+async function ajusterLaHauteur() {
+  const cadre = $("cadre");
+  const liste = $("drops");
+  if (!cadre || !liste) return;
+
+  // ⛔ On calcule la hauteur VOULUE a partir du nombre de lignes, sans la lire
+  // sur la liste elle-meme. `#drops` est plafonne par `max-height` pour pouvoir
+  // defiler quand la fenetre ne peut plus grandir : mesurer sa hauteur reelle
+  // rendrait donc toujours le plafond, et le panneau ne grandirait jamais
+  // au-dela. Le raisonnement se mordrait la queue.
+  const lignes = liste.children.length;
+  const uneLigne = liste.firstElementChild ? liste.firstElementChild.offsetHeight : 0;
+  const hauteurListe = lignes * (uneLigne || 22);
+  const chrome = cadre.offsetHeight - liste.offsetHeight;
+  const voulue = chrome + hauteurListe + 16;
+  if (Math.abs(voulue - hauteurDemandee) < PAS_DE_REDIMENSION) return;
+  hauteurDemandee = voulue;
+  try {
+    await fetch("/api/panneau/taille", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({hauteur: voulue}),
+    });
+  } catch (erreur) {
+    // Un confort. S'il echoue, le panneau garde sa taille et tout le reste
+    // continue : la capture ne depend pas de la hauteur d'une fenetre.
+  }
+}
+
 async function rafraichir() {
   try {
     afficher(await (await fetch("/api/etat")).json());
+    await ajusterLaHauteur();
   } catch (erreur) {
     // Le serveur local s'arrête quand l'application se ferme. Ce n'est pas une
     // panne à signaler au joueur, c'est la fin normale.

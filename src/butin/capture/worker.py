@@ -69,6 +69,26 @@ class CaptureUnavailable(RuntimeError):
     """
 
 
+SECONDES_AVANT_ALERTE = 30.0
+"""Silence de la zone calibrée au-delà duquel on prévient le joueur.
+
+⛔ Tiré des données, pas posé au jugé. Sur la session 0014 du 07/08/2026, la
+seule de plus de mille secondes avec un calibrage impeccable (force 0,61), il
+n'existe que **deux** plages sans la moindre ligne :
+
+    4,9 s   au démarrage, le chat était encore vide
+    247,0 s pendant que le menu Échap couvrait le chat
+
+Trente secondes séparent ces deux populations avec un facteur six en dessous et
+huit au-dessus. Le vrai aveuglement dure des minutes ; les creux normaux, des
+secondes.
+
+⚠️ On avertit, on n'arrête rien. Couper la session parce qu'on ne voit plus le
+chat ferait perdre ce qui a déjà été compté, alors que le joueur n'a peut-être
+ouvert sa carte que dix secondes.
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class CaptureStatus:
     """Ce que l'interface a besoin de savoir de la capture en cours."""
@@ -87,6 +107,22 @@ class CaptureStatus:
     qui n'augmente plus, sans rien pour distinguer la panne du farm calme.
     """
 
+    secondes_sans_texte: float = 0.0
+    """Depuis combien de temps la zone calibrée ne rend plus une seule ligne.
+
+    ⛔ Zéro tant que la zone n'a jamais rien rendu : un chat encore vide au
+    démarrage n'est pas une panne. Voir `_Compteurs.a_deja_vu_du_texte`.
+    """
+
+    @property
+    def chat_masque(self) -> bool:
+        """Vrai quand la zone ne rend plus rien depuis assez longtemps.
+
+        C'est ce que l'interface affiche, et c'est **la** information qui
+        manquait : un compteur qui ne compte rien ressemble à un farm pauvre.
+        """
+        return self.secondes_sans_texte >= SECONDES_AVANT_ALERTE
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "en_cours": self.running,
@@ -97,6 +133,8 @@ class CaptureStatus:
             "drops_enregistres": self.recorded_events,
             "silver_enregistre": self.recorded_silver,
             "erreur": self.error,
+            "secondes_sans_texte": round(self.secondes_sans_texte, 1),
+            "chat_masque": self.chat_masque,
         }
 
 
@@ -105,6 +143,20 @@ class _Compteurs:
     ticks: int = 0
     ocr_reads: int = 0
     error: str = ""
+    texte_vu_a: float | None = None
+    """Horloge monotone de la dernière lecture qui a rendu au moins une ligne.
+
+    `None` tant qu'aucune reconnaissance n'a eu lieu : on ne peut pas dire
+    « ça fait dix secondes que je ne vois rien » avant d'avoir regardé une
+    seule fois."""
+
+    a_deja_vu_du_texte: bool = False
+    """⛔ Sans lui, une session lancée devant un chat vide crierait aussitôt.
+
+    On ne prévient que si la zone a **déjà** rendu des lignes puis n'en rend
+    plus : c'est ça, être masqué. Un chat encore vide au démarrage n'est pas
+    une panne, c'est un début de session."""
+
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -191,6 +243,14 @@ class CaptureWorker:
                 self._compteurs.ocr_reads,
                 self._compteurs.error,
             )
+            # ⛔ Le silence ne compte QUE si la zone a déjà rendu des lignes,
+            # et QUE si le fil tourne encore. Sinon une session arrêtée
+            # afficherait « je ne vois plus le chat » pour l'éternité, alors
+            # que personne ne regarde plus.
+            silence = 0.0
+            if self._compteurs.a_deja_vu_du_texte and self._compteurs.texte_vu_a is not None:
+                silence = max(0.0, self._clock() - self._compteurs.texte_vu_a)
+
         if enregistreur is None:
             return CaptureStatus(
                 running=False,
@@ -211,6 +271,9 @@ class CaptureWorker:
             recorded_events=acquis.recorded_events + enregistreur.recorded_events,
             recorded_silver=acquis.recorded_silver + enregistreur.recorded_silver,
             error=erreur,
+            # Seulement quand le fil tourne : à l'arrêt, plus personne ne
+            # regarde et l'alerte n'aurait plus de sens.
+            secondes_sans_texte=silence if self.running else 0.0,
         )
 
     # -- cycle de vie ----------------------------------------------------
@@ -379,6 +442,31 @@ class CaptureWorker:
             session_start_min=session_start_min,
         )
 
+    def _noter_la_visibilite(self, trace: dict[str, Any] | None, maintenant: float) -> None:
+        """Retient depuis quand la zone calibrée ne rend plus une seule ligne.
+
+        ⛔ À appeler SOUS le verrou des compteurs, comme le reste.
+
+        ⭐ Le signal n'est pas « aucun drop », c'est **aucune ligne du tout**
+        après en avoir vu. Le journal du jeu reste affiché plusieurs secondes :
+        passer brutalement de vingt-trois lignes à zéro veut dire que la zone
+        est masquée, pas que le farm est calme.
+
+        Mesuré sur la session 0014 du 07/08/2026, celle où Maxime a ouvert le
+        menu Échap : **247 secondes d'affilée sans une seule ligne**, sur une
+        session de 1 127 s au calibrage impeccable (force 0,61). Butin a
+        continué d'afficher son total et son silver par heure comme si de rien
+        n'était, et il manquait 560 objets sur 4 080.
+        """
+        lues = (trace or {}).get("lues")
+        if lues:
+            self._compteurs.texte_vu_a = maintenant
+            self._compteurs.a_deja_vu_du_texte = True
+        elif self._compteurs.texte_vu_a is None:
+            # Première lecture, et elle est vide : on démarre le compte à
+            # partir de maintenant plutôt que depuis l'époque Unix.
+            self._compteurs.texte_vu_a = maintenant
+
     def _tourner(self, interval_s: float) -> None:
         """Boucle du fil de fond. Ne laisse jamais une exception disparaître."""
         # ⭐ Le jeu passe devant. Demandé ICI, dans le fil lui-même, parce que
@@ -407,6 +495,7 @@ class CaptureWorker:
                     self._compteurs.ticks += 1
                     if resultat.ocr_ran:
                         self._compteurs.ocr_reads += 1
+                        self._noter_la_visibilite(resultat.trace, debut)
                 # Le pas est compté depuis le DÉBUT du tour : sinon le coût de
                 # la reconnaissance s'ajoute à l'intervalle et la cadence dérive
                 # d'autant, ce qui fausserait la mesure de défilement.

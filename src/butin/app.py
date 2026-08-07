@@ -55,8 +55,19 @@ WIDTH = 1100
 HEIGHT = 820
 OVERLAY_WIDTH = 430
 OVERLAY_HEIGHT = 380
-"""Taille du panneau en surimpression. Assez pour une dizaine de drops et les
-trois chiffres, assez peu pour ne pas manger le champ de vision du jeu."""
+"""Taille de DÉPART du panneau en surimpression. Assez pour une dizaine de
+drops et les trois chiffres, assez peu pour ne pas manger le champ de vision du
+jeu."""
+
+OVERLAY_HEIGHT_MAX = 900
+"""Hauteur au-delà de laquelle le panneau cesse de grandir.
+
+⛔ Une borne, parce que le nombre d'objets distincts n'en a pas. Signalé par
+Maxime le 07/08/2026 : « on prend de plus en plus d'items en grindant », et la
+dernière ligne était coupée. Sans plafond, un farm de plusieurs heures finirait
+par couvrir l'écran du jeu — on aurait remplacé une gêne par une pire.
+
+Au-delà, la liste défile dans le panneau plutôt que de pousser ses bords."""
 
 MIN_SIZE = (860, 620)
 """Taille minimale de la fenêtre. En dessous, le tableau du butin se replie et
@@ -95,6 +106,26 @@ class Overlay:
             transparent=True,
             easy_drag=True,
         )
+
+    def resize(self, hauteur: int) -> None:
+        """Ajuste la hauteur du panneau à son contenu. **Ne lève jamais.**
+
+        ⛔ Un confort ne doit pas pouvoir interrompre une session de farm. Une
+        fenêtre déjà fermée, une bibliothèque graphique qui refuse, et la
+        capture continue exactement pareil.
+
+        La largeur ne bouge pas : les lignes sont des noms d'objets, elles
+        s'allongent rarement, et un panneau qui change de largeur à chaque drop
+        serait insupportable à regarder.
+        """
+        fenetre = self._window
+        if fenetre is None:
+            return
+        borne = max(OVERLAY_HEIGHT, min(int(hauteur), OVERLAY_HEIGHT_MAX))
+        try:
+            fenetre.resize(OVERLAY_WIDTH, borne)
+        except Exception as exc:
+            _log.debug("panneau non redimensionné : %s", exc)
 
     def close(self) -> None:
         fenetre, self._window = self._window, None
