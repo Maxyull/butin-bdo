@@ -134,9 +134,20 @@ principe, c'est un refus tant que le bénéfice est nul.
 1. Vérifier que les critères de la version visée sont remplis.
 2. Déplacer le contenu de `Non publié` sous un titre de version daté dans
    `CHANGELOG.md`, et recréer une section `Non publié` vide.
-3. Mettre à jour la version dans `pyproject.toml` **et** dans
-   `src/butin/__init__.py`. Un test vérifie que les deux concordent : deux
-   sources de vérité qui divergent produisent un numéro de version faux à
-   l'exécution, ce que personne ne remarque avant un rapport de bogue.
+3. Mettre à jour la version dans **TROIS** endroits :
+   - `pyproject.toml` ;
+   - `src/butin/__init__.py` ;
+   - `installeur/butin.iss` (`MyAppVersion`).
+
+   ⚠️ **Le troisième manquait à cette liste jusqu'au 07/08/2026**, et c'est le
+   script de construction qui l'a rattrapé en refusant de bâtir un installeur
+   dont le numéro contredisait celui du paquet. Un test vérifie les deux
+   premiers ; `installeur\construire.ps1` vérifie le troisième et **s'arrête**
+   plutôt que de produire un installeur qui s'annonce en 0.4.0 alors qu'il
+   contient la 0.5.0.
+
+   Deux sources de vérité qui divergent produisent un numéro de version faux à
+   l'exécution, ce que personne ne remarque avant un rapport de bogue. Trois
+   sources ne changent rien au principe, sauf qu'il faut les connaître toutes.
 4. Fusionner, puis étiqueter le commit de fusion `v<version>`.
 5. Créer la publication GitHub à partir de la section du journal.
