@@ -49,6 +49,7 @@ from ..store import SessionStore
 from .calibrate import Calibration
 from .lines import DEFAULT_FORMAT, ChatLineFormat
 from .loop import CaptureLoop, LoopConfig, config_from_calibration
+from .priorite import abaisser_le_fil_courant
 
 _log = logging.getLogger(__name__)
 
@@ -380,6 +381,16 @@ class CaptureWorker:
 
     def _tourner(self, interval_s: float) -> None:
         """Boucle du fil de fond. Ne laisse jamais une exception disparaître."""
+        # ⭐ Le jeu passe devant. Demandé ICI, dans le fil lui-même, parce que
+        # la priorité est une propriété du fil courant : la poser depuis
+        # `start()` la poserait sur le fil de l'interface, c'est-à-dire sur
+        # exactement celui qu'il ne faut pas ralentir.
+        #
+        # Ça ne change AUCUN calcul, seulement l'ordre de passage. Voir
+        # `priorite.py` pour la piste concurrente (borner les threads
+        # d'onnxruntime), mesurée et refusée parce qu'elle perd des lignes.
+        abaisser_le_fil_courant()
+
         enregistreur = self._recorder
         if enregistreur is None:
             return
