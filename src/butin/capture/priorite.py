@@ -59,6 +59,22 @@ BELOW_NORMAL = -1
 PRIORITE_ERREUR = 0x7FFFFFFF
 
 
+def _est_windows() -> bool:
+    """Vrai sous Windows, lu à CHAQUE appel.
+
+    ⚠️ Une fonction, et pas un `sys.platform != "win32"` écrit sur place. mypy
+    traite les comparaisons sur `sys.platform` comme des constantes de la
+    plateforme où il tourne : l'intégration continue est sous Linux, donc tout
+    ce qui suit le test y était déclaré **inatteignable** et le job échouait.
+    Cousin du `python_version` figé dans mypy, déjà consigné dans le CLAUDE.md.
+
+    ⚠️ Une fonction et pas une constante de module non plus : les tests
+    remplacent `sys.platform` pour vérifier le chemin non-Windows, ce qu'une
+    valeur calculée à l'import ne verrait jamais.
+    """
+    return sys.platform == "win32"
+
+
 def _kernel32() -> Any:
     """`kernel32` avec ses signatures DÉCLARÉES, ou `None`.
 
@@ -69,7 +85,7 @@ def _kernel32() -> Any:
     jamais. Le module aurait été livré en ne faisant **rien**, sans que rien ne
     le dise.
     """
-    if sys.platform != "win32":
+    if not _est_windows():
         return None
     import ctypes
     from ctypes import wintypes
@@ -91,7 +107,7 @@ def abaisser_le_fil_courant() -> bool:
     capture tourne exactement pareil, elle est juste servie comme avant.
     Personne ne doit s'arrêter parce qu'un confort n'a pas pu être appliqué.
     """
-    if sys.platform != "win32":
+    if not _est_windows():
         # Butin est distribué pour Windows uniquement. Ailleurs (la CI tourne
         # sous Linux), on ne fait rien plutôt que d'inventer un équivalent qui
         # ne serait jamais exercé en vrai.
