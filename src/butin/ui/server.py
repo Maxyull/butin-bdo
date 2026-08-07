@@ -83,6 +83,14 @@ class OverlayWindow(Protocol):
 
     def close(self) -> None: ...
 
+    def resize(self, hauteur: int) -> None:
+        """Ajuste la hauteur du panneau à son contenu.
+
+        Implémentation par défaut vide : un panneau qui ne sait pas se
+        redimensionner reste parfaitement utilisable, il montre simplement
+        moins d'objets à la fois. Les tests s'en servent tels quels.
+        """
+
 
 class AppState:
     """État partagé entre les requêtes.
@@ -714,6 +722,23 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def redimensionner_le_panneau(self, hauteur: int) -> dict[str, Any]:
+        """Fait suivre au panneau la hauteur de son contenu.
+
+        ⚠️ **Hors verrou**, comme l'ouverture du panneau : redimensionner passe
+        par la couche graphique, et tenir le verrou d'`AppState` pendant ce
+        temps figerait tout le reste, dont le bouton d'arrêt de session.
+
+        Demandé par Maxime le 07/08/2026 : « on prend de plus en plus d'items
+        en grindant », et la dernière ligne était coupée. La borne haute vit
+        dans `app.py`, avec sa raison.
+        """
+        panneau = self.overlay
+        if panneau is None:
+            return {"redimensionne": False}
+        panneau.resize(int(hauteur))
+        return {"redimensionne": True}
+
     def preparer_l_archive(self) -> dict[str, Any]:
         """Rassemble journaux, réglages, calibrage et capture dans un zip.
 
@@ -1206,6 +1231,12 @@ class Handler(BaseHTTPRequestHandler):
             # que le serveur local a parfaitement fait son travail, et que la
             # cause est chez le relais ou sur le réseau du joueur.
             self._send_json(self.state.send_report(message))
+        elif self.path == "/api/panneau/taille":
+            hauteur = self._read_json().get("hauteur", 0)
+            try:
+                self._send_json(self.state.redimensionner_le_panneau(int(hauteur)))
+            except (TypeError, ValueError):
+                self._send_json({"erreur": "hauteur invalide"}, status=400)
         elif self.path == "/api/archive":
             # Toujours 200, comme /api/rapport : le corps porte le nom de
             # l'archive, son contenu détaillé et ce qui a manqué.
