@@ -149,17 +149,19 @@ def item_factory():
 
 
 @pytest.fixture
-def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fait échouer bruyamment tout accès réseau involontaire.
+def verifie_l_isolation() -> None:
+    """Vérifie que le bac à sable est bien en place, pour un test qui en doute.
 
-    Un test qui télécharge vraiment le catalogue serait lent, dépendrait
-    d'internet, et masquerait le fait que le cache ne fonctionne pas.
+    ⛔ Remplace `no_network`, retirée le 07/08/2026. Cette fixture-là promettait
+    de « faire échouer bruyamment tout accès réseau involontaire » et ne le
+    faisait pas :
+
+    1. elle ne couvrait que `get`, et la fuite réelle était un **`post`** ;
+    2. elle était **opt-in**, et plus aucun test ne la demandait.
+
+    Une garde morte est pire qu'une garde absente : elle se lit comme une
+    protection. Celle-ci a laissé la suite publier dans le vrai salon Discord
+    des joueurs pendant que sa docstring affirmait le contraire. Le réseau est
+    désormais coupé par `reseau_coupe`, automatique et sans exception.
     """
-    import requests
-
-    def refuse(*args: object, **kwargs: object):
-        raise AssertionError("accès réseau interdit dans les tests")
-
-    monkeypatch.setattr(requests.Session, "get", refuse)
-    monkeypatch.setattr(requests, "get", refuse)
     assert os.environ.get("BUTIN_HOME"), "isolated_home doit être actif"
