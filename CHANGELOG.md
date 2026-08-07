@@ -9,6 +9,36 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.8.1] - 2026-08-08
+
+### Ajouté
+
+- **⛔ Butin te dit quand il ne voit plus le chat.** C'était la panne
+  invisible : le logiciel tourne, le calibrage est bon, et pourtant plus rien
+  n'est compté. À l'écran, ça ressemble exactement à un farm calme.
+
+  Sur une vraie session, un menu ouvert a recouvert le chat pendant **quatre
+  minutes**. Butin a continué d'afficher son total et son silver par heure sans
+  un mot, et il manquait **560 objets sur 4 080**.
+
+  Le panneau affiche maintenant, en rouge : « Le chat n'est plus visible depuis
+  4 min 7 s — rien n'est compté. Un menu le recouvre, ou la fenêtre a bougé. »
+
+  ⚠️ Ça prévient, ça n'arrête rien. Ouvrir ta carte dix secondes ne doit pas te
+  faire perdre ce qui est déjà compté.
+
+### Modifié
+
+- **Le panneau grandit avec le nombre d'objets.** Il était figé, et au-delà
+  d'une certaine hauteur les objets n'étaient ni coupés ni signalés : ils
+  étaient **absents**. Il suit maintenant sa liste, sans jamais dépasser une
+  taille qui couvrirait ton écran de jeu — au-delà, la liste défile.
+
+- **L'écran d'autorisation Discord est annoncé avant de s'ouvrir.** Il affiche
+  « Rubin » et non « Butin », parce que les deux logiciels partagent le même
+  serveur. Se le voir demander sans prévenir ressemble à du hameçonnage, et se
+  méfier serait la bonne réaction.
+
 ## [0.8.0] - 2026-08-07
 
 ### Corrigé
