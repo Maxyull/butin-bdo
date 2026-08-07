@@ -730,7 +730,10 @@ class AppState:
         """
         ouvert = _ouvrir_connexion_discord(_identifiant_contributeur())
         if ouvert:
-            return {"ouvert": True, "message": "Autorise Butin dans ton navigateur, puis reviens ici."}
+            return {
+                "ouvert": True,
+                "message": "Autorise Butin dans ton navigateur, puis reviens ici.",
+            }
         return {
             "ouvert": False,
             "message": "Impossible d'ouvrir le navigateur. Vérifie ta connexion, puis réessaie.",

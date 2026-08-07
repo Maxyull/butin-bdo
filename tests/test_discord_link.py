@@ -26,7 +26,9 @@ from butin.discord_link import Compte, depuis_reponse, fetch_account, login_url,
 class _Reponse:
     """Une réponse HTTP minimale, sans réseau."""
 
-    def __init__(self, status_code: int, donnees: object = None, url: str = discord_link.ACCOUNT_URL):
+    def __init__(
+        self, status_code: int, donnees: object = None, url: str = discord_link.ACCOUNT_URL
+    ):
         self.status_code = status_code
         self.url = url
         self._donnees = donnees
@@ -78,7 +80,9 @@ class TestLeNomVientDuRelais:
         page = (
             Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static" / "index.html"
         ).read_text(encoding="utf-8")
-        entete = page[page.index('id="discord-connexion"') - 2000 : page.index("</div>\n\n<div class=")]
+        entete = page[
+            page.index('id="discord-connexion"') - 2000 : page.index("</div>\n\n<div class=")
+        ]
         assert "<input" not in entete, "un champ de saisie est apparu à côté du compte Discord"
 
 

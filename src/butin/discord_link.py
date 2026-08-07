@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import logging
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import urlencode, urlparse
 
@@ -107,7 +108,7 @@ def login_url(player: str) -> str:
     return f"{LOGIN_URL}?{urlencode({'player': player})}"
 
 
-def open_login(player: str, *, opener=webbrowser.open) -> bool:
+def open_login(player: str, *, opener: Callable[[str], bool] = webbrowser.open) -> bool:
     """Ouvre le navigateur sur la page de rattachement. **Ne lève jamais.**
 
     Le navigateur du système, pas la fenêtre de Butin : une page d'autorisation
