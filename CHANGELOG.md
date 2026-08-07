@@ -9,6 +9,40 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.7.0] - 2026-08-07
+
+### Corrigé
+
+- **⛔ Butin te prévient quand le calibrage est mauvais, au lieu de l'accepter
+  en silence.** C'était le vrai coupable des chiffres qui ne veulent rien dire.
+
+  Sur une session réelle, un recalibrage en cours de route a remplacé une zone
+  de 22 rangées par une de 5, avec un pas de ligne presque double. Résultat :
+  **29 lectures sur 38 ne voyaient plus rien**, et l'écran affichait « Zone
+  calibrée » comme si tout allait bien. Un compteur qui ne compte rien ressemble
+  à un farm pauvre, et rien ne permettait de faire la différence.
+
+  Le calibrage passait chaque contrôle de justesse, et personne ne regardait la
+  combinaison. Maintenant, un bloc rouge liste ce qui cloche et te dit quand le
+  calibrage d'avant était meilleur.
+
+  ⭐ À retenir : ce n'est pas le nombre de lignes de chat qui fausse le
+  comptage. Avec un bon calibrage, une session a compté **107 objets pour 107
+  réellement ramassés**, sur 22 rangées.
+
+### Modifié
+
+- **Le jeu passe devant la reconnaissance.** Elle tournait à la même priorité
+  que le reste, sur toutes les unités du processeur, et ça se sentait en
+  jouant.
+
+  Le fil de capture demande maintenant à être servi après le jeu. Mesuré à
+  charge réaliste : **+27,8 % de temps processeur rendu au jeu, pour 2,1 % de
+  reconnaissance en plus**, sans perdre une seule lecture ni une seule ligne.
+
+  ⚠️ Rien de ce qui est lu ne change : c'est une question d'ordre de passage,
+  pas de calcul.
+
 ## [0.6.0] - 2026-08-07
 
 ### Ajouté
