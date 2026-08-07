@@ -72,6 +72,37 @@ class TestFichiers:
         for attendue in (16, 32, 48, 256):
             assert attendue in tailles, f"résolution {attendue} px absente de butin.ico"
 
+    def test_les_petites_tailles_restent_LISIBLES(self) -> None:
+        """⛔ Régression : porter la bonne résolution ne suffit pas à se voir.
+
+        La marque est un trait fin doré sur fond sombre. Générer le `.ico` en
+        donnant à Pillow une seule image de 256 px et une liste de tailles
+        réduit naïvement : le trait est moyenné avec le fond, et l'icône
+        s'éteint en rapetissant. Mesuré sur la version publiée en 0.5.0, la
+        luminance du pixel le plus clair tombait de **196 à 256 px** à
+        **104 à 16 px** — à l'écran, une tache sombre dans la barre des tâches
+        et dans l'explorateur, c'est-à-dire là où on la regarde le plus.
+
+        Signalé par Maxime sur ses propres captures, pas trouvé en relisant.
+
+        Le correctif épaissit le trait avant de réduire, et remonte le
+        contraste sur les petites tailles seulement. Le seuil est posé entre
+        les deux populations mesurées : 104 avant, 229 à 242 après.
+        """
+        import numpy as np
+        from PIL import Image
+
+        with Image.open(ICONE) as im:
+            for taille in (16, 24, 32):
+                im.size = (taille, taille)
+                im.load()
+                tableau = np.asarray(im.convert("RGBA")).astype(float)
+                luminance = tableau[..., :3].mean(axis=2) * (tableau[..., 3] / 255)
+                assert luminance.max() >= 180, (
+                    f"à {taille} px le trait plafonne à {luminance.max():.0f} sur 255 : "
+                    "l'icône s'éteint en rapetissant"
+                )
+
 
 class TestPages:
     def test_les_deux_fenetres_declarent_la_favicon(self) -> None:

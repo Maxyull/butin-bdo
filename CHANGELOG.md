@@ -9,6 +9,14 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Corrigé
+
+- **L'icône du logiciel était illisible en petit.** Dans la barre des tâches et
+  dans la liste de l'explorateur de fichiers — donc là où on la regarde le plus
+  souvent — elle n'apparaissait que comme une tache sombre. Le trait doré, fin,
+  se noyait dans le fond en rapetissant. Il est désormais épaissi et éclairci
+  aux petites tailles, et le sac se reconnaît à 16 px comme à 256.
+
 ## [0.5.0] - 2026-08-07
 
 ### Modifié
