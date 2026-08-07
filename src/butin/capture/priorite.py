@@ -90,7 +90,11 @@ def _kernel32() -> Any:
     import ctypes
     from ctypes import wintypes
 
-    kernel32 = ctypes.windll.kernel32
+    # ⚠️ `getattr` et non `ctypes.windll.kernel32`. `windll` n'existe pas dans
+    # les stubs hors Windows : l'accès direct exige un `# type: ignore
+    # [attr-defined]` sous Linux, que mypy sous Windows refuse à son tour comme
+    # inutile. Aucun commentaire ne satisfait les deux, un accès dynamique si.
+    kernel32 = getattr(ctypes, "windll").kernel32  # noqa: B009
     kernel32.GetCurrentThread.restype = wintypes.HANDLE
     kernel32.GetCurrentThread.argtypes = []
     kernel32.SetThreadPriority.restype = wintypes.BOOL
