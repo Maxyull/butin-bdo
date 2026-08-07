@@ -72,10 +72,16 @@ section 2ter).
   `[UninstallDelete]` qui y pointerait : voir le commentaire de tête du
   fichier.
 
-**L'icône** (`butin.ico`) est faite aussi : une gemme dorée sur fond sombre,
-générée en interne (PIL, aucun actif téléchargé) en sept résolutions de 16 à
-256 px, embarquée à la fois dans `butin.exe` (via `butin.spec`) et dans
-l'installeur lui-même (`SetupIconFile` dans `butin.iss`).
+**L'icône** (`butin.ico`) est faite aussi : une bourse dorée au trait facetté
+sur fond sombre, en sept résolutions de 16 à 256 px, embarquée à la fois dans
+`butin.exe` (via `butin.spec`) et dans l'installeur lui-même (`SetupIconFile`
+dans `butin.iss`).
+
+⚠️ Ce paragraphe a décrit jusqu'au 07/08/2026 « une gemme dorée » « générée en
+interne (PIL, aucun actif téléchargé) ». Les deux étaient faux : le dessin est
+une bourse, et il ne sort pas de PIL. Il vient d'un modèle d'image, PIL ne fait
+que le détourage et le rendu de chaque résolution. La provenance exacte est
+dans `ATTRIBUTION.md`, qui est l'endroit où ce dépôt en répond.
 
 ## La construction en une commande : FAIT (06/08/2026)
 

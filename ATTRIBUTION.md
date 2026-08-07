@@ -111,6 +111,22 @@ servant à confirmer en cas de divergence. Voir
 
 Les prix proviennent de l'API publique du marché central.
 
+## L'icône
+
+Le dessin de `installeur/butin.ico`, une bourse dorée au trait facetté, a été
+produit par un modèle d'image (nano-banana, via Meshy) le 06/08/2026. Pillow
+n'a fait ensuite que le détourage du fond et le rendu de chaque résolution.
+
+Aucun pictogramme, aucune fonte et aucune photographie tierce n'y est repris.
+La même marque habille Rubin, le serveur Discord et maxyull.fr, et son
+générateur vit hors de ce dépôt, dans `D:\DEV\bdo\logos\kit\build_kit.py`.
+
+⚠️ `installeur/LISEZ-MOI.md` a affirmé jusqu'au 07/08/2026 que l'icône était
+« générée en interne (PIL, aucun actif téléchargé) ». C'était faux sur
+l'origine du dessin. Cette section existe parce que ce dépôt répond de ses
+emprunts, et qu'une provenance approximative n'a pas sa place dans un dépôt
+public qui tient ce fichier à jour.
+
 ## Marque et éditeur
 
 Black Desert Online est une marque de Pearl Abyss. Butin est un outil
