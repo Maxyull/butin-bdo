@@ -111,6 +111,32 @@ visible et lisible, **0,06 au plus** là où il est masqué. Le seuil est à qua
 fois le bruit et à un tiers sous la plus faible vraie détection.
 """
 
+FORCE_FIABLE = 0.26
+"""En dessous, le calibrage est accepté mais **annoncé comme douteux**.
+
+⛔ Ce n'est pas un seuil de plus posé au jugé : c'est le bas de la population
+mesurée juste au-dessus. La docstring de `MIN_STRENGTH` dit que le chat
+lisible donne **0,26 à 0,60**, et le chat masqué **0,06 au plus**. `MIN_STRENGTH`
+a été placé à 0,15, au-dessus du bruit — donc tout ce qui tombe entre 0,15 et
+0,26 est accepté alors que **ça ne ressemble à rien de ce qui a été observé
+comme bon**.
+
+Trouvé le 07/08/2026 sur une vraie session de Maxime. Il a recalibré en cours
+de route et remplacé un calibrage à **0,53** par un à **0,16** :
+
+    avant : 475x493, pas 21,7 px, 22 rangées, force 0,53 → 19 lectures sur 19
+            contiennent du texte
+    après : 415x215, pas 38,0 px,  5 rangées, force 0,16 →  9 lectures sur 38
+
+Ses objets n'étaient pas mal comptés, ils n'étaient **jamais lus**. Et rien à
+l'écran ne le disait.
+
+⚠️ On avertit au lieu de refuser. Refuser à 0,25 jetterait des calibrages
+peut-être bons sur une résolution qu'on n'a jamais mesurée — le calibrage n'a
+été vérifié que sur un seul écran, et se tromper dans ce sens-là empêcherait de
+farmer du tout.
+"""
+
 MIN_ROWS = 5
 """Rangées qu'il faut avoir trouvées pour croire à un chat.
 
@@ -250,6 +276,54 @@ class Calibration:
             f"{self.region.describe()}, pas {self.row_height_px:.1f} px, "
             f"{self.rows} rangées, force {self.strength:.2f}"
         )
+
+    def doutes(self, precedent: Calibration | None = None) -> list[str]:
+        """Ce qui cloche dans ce calibrage, en phrases destinées au joueur.
+
+        Liste vide = rien à signaler. ⛔ Elle ne refuse jamais : voir
+        `FORCE_FIABLE` pour pourquoi avertir vaut mieux que refuser ici.
+
+        ⭐ Les critères sont regardés ENSEMBLE, ce qui est tout l'intérêt. Le
+        calibrage qui a fait perdre une session de Maxime passait chaque
+        critère de justesse : force au plancher, rangées au plancher exact, pas
+        près du plafond. Pris un par un, chacun était « acceptable ». Pris
+        ensemble, c'était du bruit.
+        """
+        raisons: list[str] = []
+
+        if self.strength < FORCE_FIABLE:
+            raisons.append(
+                f"la zone trouvée ne ressemble que faiblement à une fenêtre de chat "
+                f"(force {self.strength:.2f}, il en faut {FORCE_FIABLE:.2f} pour être tranquille)"
+            )
+        if self.rows <= MIN_ROWS:
+            raisons.append(
+                f"seulement {self.rows} rangées trouvées, c'est le minimum absolu : "
+                "la zone ne couvre probablement qu'un bout du journal"
+            )
+        # Un pas proche du plafond des valeurs cherchées veut souvent dire qu'on
+        # s'est accroché à un multiple du vrai pas, donc qu'on voit une ligne
+        # sur deux. Mesuré : 38 px là où le bon calibrage en trouvait 21,7.
+        if self.row_height_px >= int(LAGS[-1]) - 3:
+            raisons.append(
+                f"le pas de ligne trouvé ({self.row_height_px:.0f} px) est proche du maximum "
+                "cherché : c'est souvent le signe qu'on a mesuré une ligne sur deux"
+            )
+
+        if precedent is not None:
+            # ⭐ Le cas vécu : recalibrer a REMPLACÉ un calibrage qui marchait.
+            # On a l'ancien sous la main, s'en priver serait absurde.
+            if precedent.strength >= FORCE_FIABLE > self.strength:
+                raisons.append(
+                    f"le calibrage précédent était nettement meilleur "
+                    f"(force {precedent.strength:.2f} contre {self.strength:.2f})"
+                )
+            if self.rows * 2 <= precedent.rows:
+                raisons.append(
+                    f"la zone est bien plus courte qu'avant : {self.rows} rangées "
+                    f"contre {precedent.rows}"
+                )
+        return raisons
 
 
 def _column_periodicity(
