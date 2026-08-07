@@ -199,6 +199,12 @@
   .bouton-discord-compte:hover { color: var(--texte); border-color: #5865f2; }
   .bouton-discord-compte[disabled] { cursor: progress; opacity: .6; }
   .compte-discord { color: var(--doux); font-size: 13px; }
+  /* L'avertissement sur le nom affiché par Discord. Sous l'en-tête et pleine
+     largeur : il doit se lire avant de cliquer, pas se deviner à côté d'un
+     bouton. Déclarée ici — `.note-large` et `.separateur` ont déjà été
+     utilisées sans l'être, deux fois. */
+  .note-discord { margin: 0 0 var(--espace-5); max-width: 70ch; }
+  .note-discord b { color: var(--texte); }
   .compte-discord b { color: var(--texte); font-weight: 600; }
 
   /* Les deux sliders. Un vrai interrupteur a deux positions, pas une liste
@@ -349,6 +355,19 @@
     <span class="compte-discord" id="discord-compte" hidden></span>
   </div>
 </div>
+<!-- ⛔ Dit AVANT d'ouvrir le navigateur, pas après. Discord affichera « Rubin »
+     parce que les deux logiciels partagent le même serveur, et c'est lui qui y
+     est enregistré. Un joueur à qui l'on demande d'autoriser une application
+     qu'il n'a jamais installée a toutes les raisons de croire à du
+     hameçonnage — et il aurait raison de refuser.
+
+     Masqué une fois le compte rattaché : la phrase ne sert qu'au moment de
+     décider. -->
+<p class="note note-discord" id="discord-avertissement" hidden>
+  ⚠️ L'écran d'autorisation de Discord affichera <b>Rubin</b>, pas Butin. C'est
+  normal : les deux logiciels partagent le même serveur, et c'est lui qui est
+  enregistré auprès de Discord. Butin ne verra jamais ton mot de passe.
+</p>
 
 <div class="grille">
   <div class="panneau">
@@ -1517,6 +1536,9 @@ const DISCORD_SONDAGE_MS = 120000;
 function afficherLeCompteDiscord(compte) {
   const bouton = $("discord-connexion");
   const etiquette = $("discord-compte");
+  // L'avertissement suit le bouton : il ne sert qu'au moment de decider, et
+  // une phrase qui survit a ce qu'elle explique dit quelque chose de faux.
+  const avertissement = $("discord-avertissement");
 
   // ⛔ « inconnu » n'est PAS « pas connecte ». Une coupure reseau ne doit rien
   // changer a l'ecran : afficher « se connecter » a quelqu'un de deja rattache
@@ -1532,12 +1554,14 @@ function afficherLeCompteDiscord(compte) {
     if (compte.nom) etiquette.querySelector("b").textContent = compte.nom;
     etiquette.hidden = false;
     bouton.hidden = true;
+    avertissement.hidden = true;
     discordSondageJusqua = 0;  // Inutile de continuer a sonder.
   } else {
     etiquette.hidden = true;
     bouton.hidden = false;
     bouton.disabled = false;
     bouton.textContent = "Se connecter à Discord";
+    avertissement.hidden = false;
   }
 }
 
