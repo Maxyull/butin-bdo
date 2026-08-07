@@ -35,7 +35,7 @@ from pathlib import Path
 
 from .. import paths
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -66,6 +66,24 @@ CREATE TABLE IF NOT EXISTS loot (
     sid        INTEGER NOT NULL DEFAULT 0,
     qty        INTEGER NOT NULL,
     at         REAL    NOT NULL
+);
+
+-- Ce que le joueur a réellement trouvé dans son inventaire, objet par objet.
+-- ⭐ La SEULE mesure de ce logiciel qui ne passe par aucune reconnaissance
+-- d'écran, donc la seule qui puisse arbitrer quand le compteur et le banc
+-- d'essai se trompent ensemble : les deux lisent les mêmes pixels avec le même
+-- moteur, un inventaire compté à la main non.
+--
+-- ⛔ L'ABSENCE de ligne veut dire « pas vérifié », et c'est un état à part
+-- entière. Certains objets partent dans un autre inventaire (monture,
+-- serviteur) et personne n'ira les compter ; les marquer exacts par défaut
+-- ferait passer pour vérifié ce que personne n'a regardé.
+CREATE TABLE IF NOT EXISTS controle_objet (
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    item_id    INTEGER NOT NULL,
+    compte     INTEGER NOT NULL,
+    reel       INTEGER NOT NULL,
+    PRIMARY KEY (session_id, item_id)
 );
 
 CREATE INDEX IF NOT EXISTS loot_par_session ON loot(session_id);
@@ -215,6 +233,8 @@ class SessionStore:
                 self._vers_v2(connection)
             if version < 3:
                 self._vers_v3(connection)
+            if version < 4:
+                self._vers_v4(connection)
             connection.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
 
     @staticmethod
@@ -257,6 +277,19 @@ class SessionStore:
             connection.execute("ALTER TABLE sessions ADD COLUMN verdict TEXT")
         if "ecart" not in colonnes:
             connection.execute("ALTER TABLE sessions ADD COLUMN ecart INTEGER")
+
+    @staticmethod
+    def _vers_v4(connection: sqlite3.Connection) -> None:
+        """v3 -> v4 : le contrôle objet par objet.
+
+        Contrairement aux deux migrations précédentes, celle-ci n'ajoute pas de
+        colonne à une table existante mais une table entière, que
+        `CREATE TABLE IF NOT EXISTS` crée déjà en tête de `_migrate`. Il n'y a
+        donc rien à faire ici — et cette fonction existe quand même, pour que
+        le palier soit visible dans la suite des migrations plutôt qu'absent :
+        un trou dans la numérotation se lit comme un oubli.
+        """
+        del connection
 
     # -- écriture --------------------------------------------------------
 
@@ -380,6 +413,45 @@ class SessionStore:
                 "UPDATE sessions SET verdict = ?, ecart = ? WHERE id = ?",
                 (verdict, None if verdict == "exact" else ecart, session_id),
             )
+
+    def set_item_controls(self, session_id: int, reels: dict[int, tuple[int, int]]) -> int:
+        """Enregistre le contrôle objet par objet, et rend l'écart total signé.
+
+        `reels` associe un identifiant d'objet au couple (compté, réel). Seuls
+        les objets que le joueur a réellement regardés y figurent : ceux qu'il
+        laisse de côté n'ont PAS de ligne, et c'est ainsi qu'on dit « pas
+        vérifié » sans le confondre avec « exact ».
+
+        ⚠️ Les lignes précédentes de la session sont remplacées, pas
+        complétées : un joueur qui refait son contrôle corrige un constat, il
+        n'en empile pas deux. Garder l'ancien rendrait le total dépendant de
+        l'ordre des saisies.
+
+        L'écart rendu est signé, comme celui de la session : positif quand le
+        compteur a annoncé PLUS que la réalité, donc quand il a inventé.
+        """
+        with self._transaction() as connection:
+            connection.execute("DELETE FROM controle_objet WHERE session_id = ?", (session_id,))
+            connection.executemany(
+                "INSERT INTO controle_objet (session_id, item_id, compte, reel)"
+                " VALUES (?, ?, ?, ?)",
+                [(session_id, item_id, c, r) for item_id, (c, r) in reels.items()],
+            )
+        return sum(compte - reel for compte, reel in reels.values())
+
+    def item_controls(self, session_id: int) -> dict[int, tuple[int, int]]:
+        """Ce que le joueur a contrôlé, par objet : (compté, réel).
+
+        Un objet absent n'est pas « exact » : il n'a pas été vérifié.
+        """
+        with self._reading() as connection:
+            lignes = connection.execute(
+                "SELECT item_id, compte, reel FROM controle_objet WHERE session_id = ?",
+                (session_id,),
+            ).fetchall()
+        return {
+            int(ligne["item_id"]): (int(ligne["compte"]), int(ligne["reel"])) for ligne in lignes
+        }
 
     def get_session(self, session_id: int) -> Session | None:
         with self._reading() as connection:

@@ -136,6 +136,21 @@
   .verdict-vide button.bon:hover { border-color: var(--vert); color: var(--vert); }
   .verdict-vide button.mauvais:hover { border-color: var(--rouge); color: var(--rouge); }
 
+  /* Le contrôle déplié, une ligne par objet. Les plus nombreux d'abord :
+     c'est là que le compteur se trompe, donc là qu'on veut regarder. */
+  .controle-detail td { background: #11141b; }
+  .controle-objet { padding: var(--espace-1) 0; }
+  .controle-nom { min-width: 260px; }
+  /* Un champ vide veut dire « pas vérifié », et il faut que ça se voie sans
+     avoir à cliquer dedans : c'est un état, pas un oubli. */
+  .controle-objet input::placeholder { color: var(--doux); font-style: italic; }
+  .action-mince {
+    background: transparent; border: 1px solid var(--bord); color: var(--doux);
+    border-radius: var(--rayon-petit); padding: 6px 12px; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 600;
+  }
+  .action-mince:hover { border-color: var(--doux); color: var(--texte); }
+
   /* Bouton de mise à jour, à côté du numéro de version : une notification
      discrète, jamais un blocage. Il informe et laisse l'utilisateur
      cliquer, il ne l'empêche de rien faire d'autre. Voir update.py pour
@@ -1022,25 +1037,163 @@ function celluleControle(session) {
   bon.addEventListener("click", (e) => { e.stopPropagation(); envoyerVerdict(session.id, "exact", null, td); });
   mauvais.addEventListener("click", (e) => {
     e.stopPropagation();
-    // Une seule ligne, sans retour a la ligne echappe. Un retour ecrit comme
-    // une VRAIE fin de ligne est une erreur de syntaxe qui fait tomber tout le
-    // bloc de script : voila ce qui a rendu la fenetre inerte pendant six PR
-    // (numero 34). Le test du script vient de rattraper exactement ce cas.
-    const saisi = prompt(
-      "Combien d'unités d'écart ? Positif si Butin a compté TROP, négatif s'il en a compté moins. Exemple : 1413 si Butin annonce 2113 et que ton inventaire en a 700."
-    );
-    if (saisi === null) return;
-    const n = parseInt(saisi, 10);
-    if (!Number.isInteger(n) || n === 0) {
-      alert("Il faut un nombre entier non nul.");
-      return;
-    }
-    envoyerVerdict(session.id, "ecart", n, td);
+    ouvrirLeControleParObjet(session.id, td);
   });
   zone.appendChild(bon);
   zone.appendChild(mauvais);
   td.appendChild(zone);
   return td;
+}
+
+// -- Controle objet par objet ----------------------------------------------
+//
+// ⭐ On demande le NOMBRE REEL, jamais un ecart. Le logiciel sait ce qu'il a
+// compte : lui faire faire la soustraction, c'est eviter de la demander au
+// joueur, donc eviter qu'il se trompe. Meme raisonnement que les cases a
+// cocher du profil de taxe, ou l'on ne demande pas le pourcentage.
+//
+// ⛔ TROIS etats par objet, et le troisieme n'est pas un defaut :
+//   exact       le compte correspond
+//   ecart       le joueur saisit le nombre reel
+//   pas verifie il n'a pas regarde, et le dit
+//
+// L'etat de depart est « pas verifie », pour tout le monde. Raison donnee par
+// Maxime : certains objets partent dans un autre inventaire (monture,
+// serviteur) et personne n'ira les compter. Les marquer exacts par defaut
+// ferait passer pour verifie ce que personne n'a regarde.
+async function ouvrirLeControleParObjet(id, td) {
+  td.textContent = "Chargement...";
+  let objets;
+  try {
+    const reponse = await (await fetch("/api/historique/" + id + "/objets")).json();
+    objets = reponse.objets || [];
+  } catch (erreur) {
+    td.textContent = "Le serveur local n'a pas repondu.";
+    return;
+  }
+  if (!objets.length) {
+    td.textContent = "Cette session n'a rien compte.";
+    return;
+  }
+
+  const ligne = td.closest("tr");
+  const detail = document.createElement("tr");
+  detail.className = "controle-detail";
+  const cellule = document.createElement("td");
+  cellule.colSpan = 7;
+  detail.appendChild(cellule);
+
+  const intro = document.createElement("div");
+  intro.className = "note-avant";
+  // Les grosses quantites sont en tete, cote serveur : c'est la ou le compteur
+  // se trompe, d'apres Maxime. On le dit, pour que personne ne se croie oblige
+  // de tout remplir.
+  intro.textContent =
+    "Combien en as-tu VRAIMENT dans ton inventaire ? Les plus nombreux d'abord, "
+    + "c'est la qu'il y a le plus de risque. Laisse « pas verifie » pour ce que "
+    + "tu n'as pas regarde, c'est une reponse valable.";
+  cellule.appendChild(intro);
+
+  const saisies = new Map();
+  for (const objet of objets) {
+    const rangee = document.createElement("div");
+    rangee.className = "rangee controle-objet";
+
+    const nom = document.createElement("span");
+    nom.className = "controle-nom";
+    nom.textContent = objet.nom;
+
+    const compte = document.createElement("span");
+    compte.className = "compteur";
+    compte.textContent = "compte : " + nombre(objet.compte);
+
+    const champ = document.createElement("input");
+    champ.type = "number";
+    champ.min = "0";
+    champ.className = "champ champ-etroit";
+    champ.placeholder = "pas verifie";
+    champ.title = "Laisse vide si tu n'as pas verifie cet objet";
+    if (objet.reel !== null && objet.reel !== undefined) champ.value = String(objet.reel);
+
+    const exact = document.createElement("button");
+    exact.type = "button";
+    exact.className = "action-mince";
+    exact.textContent = "Exact";
+    exact.title = "Recopie le compte : c'est dire qu'il est juste";
+    exact.addEventListener("click", () => { champ.value = String(objet.compte); });
+
+    rangee.appendChild(nom);
+    rangee.appendChild(compte);
+    rangee.appendChild(champ);
+    rangee.appendChild(exact);
+    cellule.appendChild(rangee);
+    saisies.set(objet.item_id, champ);
+  }
+
+  const barre = document.createElement("div");
+  barre.className = "rangee note";
+  const valider = document.createElement("button");
+  valider.type = "button";
+  valider.className = "action";
+  valider.textContent = "Enregistrer le controle";
+  const annuler = document.createElement("button");
+  annuler.type = "button";
+  annuler.className = "action-mince";
+  annuler.textContent = "Annuler";
+  const etat = document.createElement("span");
+  etat.className = "compteur";
+  barre.appendChild(valider);
+  barre.appendChild(annuler);
+  barre.appendChild(etat);
+  cellule.appendChild(barre);
+
+  annuler.addEventListener("click", () => {
+    detail.remove();
+    td.replaceWith(celluleControle({ id: id, verdict: null, ecart: null }));
+  });
+
+  valider.addEventListener("click", async () => {
+    const reels = {};
+    let combien = 0;
+    for (const [itemId, champ] of saisies) {
+      const brut = champ.value.trim();
+      if (brut === "") continue;           // pas verifie : on n'ecrit RIEN
+      const n = parseInt(brut, 10);
+      if (!Number.isInteger(n) || n < 0) {
+        etat.textContent = "Un inventaire n'est jamais negatif.";
+        return;
+      }
+      reels[itemId] = n;
+      combien += 1;
+    }
+    if (!combien) {
+      etat.textContent = "Verifie au moins un objet, ou annule.";
+      return;
+    }
+    valider.disabled = true;
+    etat.textContent = "Enregistrement...";
+    try {
+      const reponse = await fetch("/api/historique/" + id + "/verdict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verdict: "ecart", reels: reels }),
+      });
+      const corps = await reponse.json();
+      if (corps.erreur) { etat.textContent = corps.erreur; valider.disabled = false; return; }
+      detail.remove();
+      td.replaceWith(celluleControle({ id: id, verdict: "ecart", ecart: corps.ecart }));
+      if (!corps.envoye && corps.message) {
+        const l = $("etat-dossier");
+        if (l) l.textContent = "Controle enregistre, mais pas envoye : " + corps.message;
+      }
+    } catch (erreur) {
+      etat.textContent = "Le serveur local n'a pas repondu.";
+      valider.disabled = false;
+    }
+  });
+
+  td.textContent = "";
+  ligne.after(detail);
 }
 
 async function envoyerVerdict(id, verdict, ecart, td) {
