@@ -9,6 +9,36 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.9.0] - 2026-08-08
+
+### Ajouté
+
+- **Un bouton « Capturer mon inventaire ».** L'inventaire est la seule vérité
+  qui ne passe par aucune reconnaissance d'écran : le compteur et le banc
+  d'essai lisent les mêmes pixels avec le même moteur, donc ils peuvent se
+  tromper ensemble, et seul un inventaire compté à la main peut les contredire
+  tous les deux.
+
+  Jusqu'ici cette vérité n'existait que dans ta tête, recopiée à la main. Une
+  session finie sans ce geste était perdue : l'inventaire, lui, continue de
+  bouger.
+
+  ⚠️ **Ouvre ton inventaire dans le jeu avant de cliquer.** La capture prend
+  l'écran tel qu'il est, elle ne peut pas deviner.
+
+  ⛔ Elle ne touche jamais au jeu : aucune frappe, aucun clic envoyé au client.
+  Elle reste sur ton disque et part avec l'archive, si tu la déposes.
+
+### Modifié
+
+- **Les fenêtres rouvrent là où tu les avais laissées.** Le panneau est placé à
+  la main, par-dessus le jeu, à l'endroit précis où il ne gêne pas. Une mise à
+  jour le rouvrait au centre, donc il fallait le replacer à chaque version.
+
+  ⚠️ Une position devenue invisible n'est jamais réutilisée : si tu débranches
+  un écran, la fenêtre revient à sa place par défaut plutôt que de s'ouvrir
+  dans le vide.
+
 ## [0.8.1] - 2026-08-08
 
 ### Ajouté
