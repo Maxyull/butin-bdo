@@ -257,6 +257,17 @@ transformer une suite de captures en liste de drops sans jamais compter deux
 fois. Le détail de ce qui est repris et de ce qui est neuf se trouve dans
 [ATTRIBUTION.md](ATTRIBUTION.md).
 
+## Soutenir
+
+Butin est gratuit et le restera. Il n'a pas de version payante, pas de
+publicité, et ne collecte rien : ce que vous farmez ne quitte pas votre
+machine (voir [Vie privée](#vie-privée)).
+
+Si l'outil vous fait gagner du temps et que vous voulez donner un coup de
+pouce, c'est ici, et c'est entièrement facultatif :
+
+[![Soutenir Butin sur PayPal](ressources/bouton-don-butin.png)](https://paypal.me/maxyull)
+
 ## Licence
 
 [MIT](LICENSE).
