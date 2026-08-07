@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .. import __version__, paths
+from ..autoupdate import install_update
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
@@ -694,6 +695,22 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def install_update(self) -> dict[str, Any]:
+        """Télécharge et lance l'installeur de la version disponible.
+
+        ⚠️ **Hors verrou**, comme l'envoi de rapport : le téléchargement pèse
+        des dizaines de mégaoctets et peut durer une minute. Tenir le verrou
+        d'`AppState` figerait tout le reste, dont le bouton d'arrêt de session.
+
+        ⛔ **Ne ferme rien.** L'installeur possède le cycle
+        fermeture-réouverture, voir `autoupdate.launch_installer`.
+        """
+        info = self.update_info
+        if info is None or not info.disponible:
+            return {"lance": False, "message": "Aucune mise à jour disponible."}
+        lance, message = install_update(info.version)
+        return {"lance": lance, "message": message}
+
 
 class Handler(BaseHTTPRequestHandler):
     """Routes de l'interface. Volontairement peu nombreuses."""
@@ -863,6 +880,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/session/arreter":
             self.state.stop()
             self._send_json(self.state.snapshot())
+        elif self.path == "/api/maj":
+            # Toujours 200, comme /api/rapport : le corps porte `lance` et un
+            # message affichable. Le serveur local a fait son travail même
+            # quand le telechargement echoue.
+            self._send_json(self.state.install_update())
         elif self.path == "/api/rapport":
             message = str(self._read_json().get("message", ""))
             # Toujours 200, même quand l'envoi échoue : le corps porte
