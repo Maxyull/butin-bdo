@@ -11,6 +11,17 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Corrigé
 
+- **Des drops étaient perdus quand la reconnaissance collait deux mots.** Le
+  jeu écrit « Sceau de l'Agent » ; la lecture rend parfois « Sceau del'Agent »,
+  ou remplace le `l` par un `I` majuscule. Le nom recollé ne correspondait plus
+  à rien et le drop disparaissait sans un mot. Les noms qui contiennent « l' »
+  cumulent les deux défauts, donc ce sont eux qui disparaissaient le plus.
+
+  La comparaison ignore désormais les espaces et ne distingue plus les glyphes
+  qui se ressemblent. Deux objets réellement différents qui deviendraient
+  indistinguables sont refusés plutôt que devinés : mieux vaut un drop manquant
+  qu'un drop attribué au mauvais objet.
+
 - **L'icône du logiciel était illisible en petit.** Dans la barre des tâches et
   dans la liste de l'explorateur de fichiers — donc là où on la regarde le plus
   souvent — elle n'apparaissait que comme une tache sombre. Le trait doré, fin,
