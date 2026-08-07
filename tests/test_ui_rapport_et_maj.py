@@ -213,3 +213,92 @@ class TestFichiersServis:
         with pytest.raises(urllib.error.HTTPError) as erreur:
             brut(base, "/nimporte-quoi.png")
         assert erreur.value.code == 404
+
+
+class TestControleParObjet:
+    """Les routes du contrôle : ce que la session a compté, et ce qu'on en dit."""
+
+    def _session_finie(self, etat: Any) -> int:
+        import time as _t
+
+        from butin.store.db import LootRow
+
+        session = etat.store.start_session(started_at=_t.time())
+        etat.store.add_loot(
+            session.id,
+            [
+                LootRow(item_id=44451, qty=97, at=_t.time()),
+                LootRow(item_id=16001, qty=13, at=_t.time()),
+            ],
+        )
+        etat.store.end_session(session.id, ended_at=_t.time())
+        return int(session.id)
+
+    def test_les_objets_sont_rendus_du_PLUS_NOMBREUX_au_moins(self, app) -> None:
+        """⭐ L'ordre n'est pas cosmétique, il vient d'une observation de Maxime.
+
+        « C'est surtout sur les tokens qu'on loote beaucoup » que le compteur
+        se trompe. Mettre les grosses quantités en tête rend vérifiable en
+        trois lignes ce qui compte vraiment, au lieu d'exiger une saisie
+        complète que personne ne ferait.
+        """
+        etat, base = app
+        session_id = self._session_finie(etat)
+        corps = brut(base, f"/api/historique/{session_id}/objets")[2]
+        objets = json.loads(corps)["objets"]
+        assert [o["compte"] for o in objets] == [97, 13]
+
+    def test_un_objet_jamais_controle_rend_reel_NUL(self, app) -> None:
+        """`None` et non le compte : pré-remplir ferait valider d'un clic ce
+        que personne n'a regardé."""
+        etat, base = app
+        session_id = self._session_finie(etat)
+        objets = json.loads(brut(base, f"/api/historique/{session_id}/objets")[2])["objets"]
+        assert all(o["reel"] is None for o in objets)
+
+    def test_la_route_calcule_l_ecart_a_partir_des_NOMBRES_REELS(self, app) -> None:
+        """⭐ On reçoit un inventaire, jamais une soustraction.
+
+        Demander l'écart revenait à demander au joueur de faire le calcul, donc
+        de se tromper — le même raisonnement que les cases à cocher du profil
+        de taxe, où l'on ne demande pas le pourcentage.
+        """
+        etat, base = app
+        session_id = self._session_finie(etat)
+        corps = poster(
+            base,
+            f"/api/historique/{session_id}/verdict",
+            {"verdict": "ecart", "reels": {"44451": 84}},
+        )
+        assert corps["ecart"] == 13
+
+    def test_un_objet_absent_de_la_session_est_REFUSE(self, app) -> None:
+        """Accepter ferait entrer un écart sur une quantité qui n'existe pas."""
+        etat, base = app
+        session_id = self._session_finie(etat)
+        with pytest.raises(urllib.error.HTTPError) as erreur:
+            poster(
+                base,
+                f"/api/historique/{session_id}/verdict",
+                {"verdict": "ecart", "reels": {"999999": 1}},
+            )
+        assert erreur.value.code == 400
+
+    def test_un_inventaire_negatif_est_refuse(self, app) -> None:
+        etat, base = app
+        session_id = self._session_finie(etat)
+        with pytest.raises(urllib.error.HTTPError) as erreur:
+            poster(
+                base,
+                f"/api/historique/{session_id}/verdict",
+                {"verdict": "ecart", "reels": {"44451": -1}},
+            )
+        assert erreur.value.code == 400
+
+    def test_un_ecart_sans_aucun_objet_est_refuse(self, app) -> None:
+        """Annoncer un écart sans dire lequel n'apprend rien à personne."""
+        etat, base = app
+        session_id = self._session_finie(etat)
+        with pytest.raises(urllib.error.HTTPError) as erreur:
+            poster(base, f"/api/historique/{session_id}/verdict", {"verdict": "ecart", "reels": {}})
+        assert erreur.value.code == 400

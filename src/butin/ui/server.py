@@ -697,6 +697,43 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def loot_a_controler(self, session_id: int) -> list[dict[str, Any]]:
+        """Ce que la session a compté, objet par objet, pour le contrôle.
+
+        Trié du plus nombreux au moins nombreux, et ce n'est pas cosmétique :
+        Maxime l'a dit d'expérience, « c'est surtout sur les tokens qu'on loote
+        beaucoup » que le compteur se trompe. Mettre les grosses quantités en
+        tête rend vérifiable en trois lignes ce qui compte vraiment, au lieu
+        d'exiger une saisie complète que personne ne ferait.
+        """
+        with self.lock:
+            langue = self.settings.language
+        quantites = self.store.quantities(session_id)
+        deja = self.store.item_controls(session_id)
+
+        par_objet: dict[int, int] = {}
+        for (item_id, _niveau), qte in quantites.items():
+            par_objet[item_id] = par_objet.get(item_id, 0) + qte
+
+        lignes = [
+            {
+                "item_id": item_id,
+                "nom": self._name(item_id, langue),
+                "compte": compte,
+                # `None` et non `compte` : ne pas savoir n'est pas savoir que
+                # c'est juste. Pré-remplir avec le compte ferait valider d'un
+                # clic ce que personne n'a regardé.
+                "reel": deja[item_id][1] if item_id in deja else None,
+            }
+            for item_id, compte in par_objet.items()
+        ]
+        # Trié sur `par_objet` plutôt que sur la valeur relue du dictionnaire :
+        # celle-ci est typée « ce que peut contenir un JSON », donc pas un
+        # entier aux yeux du vérificateur, et la contraindre à cet endroit
+        # masquerait un vrai problème le jour où elle n'en serait plus un.
+        lignes.sort(key=lambda ligne: -par_objet[int(str(ligne["item_id"]))])
+        return lignes
+
     def set_verdict(self, session_id: int, verdict: str, ecart: int | None) -> dict[str, Any]:
         """Enregistre le contrôle du joueur, et le remonte au salon Discord.
 
@@ -724,6 +761,7 @@ class AppState:
             signe = "de trop" if (ecart or 0) > 0 else "de moins"
             titre = f"Contrôle : ÉCART de {abs(ecart or 0)} unités {signe} (compté {compte})"
 
+        controles = self.store.item_controls(session_id)
         contexte: dict[str, object] = {
             "spot": session.spot or "inconnu",
             "durée": f"{session.duration_s(time.time()) / 60:.1f} min",
@@ -731,6 +769,24 @@ class AppState:
             "unités comptées": compte,
             "écart annoncé": "aucun" if verdict == "exact" else ecart,
         }
+        # ⭐ Le DÉTAIL par objet, pas seulement le total. Un écart global ne dit
+        # pas OÙ ça dérape, alors que c'est toute la question : le compteur se
+        # trompe sur certains objets et pas sur d'autres, et savoir lesquels
+        # est ce qui permet de chercher au bon endroit.
+        with self.lock:
+            langue = self.settings.language
+        for item_id, (compte_objet, reel) in sorted(
+            controles.items(), key=lambda paire: -abs(paire[1][0] - paire[1][1])
+        ):
+            if compte_objet == reel:
+                continue
+            nom = self._name(item_id, langue)
+            contexte[f"écart · {nom}"] = f"compté {compte_objet}, réel {reel}"
+        non_verifies = len(quantites) - len(controles)
+        if non_verifies > 0:
+            # Dit explicitement ce qui n'a PAS été regardé : sans ça, un
+            # contrôle partiel se lirait comme un contrôle complet.
+            contexte["objets non vérifiés"] = non_verifies
         resultat = _envoyer_rapport(titre, contexte=contexte)
         return {
             "verdict": verdict,
@@ -874,24 +930,61 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"erreur": "verdict attendu : exact ou ecart"}, status=400)
             return
 
-        ecart: int | None = None
-        if verdict == "ecart":
-            valeur = corps.get("ecart")
-            if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur == 0:
-                self._send_json(
-                    {
-                        "erreur": "écart attendu : un entier non nul, positif si le "
-                        "compteur a annoncé trop"
-                    },
-                    status=400,
-                )
-                return
-            ecart = valeur
-
         if self.state.store.get_session(session_id) is None:
             self._send_json({"erreur": "session introuvable"}, status=404)
             return
+
+        ecart: int | None = None
+        if verdict == "ecart":
+            # ⭐ On reçoit les nombres RÉELS, pas un écart. Demander un écart
+            # revenait à demander au joueur de faire la soustraction, donc de
+            # se tromper — exactement le raisonnement des cases à cocher du
+            # profil de taxe, où on ne demande pas le pourcentage.
+            reels = corps.get("reels")
+            if not isinstance(reels, dict) or not reels:
+                self._send_json({"erreur": "il faut au moins un objet contrôlé"}, status=400)
+                return
+            comptes: dict[int, int] = {
+                int(str(ligne["item_id"])): int(str(ligne["compte"]))
+                for ligne in self.state.loot_a_controler(session_id)
+            }
+            controles: dict[int, tuple[int, int]] = {}
+            for cle, valeur in reels.items():
+                try:
+                    item_id = int(cle)
+                    reel = int(valeur)
+                except (TypeError, ValueError):
+                    self._send_json({"erreur": f"nombre illisible pour « {cle} »"}, status=400)
+                    return
+                if reel < 0:
+                    self._send_json({"erreur": "un inventaire n'est jamais négatif"}, status=400)
+                    return
+                if item_id not in comptes:
+                    # Un objet que la session n'a pas compté n'a rien à faire
+                    # dans son contrôle : accepter le ferait entrer un écart
+                    # sur une quantité qui n'existe pas.
+                    self._send_json(
+                        {"erreur": f"l'objet {item_id} n'a pas été compté dans cette session"},
+                        status=400,
+                    )
+                    return
+                controles[item_id] = (comptes[item_id], reel)
+            ecart = self.state.store.set_item_controls(session_id, controles)
+
         self._send_json(self.state.set_verdict(session_id, verdict, ecart))
+
+    def _objets_a_controler(self) -> None:
+        """`GET /api/historique/<id>/objets` : ce que la session a compté."""
+        brut = self.path[len("/api/historique/") : -len("/objets")]
+        try:
+            session_id = int(brut)
+        except ValueError:
+            self._send_json({"erreur": "identifiant de session invalide"}, status=400)
+            return
+        if self.state.store.get_session(session_id) is None:
+            self._send_json({"erreur": "session introuvable"}, status=404)
+            return
+        self._send_json({"objets": self.state.loot_a_controler(session_id)})
 
     def _read_json(self) -> dict[str, Any]:
         try:
@@ -922,6 +1015,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(self.state.snapshot())
         elif self.path == "/api/historique":
             self._send_json({"sessions": self.state.history()})
+        elif self.path.startswith("/api/historique/") and self.path.endswith("/objets"):
+            self._objets_a_controler()
         elif self.path.startswith("/api/historique/"):
             self._send_detail(self.path.removeprefix("/api/historique/"))
         elif self.path.startswith("/icone/"):

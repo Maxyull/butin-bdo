@@ -9,6 +9,24 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Modifié
+
+- **Le contrôle d'une session se fait maintenant objet par objet, et on ne
+  demande plus un écart mais le nombre réel.** Cliquer « Écart » déplie la
+  liste de ce que la session a compté, du plus nombreux au moins nombreux, et
+  il suffit d'écrire à côté combien tu en as vraiment dans ton inventaire. La
+  soustraction, c'est le logiciel qui la fait.
+
+  Un objet laissé vide reste **« pas vérifié »**, et c'est une réponse
+  valable : certains objets partent dans un autre inventaire et personne n'ira
+  les compter. Ils ne sont donc jamais comptés comme justes, ce qui ferait
+  passer pour vérifié quelque chose que personne n'a regardé.
+
+  Les objets les plus nombreux arrivent en premier parce que c'est là que le
+  compteur se trompe : vérifier les trois premiers suffit le plus souvent.
+  Le constat part dans le salon Discord avec le détail par objet — un écart
+  global ne dit pas **où** ça dérape, alors que c'est toute la question.
+
 ### Corrigé
 
 - **L'en-tête n'affiche plus rien quand il n'y a rien à afficher.** Il montrait
