@@ -48,6 +48,30 @@ class MatchConfig:
     digit_confusion: bool = True
     """Traiter deux quantités confondables comme égales."""
 
+    quantite_tronquee: bool = True
+    """Traiter « 1 face à n » comme une même ligne dont la quantité a été perdue.
+
+    ⭐ Ce n'est pas une tolérance de plus, c'est une propriété du format. Le jeu
+    **n'écrit jamais `x1`** : il écrit 1 par une **absence** de quantité suivie
+    d'un point collé au crochet (voir `docs/journal-acquisition.md`). Or une
+    absence est exactement ce que produit une lecture tronquée en fin de ligne.
+
+    Relevé le 07/08/2026 dans le journal d'une vraie session, sur un objet qui
+    ne tombe qu'en x2, x5, x7 et x10 :
+
+        ...ancestrale] x2 (16:32)     la ligne
+        ...ancestrale]. (16:32)       la MÊME, sa quantité rabotée
+
+    La seconde ne ressemblait plus à la première, donc elle était déclarée
+    nouvelle, donc créditée : **un drop inventé**. Cinq fois dans une session,
+    pour sept unités de trop.
+
+    ⚠️ Le prix, assumé : un vrai drop de 1 qui suit un drop du même objet dans
+    la même minute peut être fondu dans le précédent, donc perdu. C'est le sens
+    acceptable de l'erreur — rater un drop donne un chiffre un peu bas, en
+    inventer un donne un chiffre faux.
+    """
+
     line_accept: float = 0.70
     """Score minimal pour considérer que deux lignes sont la même ligne
     physique du journal."""
@@ -125,7 +149,43 @@ def quantities_match(a: int, b: int, cfg: MatchConfig | None = None) -> tuple[bo
         # Confiance volontairement basse : la correspondance est acceptée pour
         # ne pas casser l'alignement, mais elle reste une hypothèse.
         return (True, 0.75)
+    if cfg.quantite_tronquee and quantite_perdue(a, b):
+        # Encore plus basse que la confusion de chiffres : là on ne compare
+        # même pas deux lectures d'un nombre, on suppose qu'un nombre a
+        # disparu. Assez pour éviter d'inventer un drop, assez peu pour qu'un
+        # meilleur recouvrement l'emporte ailleurs.
+        return (True, 0.60)
     return (False, 0.0)
+
+
+#: Au-delà, « 1 face à n » n'est plus traité comme une troncature.
+#:
+#: ⛔ Borne tirée des lectures réelles, pas posée au jugé. Les troncatures
+#: observées le 07/08/2026 perdent ` x2`, ` x5` ou ` x7`, soit deux ou trois
+#: caractères, **tout en gardant l'heure intacte** (`. (16:32)`). Perdre
+#: ` x7000` et conserver la parenthèse qui suit n'est pas la même panne : c'est
+#: une autre lecture, et la traiter comme une troncature ferait fondre un vrai
+#: drop unitaire dans une pile de sept mille.
+#:
+#: Deux chiffres laissent de la marge au-dessus de ce qui a été vu, sans aller
+#: jusqu'aux montants.
+QUANTITE_TRONQUABLE_MAX = 99
+
+
+def quantite_perdue(a: int, b: int) -> bool:
+    """Vrai si l'une des deux quantités vaut 1 et l'autre une petite valeur.
+
+    ⭐ 1 est le seul nombre que le jeu n'écrit pas. Il le rend par une absence
+    (`[Objet].` et non `[Objet] x1`), donc une lecture qui rabote la fin de la
+    ligne produit un « 1 » indiscernable d'un vrai. Voir
+    `MatchConfig.quantite_tronquee`.
+
+    ⛔ Le code ne dit pas laquelle des deux lectures est la bonne, seulement que
+    l'écart n'est **pas une preuve** de second drop.
+    """
+    if (a == 1) == (b == 1):
+        return False
+    return max(a, b) <= QUANTITE_TRONQUABLE_MAX
 
 
 def items_match(

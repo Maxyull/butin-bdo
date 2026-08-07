@@ -315,8 +315,7 @@
 
 <div class="haut">
   <h1><img class="marque" src="/butin.png" alt="">Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
-     type="button"></button><a class="bouton-maj" id="lien-maj" hidden
-     target="_blank" rel="noopener">Voir la version</a>
+     type="button"></button>
      <span id="maj-etat" class="etat-en-ligne"></span></h1>
   <div class="sliders">
     <div class="slider">
@@ -668,35 +667,29 @@ function poserMessageMaj(texte) {
 
 function afficherLaMiseAJour(maj) {
   const bouton = $("bouton-maj");
-  const lien = $("lien-maj");
   const etat = $("maj-etat");
   if (majEnCours) return;
   if (!maj || !maj.disponible) {
-    // ⛔ Le message est EFFACE ici, et pas seulement les boutons. Sans ça,
+    // ⛔ Le message est EFFACE ici, et pas seulement le bouton. Sans ça,
     // « Aucune mise à jour disponible » restait affiché indéfiniment, bien
-    // après que sa cause a disparu. Vérifié dans un navigateur : les boutons
-    // se cachaient bien, la phrase non — et une phrase qui survit à ce
+    // après que sa cause a disparu. Vérifié dans un navigateur : le bouton
+    // se cachait bien, la phrase non — et une phrase qui survit à ce
     // qu'elle décrit dit quelque chose de faux.
     bouton.hidden = true;
-    lien.hidden = true;
-    if (Date.now() > majMessageJusqua) {
-      etat.textContent = "";
-      lien.hidden = true;
-    }
+    if (Date.now() > majMessageJusqua) etat.textContent = "";
     return;
   }
-  // ⭐ UN seul élément à côté du numéro de version quand une mise à jour
-  // existe, et RIEN quand il n'y en a pas. Demandé par Maxime le 07/08/2026 :
-  // un bouton, un lien et une phrase pour annoncer qu'il n'y a rien à faire,
-  // c'est trois fois trop pour une information nulle.
+  // ⭐ UN SEUL element a cote du numero de version, et rien quand il n'y a
+  // rien a faire. Le lien « Voir la version » a ete retire le 07/08/2026 a la
+  // demande de Maxime.
   //
-  // Le lien vers la page de la version n'apparaît donc plus d'emblée : il ne
-  // sert que si le téléchargement échoue, comme chemin de repli. C'est là
-  // qu'il compte, et seulement là.
+  // ⚠️ Ce qu'on perd, ecrit plutot que decouvert : c'etait le chemin de repli
+  // quand le telechargement echoue. Apres un echec, il n'y a plus de lien
+  // cliquable vers la page de la version depuis l'application — il reste le
+  // message d'erreur et le salon Discord.
   bouton.textContent = "Mettre à jour → " + maj.version;
   bouton.disabled = false;
   bouton.hidden = false;
-  lien.href = maj.url;
 }
 
 // ⛔ Le message va dans son PROPRE element, jamais dans le libelle du bouton.
@@ -720,9 +713,9 @@ $("bouton-maj").addEventListener("click", async () => {
     // Butin dans les secondes qui suivent, et le rendre cliquable relancerait
     // un second telechargement pendant la fermeture.
     if (!corps.lance) {
-      // Le chemin manuel n'apparait qu'ICI, quand il sert vraiment : le
-      // telechargement a echoue et il faut pouvoir installer a la main.
-      $("lien-maj").hidden = false;
+      // ⚠️ Le lien de repli vers la page de la version a ete retire le
+      // 07/08/2026. Il ne reste donc que le message d'echec et le bouton
+      // « Reessayer » : c'est `poserMessageMaj` qui porte toute l'explication.
       majEnCours = false;
       bouton.disabled = false;
       bouton.textContent = "Réessayer";
