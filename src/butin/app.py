@@ -44,6 +44,8 @@ from typing import Any
 from . import paths
 from .capture.worker import CaptureWorker
 from .catalog import ItemCatalog, ItemMatcher
+from .fenetres import Position, position_a_restaurer
+from .fenetres import enregistrer as enregistrer_position
 from .market import PriceBook
 from .store import SessionStore
 from .ui.server import AppState, build_server
@@ -75,6 +77,53 @@ les quatre chiffres passent les uns sous les autres : lisible, mais ce n'est
 plus la même lecture d'un coup d'œil."""
 
 
+FENETRE_PRINCIPALE = "principale"
+FENETRE_PANNEAU = "panneau"
+
+SUIVI_POSITION_S = 3.0
+"""Intervalle entre deux relevés de la position d'une fenêtre.
+
+⛔ On relève **pendant** que la fenêtre vit, et pas à sa fermeture. `butin.iss`
+pose `CloseApplications=force` : c'est le Gestionnaire de redémarrage de
+Windows qui ferme l'application pendant une mise à jour, et rien ne garantit
+qu'un code de fermeture propre s'exécute.
+
+Autrement dit, **le seul moment où l'on tient à se souvenir de la position est
+précisément celui où la fermeture n'est pas polie.**
+
+Trois secondes : assez fin pour ne perdre qu'un déplacement en cours, assez
+espacé pour que ça reste invisible (une lecture d'attribut et, seulement si la
+position a bougé, une écriture de quelques octets)."""
+
+
+def _suivre_la_position(fenetre: Any, nom: str) -> threading.Event:
+    """Enregistre la position de `fenetre` tant qu'elle vit. **Ne lève jamais.**
+
+    Rend l'événement qui arrête le fil. ⚠️ L'appelant DOIT le positionner : un
+    fil de fond qui survit à `run()` est un défaut que ce projet a déjà payé
+    une fois (voir #37 et la note d'en-tête de `run`).
+    """
+    arret = threading.Event()
+
+    def suivre() -> None:
+        derniere: tuple[int, int] | None = None
+        while not arret.wait(SUIVI_POSITION_S):
+            try:
+                courante = (int(fenetre.x), int(fenetre.y))
+            except Exception as exc:
+                # Fenêtre fermée, pas encore prête, ou bibliothèque qui refuse.
+                # Un confort ne doit pas faire de bruit dans le journal.
+                _log.debug("position de « %s » illisible : %s", nom, exc)
+                continue
+            if courante == derniere:
+                continue
+            derniere = courante
+            enregistrer_position(nom, Position(*courante))
+
+    threading.Thread(target=suivre, daemon=True, name=f"butin-position-{nom}").start()
+    return arret
+
+
 class Overlay:
     """Le panneau en surimpression, posé par-dessus le jeu.
 
@@ -90,22 +139,31 @@ class Overlay:
     def __init__(self, url: str) -> None:
         self._url = url
         self._window: Any = None
+        self._arret_suivi: threading.Event | None = None
 
     def open(self) -> None:
         if self._window is not None:
             return
         import webview
 
+        # ⭐ C'est LE panneau qui compte ici. Il est placé à la main, par-dessus
+        # le jeu, à l'endroit précis où il ne gêne pas. Le rouvrir au centre à
+        # chaque mise à jour transformait la mise à jour en un clic en une
+        # corvée en deux gestes.
+        depart = position_a_restaurer(FENETRE_PANNEAU)
         self._window = webview.create_window(
             "Butin — en direct",
             self._url,
             width=OVERLAY_WIDTH,
             height=OVERLAY_HEIGHT,
+            x=depart.x if depart else None,
+            y=depart.y if depart else None,
             frameless=True,
             on_top=True,
             transparent=True,
             easy_drag=True,
         )
+        self._arret_suivi = _suivre_la_position(self._window, FENETRE_PANNEAU)
 
     def resize(self, hauteur: int) -> None:
         """Ajuste la hauteur du panneau à son contenu. **Ne lève jamais.**
@@ -128,6 +186,13 @@ class Overlay:
             _log.debug("panneau non redimensionné : %s", exc)
 
     def close(self) -> None:
+        # ⚠️ Arrêter le fil AVANT de détruire la fenêtre : sinon il lirait une
+        # fenêtre partie et écrirait des positions dans le vide pendant trois
+        # secondes. Un fil de fond ne doit pas survivre à ce qu'il observe.
+        arret, self._arret_suivi = self._arret_suivi, None
+        if arret is not None:
+            arret.set()
+
         fenetre, self._window = self._window, None
         if fenetre is None:
             return
@@ -294,8 +359,25 @@ def _open_window(url: str) -> None:
             "navigateur."
         ) from None
 
-    webview.create_window(TITLE, url, width=WIDTH, height=HEIGHT, min_size=MIN_SIZE)
-    webview.start()
+    # ⭐ Rouvrir là où on l'avait laissée. `position_a_restaurer` refuse une
+    # position tombée hors écran (deuxième moniteur débranché, résolution
+    # changée) : une fenêtre invisible ressemble de l'extérieur à un logiciel
+    # qui ne démarre plus.
+    depart = position_a_restaurer(FENETRE_PRINCIPALE)
+    fenetre = webview.create_window(
+        TITLE,
+        url,
+        width=WIDTH,
+        height=HEIGHT,
+        min_size=MIN_SIZE,
+        x=depart.x if depart else None,
+        y=depart.y if depart else None,
+    )
+    arret = _suivre_la_position(fenetre, FENETRE_PRINCIPALE)
+    try:
+        webview.start()
+    finally:
+        arret.set()
 
 
 def main() -> int:
