@@ -177,6 +177,84 @@ class TestRouteMiseAJour:
         assert "impossible" in corps["message"]
 
 
+class TestRouteArchive:
+    """⭐ « Un module testé et bien branché n'est pas un module testé. »
+
+    Le module de l'archive a ses propres tests. Cette classe couvre le fil qui
+    le relie à la page, parce que c'est là qu'était le défaut réel du jour :
+    une route qui rendait 404, et une page qui affichait « Réponse illisible »
+    sans dire pourquoi.
+    """
+
+    def test_la_route_repond_avec_de_quoi_afficher(self, app, monkeypatch: Any) -> None:
+        from butin.ui import server as module
+
+        # Pas de capture d'écran en test : ni écran ni pilote graphique sur
+        # l'intégration continue, et ce n'est pas ce qu'on vérifie ici.
+        monkeypatch.setattr(module.AppState, "_apercu_de_la_zone", lambda self: None)
+        monkeypatch.setattr(module, "_ouvrir_le_dossier", lambda chemin: True)
+
+        _, base = app
+        corps = poster(base, "/api/archive")
+        assert corps["nom"].startswith("rapport-")
+        assert corps["nom"].endswith(".zip")
+        assert "contexte.txt" in corps["contenu"]
+        assert corps["message"]
+
+    def test_une_capture_impossible_n_empeche_pas_l_archive(self, app, monkeypatch: Any) -> None:
+        """⛔ Régression : les journaux comptent plus que l'image.
+
+        Une machine sans écran, un pilote fâché ou un calibrage illisible
+        doivent dégrader l'archive, jamais la faire échouer — le journal de
+        lecture est ce qui permet de comprendre un sur-comptage, l'image n'est
+        qu'un confort.
+
+        ⚠️ La panne est provoquée **à l'intérieur** de `_apercu_de_la_zone`,
+        pas en remplaçant la méthode elle-même. Un premier essai la remplaçait
+        par une fonction qui lève : ça faisait tomber la route, et ça ne
+        testait que le bouchon, puisque le `try/except` qu'on veut vérifier est
+        justement dans le corps remplacé.
+
+        ⚠️ On casse la CAPTURE, pas le calibrage. Un deuxième essai faisait lever
+        `Calibration.load`, qui est aussi appelé par `snapshot()` — lequel
+        n'attrape que `ValueError`, donc tout le rafraîchissement tombait au
+        lieu de la seule image. (Fragilité réelle, notée pour plus tard : un
+        calibrage corrompu autrement qu'en `ValueError` casserait l'interface
+        entière.)
+        """
+        from butin.capture import screen
+        from butin.ui import server as module
+
+        def casse(*args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("pas d'écran")
+
+        monkeypatch.setattr(screen, "ScreenCapture", casse)
+        monkeypatch.setattr(module, "_ouvrir_le_dossier", lambda chemin: True)
+
+        _, base = app
+        corps = poster(base, "/api/archive")
+        assert corps["nom"].endswith(".zip")
+        assert "capture de la zone" in corps["contenu"]
+
+    def test_l_archive_ne_part_sur_AUCUN_reseau(self, app, monkeypatch: Any) -> None:
+        """⛔ Le test qui fige la décision de conception.
+
+        L'archive contient les messages des autres joueurs, la reconnaissance
+        lisant la zone de chat telle quelle. L'envoyer toute seule déciderait à
+        leur place quelque chose qu'on ne peut pas rattraper.
+
+        La fixture `reseau_coupe` ferait échouer tout appel sortant : ce test
+        passe donc uniquement si la route n'en fait aucun.
+        """
+        from butin.ui import server as module
+
+        monkeypatch.setattr(module.AppState, "_apercu_de_la_zone", lambda self: None)
+        monkeypatch.setattr(module, "_ouvrir_le_dossier", lambda chemin: True)
+
+        _, base = app
+        assert poster(base, "/api/archive")["nom"]
+
+
 class TestFichiersServis:
     def test_la_marque_est_servie_avec_le_bon_type(self, app) -> None:
         """⛔ Régression : sans type déclaré, l'image se télécharge au lieu de s'afficher.

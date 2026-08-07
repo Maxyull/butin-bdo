@@ -42,6 +42,9 @@ from typing import Any, Protocol
 
 from .. import __version__, paths
 from ..autoupdate import install_update
+from ..bundle import decrire_le_contenu as _decrire_archive
+from ..bundle import ouvrir_le_dossier as _ouvrir_le_dossier
+from ..bundle import preparer as _preparer_archive
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
@@ -700,6 +703,62 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
+    def preparer_l_archive(self) -> dict[str, Any]:
+        """Rassemble journaux, réglages, calibrage et capture dans un zip.
+
+        ⚠️ **Hors verrou**, comme `send_report` : la capture d'écran et la
+        compression durent, et tenir le verrou d'`AppState` figerait le
+        rafraîchissement et le bouton d'arrêt de session.
+
+        ⛔ **Rien n'est envoyé.** L'archive est écrite chez le joueur et
+        l'explorateur s'ouvre dessus : c'est lui qui la dépose. Elle contient
+        les messages des autres joueurs, puisque la reconnaissance lit la zone
+        de chat telle quelle. Voir l'en-tête de `bundle.py`.
+        """
+        etat = self.snapshot()
+        apercu = self._apercu_de_la_zone()
+        archive = _preparer_archive(etat=etat, apercu=apercu)
+        _ouvrir_le_dossier(archive.chemin)
+        return {
+            "nom": archive.chemin.name,
+            "octets": archive.octets,
+            "contenu": _decrire_archive(archive),
+            "message": (
+                f"Archive prête : {archive.chemin.name} "
+                f"({max(archive.octets // 1024, 1)} Ko). "
+                "Le dossier s'est ouvert, dépose le fichier dans le salon Discord."
+            ),
+        }
+
+    def _apercu_de_la_zone(self) -> bytes | None:
+        """Une image de la zone calibrée, ou `None`. **Ne lève jamais.**
+
+        ⭐ La zone calibrée, PAS l'écran entier. Un écran entier emporterait le
+        jeu, les autres fenêtres ouvertes et tout ce qui traîne dessus, alors
+        que ce qui sert à comprendre un défaut de comptage tient dans la bande
+        que la reconnaissance lit. Le moins de vie privée possible pour la même
+        information.
+
+        ⚠️ Sans calibrage, on ne rend rien plutôt qu'un écran entier par
+        défaut : ce serait exactement le contraire de la règle ci-dessus.
+        """
+        try:
+            from ..capture.calibrate import Calibration, draw_preview
+            from ..capture.screen import ScreenCapture
+
+            calibrage = Calibration.load()
+            if calibrage is None:
+                return None
+            with ScreenCapture() as capture:
+                image = capture.grab(capture.target_monitor())
+            return draw_preview(image, calibrage)
+        except Exception as exc:
+            # Volontairement large : c'est un confort. Une machine sans écran,
+            # un pilote graphique fâché ou un calibrage illisible ne doivent
+            # pas empêcher de joindre les journaux, qui sont l'essentiel.
+            _log.warning("capture de la zone impossible pour l'archive : %s", exc)
+            return None
+
     def compte_discord(self) -> dict[str, Any]:
         """L'état du rattachement Discord, tel qu'il doit s'afficher.
 
@@ -1136,6 +1195,10 @@ class Handler(BaseHTTPRequestHandler):
             # que le serveur local a parfaitement fait son travail, et que la
             # cause est chez le relais ou sur le réseau du joueur.
             self._send_json(self.state.send_report(message))
+        elif self.path == "/api/archive":
+            # Toujours 200, comme /api/rapport : le corps porte le nom de
+            # l'archive, son contenu détaillé et ce qui a manqué.
+            self._send_json(self.state.preparer_l_archive())
         elif self.path == "/api/discord/connexion":
             # Toujours 200, même raison que /api/rapport : le corps porte
             # `ouvert` et un message affichable tel quel.

@@ -144,6 +144,11 @@
   /* Un champ vide veut dire « pas vérifié », et il faut que ça se voie sans
      avoir à cliquer dedans : c'est un état, pas un oubli. */
   .controle-objet input::placeholder { color: var(--doux); font-style: italic; }
+  /* Sépare deux sujets dans un même panneau : signaler en une phrase, et
+     préparer une archive. Déclarée ici plutôt que laissée au style par défaut
+     du navigateur, qui pose un trait clair sur un fond sombre. */
+  .separateur { border: 0; border-top: 1px solid var(--bord);
+                margin: var(--espace-5) 0 var(--espace-4); }
   .action-mince {
     background: transparent; border: 1px solid var(--bord); color: var(--doux);
     border-radius: var(--rayon-petit); padding: 6px 12px; cursor: pointer;
@@ -417,6 +422,28 @@
     <span id="rapport-compteur" class="compteur">0 / 1800</span>
   </div>
   <div id="rapport-etat" class="note"></div>
+
+  <!-- L'archive complète, pour les défauts qu'une phrase ne décrit pas.
+       ⛔ Elle n'est PAS envoyée : elle est écrite sur le disque et le dossier
+       s'ouvre dessus. Elle contient les messages des autres joueurs, puisque
+       la reconnaissance lit la zone de chat telle quelle. -->
+  <hr class="separateur">
+  <div class="note-avant">
+    <b>Le compteur se trompe dans ses chiffres ?</b> Prépare une archive : elle
+    rassemble le journal de lecture ligne par ligne, tes réglages, ton calibrage
+    et une image de la zone lue. C'est ce qui permet de comprendre un
+    sur-comptage, qu'aucune phrase ne peut décrire.
+  </div>
+  <div class="rangee note">
+    <button class="action-mince" id="bouton-archive">Préparer une archive</button>
+  </div>
+  <div id="archive-etat" class="note"></div>
+  <pre id="archive-contenu" class="extrait" hidden></pre>
+  <div class="note">
+    ⚠️ Elle n'est envoyée à personne : le dossier s'ouvre et c'est toi qui
+    déposes le fichier. Regarde ce qu'il y a dedans avant, la zone de chat
+    contient aussi les messages des autres joueurs.
+  </div>
 </div>
 
 <div class="panneau">
@@ -1415,6 +1442,34 @@ async function rafraichir() {
     // avec une erreur, la prochaine tentative suffit.
   }
 }
+
+// ---------------------------------------------------------- Archive complete
+//
+// ⛔ Rien n'est envoye. Le serveur ecrit le zip et ouvre le dossier dessus ;
+// c'est le joueur qui depose le fichier. Le contenu est AFFICHE avant, parce
+// qu'une archive qu'on depose sans savoir ce qu'il y a dedans est un
+// formulaire signe en blanc — et celle-ci contient les messages des autres
+// joueurs, la reconnaissance lisant la zone de chat telle quelle.
+$("bouton-archive").addEventListener("click", async () => {
+  const bouton = $("bouton-archive");
+  const etat = $("archive-etat");
+  const detail = $("archive-contenu");
+  bouton.disabled = true;
+  etat.textContent = "Préparation… (la capture de la zone prend un instant)";
+  detail.hidden = true;
+  try {
+    const corps = await (await fetch("/api/archive", { method: "POST" })).json();
+    etat.textContent = corps.message || "Réponse illisible.";
+    if (corps.contenu) {
+      detail.textContent = corps.contenu;
+      detail.hidden = false;
+    }
+  } catch (erreur) {
+    etat.textContent = "Le serveur local n'a pas répondu.";
+  } finally {
+    bouton.disabled = false;
+  }
+});
 
 // ---------------------------------------------------------------- Discord
 //
