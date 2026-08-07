@@ -50,6 +50,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__, paths
+from .capture.inventaire import captures_existantes as captures_inventaire
 from .diagnostic import dossier_des_rapports
 
 _log = logging.getLogger(__name__)
@@ -65,6 +66,23 @@ JOURNAUX_JOINTS = 3
 #: Plafond par journal. Au-delà, il est tronqué et l'archive le DIT : une
 #: troncature muette ferait chercher une cause dans un fichier amputé.
 MAX_OCTETS_JOURNAL = 8 * 1024 * 1024
+
+#: Captures d'inventaire jointes : **une seule**, la plus récente.
+#:
+#: ⛔ Mesuré le 08/08/2026, pas décidé au jugé. Une capture d'écran 2560x1440
+#: pèse **5,1 Mo**, et un PNG ne se compresse plus : l'archive complète fait
+#: 5,3 Mo avec une, elle en ferait 10,6 avec deux. Discord refuse les fichiers
+#: de plus de 10 Mo sans abonnement.
+#:
+#: Une archive trop lourde pour être déposée est une archive qui n'atteint
+#: personne — donc exactement aussi utile qu'une archive qu'on n'aurait pas
+#: préparée, mais avec la déception en plus.
+INVENTAIRES_JOINTS = 1
+
+#: Taille au-delà de laquelle l'archive prévient qu'elle risque d'être refusée.
+#: La limite de Discord sans abonnement, avec de la marge pour l'en-tête du
+#: message.
+OCTETS_AVANT_AVERTISSEMENT = 9 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -198,6 +216,12 @@ def preparer(
                 else:
                     avertissements.append(f"{nom} : absent")
 
+            # ⭐ Les captures d'inventaire, s'il y en a. C'est la SEULE vérité
+            # de ce logiciel qui ne passe par aucune reconnaissance d'écran :
+            # sans elle, on ne peut que comparer le compteur à lui-même.
+            for image in captures_inventaire(racine)[:INVENTAIRES_JOINTS]:
+                _joindre(archive, image, f"inventaires/{image.name}", contenu, avertissements)
+
             if apercu:
                 archive.writestr("zone-calibree.png", apercu)
                 contenu.append(f"zone-calibree.png ({len(apercu) // 1024} Ko)")
@@ -218,6 +242,16 @@ def preparer(
         taille = chemin.stat().st_size
     except OSError:
         taille = 0
+
+    # ⛔ Une archive trop lourde pour être déposée n'atteint personne, et le
+    # joueur le découvrirait au moment où Discord la refuse — après avoir fait
+    # tout le travail. Autant le dire avant.
+    if taille > OCTETS_AVANT_AVERTISSEMENT:
+        avertissements.append(
+            f"l'archive fait {taille // (1024 * 1024)} Mo : Discord refuse au-delà de 10 Mo "
+            "sans abonnement. Envoie-la par un lien, ou dis-le-moi et je la découperai."
+        )
+
     return Archive(chemin=chemin, octets=taille, contenu=contenu, avertissements=avertissements)
 
 

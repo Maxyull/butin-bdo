@@ -147,6 +147,10 @@
   /* Sépare deux sujets dans un même panneau : signaler en une phrase, et
      préparer une archive. Déclarée ici plutôt que laissée au style par défaut
      du navigateur, qui pose un trait clair sur un fond sombre. */
+  /* Une note qui SUIT les boutons qu'elle explique, au lieu de les précéder.
+     Déclarée plutôt qu'écrite en style en ligne : ce fichier en comptait
+     vingt-huit, avec sept valeurs pour la même intention. */
+  .note-apres-action { margin-top: var(--espace-2); }
   .separateur { border: 0; border-top: 1px solid var(--bord);
                 margin: var(--espace-5) 0 var(--espace-4); }
   .action-mince {
@@ -463,9 +467,24 @@
     et une image de la zone lue. C'est ce qui permet de comprendre un
     sur-comptage, qu'aucune phrase ne peut décrire.
   </div>
+  <!-- ⭐ La capture d'inventaire. C'est la SEULE vérité de ce logiciel qui ne
+       passe par aucune reconnaissance d'écran : sans elle, on ne peut que
+       comparer le compteur à lui-même.
+
+       ⚠️ La consigne « ouvre ton inventaire d'abord » est AVANT le bouton, pas
+       après. La capture prend l'écran tel qu'il est ; si l'inventaire est
+       fermé, l'image ne contiendra rien d'utile et personne ne s'en rendra
+       compte avant d'ouvrir le fichier. -->
   <div class="rangee note">
+    <button class="action-mince" id="bouton-inventaire">Capturer mon inventaire</button>
     <button class="action-mince" id="bouton-archive">Préparer une archive</button>
   </div>
+  <div class="note-avant note-apres-action">
+    <b>Ouvre ton inventaire dans le jeu avant de cliquer.</b> La capture prend
+    l'écran tel qu'il est, elle ne peut pas deviner. Elle reste sur ton disque
+    et part avec l'archive.
+  </div>
+  <div id="inventaire-etat" class="note"></div>
   <div id="archive-etat" class="note"></div>
   <pre id="archive-contenu" class="extrait" hidden></pre>
   <div class="note">
@@ -1499,6 +1518,25 @@ async function rafraichir() {
 // qu'une archive qu'on depose sans savoir ce qu'il y a dedans est un
 // formulaire signe en blanc — et celle-ci contient les messages des autres
 // joueurs, la reconnaissance lisant la zone de chat telle quelle.
+// ⭐ La capture d'inventaire. Elle ne touche JAMAIS au jeu : pas de frappe
+// clavier dans la barre de recherche, pas de clic. Injecter des entrees dans un
+// client de Black Desert est sanctionne par un bannissement, et aucun confort
+// ne vaut le compte de quelqu'un.
+$("bouton-inventaire").addEventListener("click", async () => {
+  const bouton = $("bouton-inventaire");
+  const etat = $("inventaire-etat");
+  bouton.disabled = true;
+  etat.textContent = "Capture…";
+  try {
+    const corps = await (await fetch("/api/inventaire", { method: "POST" })).json();
+    etat.textContent = corps.message || "Réponse illisible.";
+  } catch (erreur) {
+    etat.textContent = "Le serveur local n'a pas répondu.";
+  } finally {
+    bouton.disabled = false;
+  }
+});
+
 $("bouton-archive").addEventListener("click", async () => {
   const bouton = $("bouton-archive");
   const etat = $("archive-etat");
