@@ -178,3 +178,44 @@ class TestServeur:
     def test_la_marque_a_sa_route(self) -> None:
         source = (RACINE / "src" / "butin" / "ui" / "server.py").read_text(encoding="utf-8")
         assert '"/butin.png"' in source
+
+
+FUNDING = RACINE / ".github" / "FUNDING.yml"
+BANNIERE_DON = RACINE / "ressources" / "bouton-don-butin.png"
+LIEN_DON = "https://paypal.me/maxyull"
+
+
+class TestSoutien:
+    """Le canal de don, et les deux endroits qui doivent rester d'accord.
+
+    ⚠️ Rien dans la chaîne de construction ne relie ces trois fichiers. Un
+    changement de canal de don qui n'en corrige que deux passerait la CI en
+    laissant le troisième pointer vers l'ancien, et personne ne le verrait :
+    ni ruff, ni mypy, ni la suite d'intégration ne lisent `.github/`, un README
+    ni un PNG. C'est le même angle mort que celui qui a motivé
+    `test_workflows.py`.
+    """
+
+    def test_le_bouton_sponsor_pointe_vers_le_bon_canal(self) -> None:
+        assert FUNDING.is_file(), "sans ce fichier, GitHub n'affiche aucun bouton Sponsor"
+        contenu = FUNDING.read_text(encoding="utf-8")
+        assert LIEN_DON in contenu, f"FUNDING.yml ne cite pas {LIEN_DON}"
+
+    def test_la_banniere_de_don_existe_et_est_servie_par_le_readme(self) -> None:
+        """Une image manquante ne casse rien : GitHub affiche un carré vide à sa
+        place, ce qui donne un README abîmé sans la moindre alerte."""
+        assert BANNIERE_DON.is_file(), "bannière de don absente du dépôt"
+
+        readme = (RACINE / "README.md").read_text(encoding="utf-8")
+        chemin_relatif = "ressources/bouton-don-butin.png"
+        assert chemin_relatif in readme, "le README n'affiche pas la bannière"
+        assert LIEN_DON in readme, f"le README ne renvoie pas vers {LIEN_DON}"
+
+    def test_la_banniere_a_les_dimensions_du_gabarit(self) -> None:
+        """560 x 120 est le gabarit produit par le générateur du kit. Une image
+        d'une autre taille signale qu'elle vient d'ailleurs, ou a été retouchée
+        à la main, ce qui la ferait diverger des bannières des autres dépôts."""
+        Image = pytest.importorskip("PIL.Image")
+
+        with Image.open(BANNIERE_DON) as image:
+            assert image.size == (560, 120), f"gabarit inattendu : {image.size}"

@@ -39,6 +39,10 @@ captures/
 # dépôt. L'intégration continue l'a vue en 404, sur une copie propre — c'est
 # le seul endroit où la différence se voit.
 !src/butin/ui/static/*.png
+# ⛔ Même histoire, exactement, pour la bannière de don servie par le README :
+# `git add` l'a écartée sans un mot, et seul `git status` l'a montré. Une image
+# absente du dépôt ne casse rien, GitHub affiche un carré vide à sa place.
+!ressources/*.png
 
 # Système
 Thumbs.db

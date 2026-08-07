@@ -1,0 +1,7 @@
+# Le bouton « Sponsor » en haut du dépôt.
+#
+# `custom` et non `github`, `ko_fi` ou `open_collective` : PayPal est le seul
+# canal ouvert aujourd'hui. Déclarer une plateforme sur laquelle rien n'existe
+# afficherait un bouton menant à une page vide, ce qui est pire que pas de
+# bouton du tout.
+custom: ["https://paypal.me/maxyull"]
