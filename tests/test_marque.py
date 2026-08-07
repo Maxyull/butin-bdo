@@ -41,10 +41,13 @@ class TestFichiers:
         import shutil
         import subprocess
 
-        if shutil.which("git") is None:
+        git = shutil.which("git")
+        if git is None:
             pytest.skip("git indisponible")
+        # Chemin complet : l'analyseur de sécurité refuse un exécutable résolu
+        # par le PATH, et il a raison — le PATH décide alors de ce qui tourne.
         resultat = subprocess.run(  # noqa: S603
-            ["git", "check-ignore", "-q", str(MARQUE)],
+            [git, "check-ignore", "-q", str(MARQUE)],
             cwd=RACINE,
             capture_output=True,
             check=False,
