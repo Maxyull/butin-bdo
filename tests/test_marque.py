@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 RACINE = Path(__file__).resolve().parents[1]
 ICONE = RACINE / "installeur" / "butin.ico"
 MARQUE = RACINE / "src" / "butin" / "ui" / "static" / "butin.png"
@@ -22,6 +24,35 @@ class TestFichiers:
 
     def test_la_marque_servie_aux_pages_existe(self) -> None:
         assert MARQUE.is_file()
+
+    def test_la_marque_est_SUIVIE_PAR_GIT(self) -> None:
+        """⛔ Régression : `.gitignore` avait un `*.png` global qui l'avalait.
+
+        Le mode de défaillance est le pire qui soit : le fichier existait sur
+        ma machine, donc la page l'affichait, le test précédent passait, et le
+        navigateur la chargeait en 200. Elle n'était nulle part dans le dépôt.
+        Seule l'intégration continue l'a vue, en 404, sur une copie propre.
+
+        `is_file()` ne suffit donc pas ici : il faut demander à git ce qu'il
+        emporterait vraiment. Ignoré si git n'est pas là — le test ne doit pas
+        échouer sur une machine qui n'a pas l'outil, seulement sur un dépôt où
+        le fichier manque.
+        """
+        import shutil
+        import subprocess
+
+        if shutil.which("git") is None:
+            pytest.skip("git indisponible")
+        resultat = subprocess.run(  # noqa: S603
+            ["git", "check-ignore", "-q", str(MARQUE)],
+            cwd=RACINE,
+            capture_output=True,
+            check=False,
+        )
+        # `check-ignore` rend 0 quand le chemin EST ignoré : c'est l'échec.
+        assert resultat.returncode != 0, (
+            "butin.png est ignoré par git : il marchera en local et nulle part ailleurs"
+        )
 
     def test_l_icone_porte_ses_petites_resolutions(self) -> None:
         """Régression : une icône en 256 seulement devient floue en 16 px.

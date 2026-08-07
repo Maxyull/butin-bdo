@@ -33,6 +33,12 @@ captures/
 # jamais des captures réelles du jeu, donc elles ne portent aucune donnée
 # personnelle et sont suivies par git.
 !tests/fixtures/*.png
+# ⛔ La marque du logiciel, servie aux deux fenêtres. Le `*.png` ci-dessus
+# l'avait avalée EN SILENCE : elle existait sur ma machine, donc la page
+# l'affichait et les tests passaient, mais elle n'était nulle part dans le
+# dépôt. L'intégration continue l'a vue en 404, sur une copie propre — c'est
+# le seul endroit où la différence se voit.
+!src/butin/ui/static/*.png
 
 # Système
 Thumbs.db
