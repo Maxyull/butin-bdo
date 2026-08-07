@@ -142,23 +142,124 @@ class TestListeBlanche:
         assert not cible.exists()
 
 
+#: Le fichier de l'installeur, lu par les tests ci-dessous. C'est le SEUL
+#: endroit où vit la moitié « rouvrir » de la mise à jour : aucun test Python ne
+#: l'exécute, donc rien d'autre ne le vérifie.
+ISS = Path(__file__).resolve().parents[1] / "installeur" / "butin.iss"
+
+#: Le commutateur qui demande la réouverture. Il doit être écrit à l'identique
+#: dans `autoupdate.py` et dans `butin.iss` ; c'est tout l'objet de
+#: `test_le_commutateur_est_le_MEME_des_deux_cotes`.
+RELANCER = "/RELANCER"
+
+
+def _directives(chemin: Path) -> str:
+    """Le contenu de `butin.iss` SANS ses commentaires.
+
+    Un commentaire d'Inno Setup commence par `;`. Ce fichier en contient
+    beaucoup, dont ceux qui racontent les anciennes valeurs : chercher une
+    directive dans le texte brut trouve alors ce qui est expliqué au lieu de ce
+    qui est appliqué.
+    """
+    lignes = chemin.read_text(encoding="utf-8").splitlines()
+    return "\n".join(ligne for ligne in lignes if not ligne.strip().startswith(";"))
+
+
 class TestLancement:
     def test_l_installeur_recoit_les_options_de_relance(self, monkeypatch: Any) -> None:
-        """⛔ `/RESTARTAPPLICATIONS` est ce qui rouvre Butin après la mise à jour.
+        vus: list[list[str]] = []
+        monkeypatch.setattr(
+            autoupdate.subprocess, "Popen", lambda args, **kw: vus.append(args) or None
+        )
+        autoupdate.launch_installer(Path("installeur.exe"))
+        assert RELANCER in vus[0]
+        assert "/VERYSILENT" in vus[0]
+        assert "/NORESTART" in vus[0]
 
-        Il s'appuie sur `CloseApplications=force` et `RestartApplications=yes`
-        posés dans `butin.iss`. Retirer l'un des trois casse la réouverture
-        sans casser l'installation : le joueur se retrouve devant un logiciel
-        fermé, sans rien qui le dise.
+    def test_RESTARTAPPLICATIONS_n_est_PLUS_passe(self, monkeypatch: Any) -> None:
+        """⛔ Régression : deux mécanismes de réouverture en lanceraient deux.
+
+        Le Gestionnaire de redémarrage de Windows et la section [Run] de
+        l'installeur rouvriraient chacun leur exemplaire. Deux Butin en
+        parallèle, ce sont deux fils de capture sur la même session : le
+        compteur doublerait, et c'est exactement l'invention de drops que la
+        section 1 du CLAUDE.md refuse en premier.
         """
         vus: list[list[str]] = []
         monkeypatch.setattr(
             autoupdate.subprocess, "Popen", lambda args, **kw: vus.append(args) or None
         )
         autoupdate.launch_installer(Path("installeur.exe"))
-        assert "/RESTARTAPPLICATIONS" in vus[0]
-        assert "/VERYSILENT" in vus[0]
-        assert "/NORESTART" in vus[0]
+        assert "/RESTARTAPPLICATIONS" not in vus[0]
+
+
+class TestLInstalleurRouvreVraimentButin:
+    """⛔ Ce que l'ancien test ne regardait PAS, et qui a coûté une version.
+
+    Il vérifiait que `/RESTARTAPPLICATIONS` était bien passé à l'installeur, et
+    il était vert. Butin ne revenait quand même pas après une mise à jour :
+    passer un commutateur n'est pas la même chose que rouvrir l'application, et
+    la moitié qui manquait était dans `butin.iss`, qu'aucun test ne lisait.
+
+    Constaté par Maxime en jouant, le 07/08/2026.
+    """
+
+    def test_une_ligne_de_relancement_existe_et_n_est_PAS_skipifsilent(self) -> None:
+        """⛔ Le défaut exact, figé.
+
+        La seule ligne qui relançait l'application portait `skipifsilent`, et
+        la mise à jour en un clic passe précisément en `/VERYSILENT` : elle
+        était donc systématiquement sautée sur le seul chemin où elle
+        comptait.
+        """
+        lignes = [
+            ligne.strip()
+            for ligne in ISS.read_text(encoding="utf-8").splitlines()
+            if ligne.strip().startswith("Filename:") and "MyAppExeName" in ligne
+        ]
+        relance = [ligne for ligne in lignes if "Check: RelancementDemande" in ligne]
+        assert relance, "aucune ligne [Run] ne relance Butin après une mise à jour silencieuse"
+        assert "skipifsilent" not in relance[0], (
+            "la ligne de relancement est sautée en mode silencieux, "
+            "c'est-à-dire sur le seul chemin où elle sert"
+        )
+
+    def test_le_commutateur_est_le_MEME_des_deux_cotes(self) -> None:
+        """⭐ Le test qui relie les deux fichiers.
+
+        `autoupdate.py` passe un commutateur, `butin.iss` en teste un. Rien
+        n'oblige les deux à s'accorder, et les renommer d'un seul côté casserait
+        la réouverture **en silence** : l'installation continuerait de réussir,
+        et seul un joueur s'en apercevrait.
+        """
+        source = Path(autoupdate.__file__).read_text(encoding="utf-8")
+        assert f'"{RELANCER}"' in source, f"{RELANCER} n'est plus passé par autoupdate.py"
+        iss = ISS.read_text(encoding="utf-8")
+        assert f"CmdLineParamExists('{RELANCER}')" in iss, (
+            f"butin.iss ne teste plus {RELANCER} : le commutateur a été renommé d'un seul côté"
+        )
+
+    def test_le_gestionnaire_de_redemarrage_ne_rouvre_PAS_en_plus(self) -> None:
+        """Sinon deux exemplaires de Butin s'ouvriraient. Voir le test jumeau.
+
+        ⚠️ Les commentaires sont retirés avant de chercher. Une première
+        version cherchait dans le fichier entier et échouait sur le commentaire
+        qui raconte l'ancienne valeur : un test qui lit une configuration doit
+        ignorer ce qui l'explique, sinon documenter un changement casse le test
+        qui le garde.
+        """
+        directives = _directives(ISS)
+        assert "RestartApplications=no" in directives
+        assert "RestartApplications=yes" not in directives
+
+    def test_la_fermeture_reste_confiee_au_gestionnaire_de_redemarrage(self) -> None:
+        """Elle, on la garde : sans elle l'installeur ne peut pas écrire.
+
+        Windows refuse qu'on écrase un `.exe` en cours d'exécution. Retirer
+        cette ligne ferait échouer la mise à jour elle-même, pas seulement la
+        réouverture.
+        """
+        assert "CloseApplications=force" in ISS.read_text(encoding="utf-8")
 
     def test_butin_ne_se_ferme_JAMAIS_lui_meme(self) -> None:
         """⛔ Régression sur le bogue que Rubin a payé en jouant.

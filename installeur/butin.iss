@@ -47,21 +47,34 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-; ⛔ Ces deux lignes sont ce qui rend la mise à jour en un clic possible, et
-; elles portent la responsabilité ENTIÈRE du cycle fermeture-réouverture.
+; ⛔ La fermeture pendant une mise à jour en un clic.
 ;
 ; `CloseApplications=force` fait fermer Butin par le Gestionnaire de
-; redémarrage de Windows, et `RestartApplications=yes` le fait rouvrir une
-; fois les fichiers remplacés. Sans elles, l'installeur échouerait à écrire
+; redémarrage de Windows. Sans elle, l'installeur échouerait à écrire
 ; par-dessus un exécutable en cours d'exécution.
+;
+; ⛔ `RestartApplications` est passé à **no** le 07/08/2026, et ce n'est pas un
+; renoncement : c'est le contraire.
+;
+; Il valait `yes`, et le relancement reposait donc entièrement sur le
+; Gestionnaire de redémarrage de Windows. Constaté par Maxime en jouant :
+; **Butin ne revenait pas** après une mise à jour. L'application se fermait,
+; les fichiers étaient remplacés, et plus rien.
+;
+; Le relancement est désormais une ligne explicite de la section [Run],
+; conditionnée à `/RELANCER`. Un mécanisme qu'on peut lire, tester et voir
+; échouer, au lieu d'un comportement du système qu'on espère.
+;
+; ⚠️ Les deux ne doivent JAMAIS être actifs ensemble : le Gestionnaire de
+; redémarrage et la section [Run] rouvriraient chacun leur exemplaire, et deux
+; Butin en parallèle voudraient dire deux fils de capture sur la même session.
 ;
 ; ⛔ Corollaire à ne jamais défaire : l'application ne doit PAS se fermer
 ; elle-même après avoir lancé l'installeur. Se fermer avant que le
-; Gestionnaire de redémarrage ait enregistré le processus lui retire l'objet
-; qu'il devait rouvrir, et plus rien ne se relance. C'est le bogue que Rubin a
-; trouvé en jouant, pas en relisant. Voir `src/butin/autoupdate.py`.
+; Gestionnaire de redémarrage ait enregistré le processus l'empêche de faire
+; son travail de fermeture propre. Voir `src/butin/autoupdate.py`.
 CloseApplications=force
-RestartApplications=yes
+RestartApplications=no
 OutputDir=..\dist
 OutputBaseFilename=butin-{#MyAppVersion}-installation
 SetupIconFile=butin.ico
@@ -90,7 +103,28 @@ Name: "{group}\Désinstaller {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+; Installation manuelle : la case « Lancer Butin » de la dernière page.
+; `skipifsilent` la retire en mode silencieux, ce qui est correct ICI — mais
+; c'était la seule chose qui relançait l'application, et la mise à jour en un
+; clic passe justement en `/VERYSILENT`. Voir la ligne suivante.
 Filename: "{app}\{#MyAppExeName}"; Description: "Lancer {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+; ⛔ Le relancement après une mise à jour en un clic, EXPLICITE.
+;
+; Il reposait avant sur `RestartApplications=yes` seul, c'est-à-dire sur le
+; Gestionnaire de redémarrage de Windows. Constaté par Maxime le 07/08/2026 :
+; Butin ne revenait pas. L'application se fermait, les fichiers étaient
+; remplacés, et plus rien — ce qui, vu du joueur, ressemble à une mise à jour
+; qui casse le logiciel.
+;
+; On ne dépend plus du Gestionnaire de redémarrage pour rouvrir : il ferme
+; (`CloseApplications=force`), et c'est cette ligne qui rouvre. Un mécanisme
+; explicite, qui se vérifie en lançant l'installeur.
+;
+; ⚠️ `/RELANCER` et non « toujours en silencieux » : `construire.ps1` installe
+; aussi en silencieux pour vérifier le paquet, et il n'a aucune raison
+; d'ouvrir une fenêtre à ce moment-là. Seule la mise à jour le demande.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: RelancementDemande
 
 ; Pas de section [UninstallDelete] pointant vers Documents\BDO Tracker ou les
 ; réglages de l'utilisateur : ce sont SES données (historique de farm), pas
@@ -98,3 +132,20 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Lancer {#MyAppName}"; Flags: no
 ; au même titre qu'un changement de dossier de stockage ne déplace rien
 ; (voir CLAUDE.md, section 2ter). Seul {app} (le dossier d'installation
 ; lui-même) est retiré, comportement par défaut d'Inno Setup.
+
+[Code]
+{ Vrai quand la mise à jour en un clic a demandé le relancement.
+
+  `CmdLineParamExists` compare sans tenir compte de la casse et accepte la
+  forme `/RELANCER` comme `-relancer` : c'est la même fonction qu'Inno Setup
+  utilise pour ses propres commutateurs, donc pas une convention à nous.
+
+  ⛔ Ne pas remplacer par `WizardSilent()`. Toute installation silencieuse
+  relancerait alors l'application, y compris celle que `construire.ps1` fait
+  pour vérifier le paquet — une fenêtre s'ouvrirait au milieu d'une
+  construction, et le test d'installation ne testerait plus la même chose que
+  ce qu'un joueur exécute. }
+function RelancementDemande(): Boolean;
+begin
+  Result := CmdLineParamExists('/RELANCER');
+end;
