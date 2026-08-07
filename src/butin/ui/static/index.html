@@ -282,6 +282,13 @@
   .badge.vendeur { color: var(--bleu); border-color: #24384f; }
   .badge.inconnu { color: var(--rouge); border-color: #4d2b26; }
 
+  /* Les raisons d'un calibrage douteux. Rouge comme l'avertissement qu'elles
+     détaillent : ce n'est pas une note, c'est une consigne de recommencer. */
+  .doutes { margin-top: var(--espace-2); padding: var(--espace-3) var(--espace-4);
+            border: 1px solid rgba(224, 113, 95, .40); border-radius: var(--rayon-petit);
+            background: rgba(224, 113, 95, .10); color: var(--texte); font-size: 13px; }
+  .doutes ul { margin: var(--espace-2) 0 0; padding-left: 20px; }
+  .doutes li { margin-bottom: var(--espace-1); }
   .avertissement { margin-top: 14px; padding: 12px 14px; border-radius: 8px;
                    border: 1px solid #4a3d20; background: #1e1a10; color: #e8c876;
                    font-size: 13px; }
@@ -404,6 +411,10 @@
   <div id="etat-capture" class="note note-large"></div>
   <div id="etat-calibrage" class="note note-large"></div>
   <pre id="extrait-calibrage" class="extrait" hidden></pre>
+  <!-- Ce qui cloche dans le calibrage qu'on vient d'accepter. Masqué quand il
+       n'y a rien à dire : un avertissement qui s'affiche aussi sur les bons
+       calibrages est un avertissement qu'on apprend à ignorer. -->
+  <div id="calibrage-doutes" class="doutes" hidden></div>
   <img id="apercu-calibrage" class="apercu" alt="Zone calibrée, cadre en surbrillance" hidden>
 </div>
 
@@ -958,8 +969,34 @@ $("bouton-calibrer").addEventListener("click", async () => {
       ligne.textContent = corps.erreur || "calibrage impossible";
       return;
     }
-    ligne.classList.remove("avertissement");
-    ligne.textContent = "Zone calibrée : " + corps.zone;
+    // ⛔ Un calibrage douteux est ACCEPTE mais annonce. Le 07/08/2026, un
+    // recalibrage en cours de session a remplace une zone de 22 rangees a
+    // force 0,53 par une de 5 rangees a force 0,16 : plus rien n'etait lu
+    // pendant une minute de farm, et l'ecran disait « Zone calibree » comme si
+    // tout allait bien. Un compteur qui ne compte rien ressemble a un farm
+    // pauvre — c'est le mode de defaillance que ce projet refuse partout.
+    const doutes = corps.doutes || [];
+    ligne.classList.toggle("avertissement", doutes.length > 0);
+    ligne.textContent = doutes.length
+      ? "⚠️ Calibrage douteux : " + corps.zone
+      : "Zone calibrée : " + corps.zone;
+    const bloc = $("calibrage-doutes");
+    if (doutes.length) {
+      bloc.innerHTML = "";
+      const titre = document.createElement("b");
+      titre.textContent = "Recommence le calibrage. Ce qui cloche :";
+      bloc.appendChild(titre);
+      const liste = document.createElement("ul");
+      for (const raison of doutes) {
+        const item = document.createElement("li");
+        item.textContent = raison;
+        liste.appendChild(item);
+      }
+      bloc.appendChild(liste);
+      bloc.hidden = false;
+    } else {
+      bloc.hidden = true;
+    }
     // Montrer ce qui a été lu, et pas seulement « c'est calibré » : la
     // détection ne sait pas d'où vient l'image, et un essai réel a calibré
     // proprement sur une capture du chat ouverte dans une visionneuse.

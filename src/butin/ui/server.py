@@ -509,6 +509,16 @@ class AppState:
                     time.sleep(0.4)
                 images.append(capture.grab(ecran))
 
+        # ⭐ L'ANCIEN calibrage est relu AVANT d'être écrasé. Sans ça, on ne
+        # peut pas dire « celui d'avant était meilleur », qui est justement le
+        # cas vécu : Maxime a recalibré en cours de session et remplacé une
+        # zone de 22 rangées à force 0,53 par une de 5 rangées à force 0,16.
+        # Ses objets n'étaient plus lus du tout, et rien ne le lui disait.
+        try:
+            precedent = Calibration.load()
+        except ValueError:
+            precedent = None
+
         lecteur = TextReader()
         calibrage = calibrate_frames(images, lecteur, origin=(ecran.left, ecran.top))
         calibrage.save()
@@ -526,6 +536,7 @@ class AppState:
             "extrait": [ligne[:90] for ligne in rangees[:4]],
             "gains": gains,
             "apercu": f"data:image/png;base64,{apercu}",
+            "doutes": calibrage.doutes(precedent),
         }
 
     def start(self, spot: str, *, now: float | None = None) -> int:
