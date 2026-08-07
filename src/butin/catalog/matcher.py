@@ -161,6 +161,23 @@ class ItemMatcher:
                 return Match(item=exact, score=100.0, method=MatchMethod.EXACT)
             return None
 
+        # ⭐ Deuxième clé exacte, avant le score flou : espaces retirés et
+        # glyphes verticaux unifiés. Elle rattrape les deux défauts d'OCR
+        # mesurés sur une vraie session (« Sceau del'Agent », « Sceau de
+        # I'Agent »), que le flou ne rattrape PAS — deux mots recollés font un
+        # mot différent, pas un mot abîmé.
+        #
+        # Placée ici et pas avant l'exacte : tant qu'une correspondance stricte
+        # existe, elle gagne. Placée avant le flou parce qu'elle est exacte,
+        # donc elle ne peut pas se tromper « un peu » ; le flou, si.
+        #
+        # Voir `ItemCatalog.by_compact_name` pour la mesure et son coût.
+        compact = self.catalog.by_compact_name(text)
+        if compact is not None and (
+            scope is None or not scope.strict or scope.contains(compact.item_id)
+        ):
+            return Match(item=compact, score=100.0, method=MatchMethod.EXACT)
+
         choices: Sequence[str]
         threshold: float
         if scope:

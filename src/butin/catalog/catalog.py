@@ -33,6 +33,31 @@ from .overrides import VerifiedName
 _log = logging.getLogger(__name__)
 
 
+#: Glyphes verticaux que l'OCR intervertit sur la police du journal : le l
+#: minuscule, le I majuscule et le chiffre 1. Ils sont ramenés au même
+#: caractère avant comparaison, ce qui ne coûte rien puisque la clé n'est
+#: jamais réaffichée : elle sert uniquement à retrouver l'objet.
+#:
+#: ⚠️ La barre « | » n'y figure PAS, et ce n'est pas un oubli : `fold` la
+#: supprime déjà comme ponctuation, donc l'ajouter ici serait du code mort.
+#: Vérifié, `fold("de |'Agent")` rend « de agent ».
+_GLYPHES_VERTICAUX = "il1"
+
+
+def compact_key(text: str) -> str:
+    """Clé de correspondance tolérante aux deux défauts mesurés de l'OCR.
+
+    Voir `ItemCatalog.by_compact_name` pour la mesure et pour ce qu'elle coûte.
+    Volontairement séparée de `fold` : celle-ci vit dans le socle partagé avec
+    rubin, et lui donner ce comportement changerait aussi son affichage, alors
+    qu'ici la forme compacte ne sert QU'À chercher.
+    """
+    plie = fold(text).replace(" ", "")
+    for glyphe in _GLYPHES_VERTICAUX:
+        plie = plie.replace(glyphe, "l")
+    return plie
+
+
 class ItemCatalog:
     """Accès indexé aux objets du jeu."""
 
@@ -40,6 +65,7 @@ class ItemCatalog:
         self.locale = locale
         self._by_id: dict[int, Item] = {}
         self._by_folded: dict[str, list[int]] = {}
+        self._by_compact: dict[str, list[int]] = {}
 
         for item in items:
             self._by_id[item.item_id] = item
@@ -50,6 +76,7 @@ class ItemCatalog:
             if not folded:
                 continue
             self._by_folded.setdefault(folded, []).append(item.item_id)
+            self._by_compact.setdefault(compact_key(label), []).append(item.item_id)
 
         # Départage stable : à nom égal, le plus petit identifiant gagne. Les
         # identifiants bas correspondent aux objets de base du jeu, les hauts
@@ -58,6 +85,8 @@ class ItemCatalog:
         # se trompe, la correction passe par une exception explicite dans les
         # données, jamais par un changement de cette règle.
         for ids in self._by_folded.values():
+            ids.sort()
+        for ids in self._by_compact.values():
             ids.sort()
 
         self._folded_names: tuple[str, ...] = tuple(self._by_folded)
@@ -174,6 +203,44 @@ class ItemCatalog:
         """
         ids = self._by_folded.get(fold(text))
         if not ids:
+            return None
+        return self._by_id[ids[0]]
+
+    def by_compact_name(self, text: str) -> Item | None:
+        """Correspondance exacte sur une clé qui absorbe deux défauts de l'OCR.
+
+        ⭐ Mesuré sur une vraie session de Maxime le 07/08/2026, dans le journal
+        de diagnostic : sur 57 lectures de « [Évén.] Sceau de l'Agent », **43
+        étaient illisibles** pour la reconnaissance, et le drop était perdu en
+        silence. Deux défauts, tous deux sur la même partie du nom :
+
+        * **l'espace mangé** : « Sceau del'Agent » ;
+        * **le glyphe vertical confondu** : « Sceau de I'Agent », avec un I
+          majuscule au lieu du l minuscule.
+
+        Un nom qui contient « l' » les cumule, ce qui explique que ce soit
+        précisément le sien qui disparaisse. La couche floue ne rattrape pas :
+        deux mots recollés font un mot différent, pas un mot abîmé.
+
+        La clé retire donc les espaces et unifie `i`, `l`, `1` et `|`. C'est une
+        correspondance **exacte**, pas un score : elle ne peut pas se tromper
+        « un peu ». Une clé qui désigne plusieurs objets différents est refusée
+        plutôt que tranchée au hasard, ce qui est la règle de ce projet — rater
+        un drop donne un chiffre bas, en inventer un donne un chiffre faux.
+
+        ⚠️ Coût mesuré sur les 57 547 noms du catalogue : **13 clés
+        fusionnent**, soit 0,02 %. Les fusions dues au seul retrait des espaces
+        sont le même objet écrit de deux façons (« 7 jours » et « 7jours »),
+        donc pas de vraie ambiguïté. Les autres sont refusées.
+
+        Rubin avait relevé le même défaut de son côté (voir COORDINATION.md) et
+        mesuré zéro ambiguïté ajoutée sur ses 3 924 quêtes. Butin ne s'en était
+        jamais servi.
+        """
+        ids = self._by_compact.get(compact_key(text))
+        if not ids or len(set(ids)) > 1:
+            # Plusieurs objets DIFFÉRENTS derrière la même clé : on ne tranche
+            # pas. Le score flou reprendra la main, avec sa propre marge.
             return None
         return self._by_id[ids[0]]
 
