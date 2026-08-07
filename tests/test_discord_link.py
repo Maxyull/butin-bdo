@@ -86,6 +86,51 @@ class TestLeNomVientDuRelais:
         assert "<input" not in entete, "un champ de saisie est apparu à côté du compte Discord"
 
 
+class TestLaPagePrevientAvantDOuvrirLeNavigateur:
+    """⛔ Une justification écrite et non implémentée est pire qu'une absence.
+
+    L'en-tête de `discord_link.py` affirmait que « l'interface le dit avant
+    d'ouvrir le navigateur ». Le mot « Rubin » n'apparaissait nulle part dans
+    la page. Constaté le 07/08/2026 quand Maxime a cliqué sur le bouton et vu
+    Discord lui demander d'autoriser un logiciel qu'il n'avait pas installé.
+
+    Une docstring qui promet ce que le code ne fait pas empêche quiconque relit
+    de voir le trou : elle répond à la question avant qu'on la pose.
+    """
+
+    def _page(self) -> str:
+        from pathlib import Path
+
+        return (
+            Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static" / "index.html"
+        ).read_text(encoding="utf-8")
+
+    def test_la_page_previent_que_discord_affiche_rubin(self) -> None:
+        page = self._page()
+        assert 'id="discord-avertissement"' in page, "l'avertissement a disparu de la page"
+        debut = page.index('id="discord-avertissement"')
+        assert "Rubin" in page[debut : debut + 500], (
+            "l'avertissement ne nomme plus l'application que Discord affichera"
+        )
+
+    def test_l_avertissement_est_masque_par_defaut(self) -> None:
+        """Il ne doit pas s'afficher à quelqu'un de déjà rattaché.
+
+        Une phrase qui survit à ce qu'elle explique dit quelque chose de faux :
+        c'est le défaut déjà corrigé sur l'en-tête de mise à jour.
+        """
+        page = self._page()
+        debut = page.index('id="discord-avertissement"')
+        assert "hidden" in page[debut : debut + 60]
+
+    def test_le_script_le_masque_quand_le_compte_est_rattache(self) -> None:
+        """Régression de câblage : l'élément peut exister et ne jamais bouger."""
+        page = self._page()
+        corps = page[page.index("function afficherLeCompteDiscord") :][:1600]
+        assert "avertissement.hidden = true" in corps
+        assert "avertissement.hidden = false" in corps
+
+
 class TestLectureDeLaReponse:
     def test_un_compte_rattache_rend_son_nom(self) -> None:
         assert depuis_reponse({"rattache": True, "nom": "maxyull"}) == Compte(True, "maxyull")

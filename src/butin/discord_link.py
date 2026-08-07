@@ -40,10 +40,23 @@ ici plutôt que découvert plus tard.
 
 Le relais n'a qu'une seule application Discord enregistrée, celle de Rubin
 (`client_id` 1534871942685921280), et c'est elle qui apparaît. Un joueur de
-Butin à qui l'on demande d'autoriser *Rubin* peut légitimement hésiter, donc
-l'interface le dit avant d'ouvrir le navigateur au lieu de le laisser le
-découvrir. Signalé à la session rubin le 07/08/2026 dans `COORDINATION.md` :
-le corriger demande une seconde application côté relais, pas ici.
+Butin à qui l'on demande d'autoriser *Rubin* peut légitimement croire à du
+hameçonnage — et il aurait raison de refuser.
+
+L'interface le dit donc **avant** d'ouvrir le navigateur, dans
+`#discord-avertissement`, et `test_la_page_previent_que_discord_affiche_rubin`
+garde ce lien.
+
+⛔ Cette phrase-ci a d'abord été écrite ici **sans être implémentée** : la
+docstring affirmait que l'interface prévenait, et le mot « Rubin » n'apparaissait
+nulle part dans la page. Constaté le 07/08/2026 quand Maxime a cliqué sur le
+bouton. Une justification qu'on écrit et qu'on n'implémente pas est pire qu'une
+absence : elle empêche quiconque relit de voir le trou.
+
+Signalé à la session rubin dans `COORDINATION.md` : le corriger pour de bon
+demande une seconde application côté relais, pas ici. L'application Butin
+existe (`client_id` 1535235309447548970), il lui manque son URI de redirection
+et son secret sur le serveur.
 """
 
 from __future__ import annotations
