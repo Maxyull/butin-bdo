@@ -218,6 +218,26 @@ class TestFichiersServis:
 class TestControleParObjet:
     """Les routes du contrôle : ce que la session a compté, et ce qu'on en dit."""
 
+    @pytest.fixture(autouse=True)
+    def _relais_bouchonne(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """⛔ Régression : ces trois tests postaient dans le VRAI Discord.
+
+        `set_verdict` remonte le contrôle au relais, exprès : un écart constaté
+        chez quelqu'un est la seule mesure qui puisse contredire le compteur.
+        Mais la route est ici exercée pour de bon, donc chaque `pytest`
+        publiait un rapport, et la CI autant. Le forum `butin-bugs` s'est
+        rempli de « compté 97, réel 84 » — les chiffres de ce fichier même.
+
+        Le bouchon est `autouse` sur la classe : un test futur qui toucherait à
+        cette route hériterait de la protection sans avoir à y penser, ce qui
+        est précisément ce qui a manqué la première fois.
+        """
+        from butin.ui import server as module
+
+        monkeypatch.setattr(
+            module, "_envoyer_rapport", lambda *a, **k: _Resultat(True, "bouchon de test")
+        )
+
     def _session_finie(self, etat: Any) -> int:
         import time as _t
 

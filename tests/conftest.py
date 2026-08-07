@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -51,6 +52,57 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """
     monkeypatch.setenv("BUTIN_HOME", str(tmp_path))
     return tmp_path
+
+
+#: Ce qu'un test a le droit d'appeler : le serveur local qu'il vient de lancer.
+_HOTES_LOCAUX = frozenset({"127.0.0.1", "localhost", "::1", ""})
+
+
+@pytest.fixture(autouse=True)
+def reseau_coupe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """⛔ Interdit tout appel réseau SORTANT pendant les tests.
+
+    Pourquoi cette fixture existe, et pourquoi elle est automatique
+    ---------------------------------------------------------------
+
+    Le 07/08/2026, la suite a **posté pour de vrai dans le salon Discord** des
+    joueurs. Les trois tests de la route `/api/historique/<id>/verdict`
+    lançaient un vrai serveur et un vrai `AppState`, et `set_verdict` remonte
+    le contrôle au relais : chaque `pytest` publiait donc un rapport, la CI
+    autant, et le forum `butin-bugs` s'est rempli de « compté 97, réel 84 »,
+    c'est-à-dire du jeu de données de `test_controle_par_objet.py`. Constaté
+    par Maxime en regardant son propre Discord, pas par un test.
+
+    ⭐ Ce qui rend le défaut instructif : `isolated_home` protégeait déjà le
+    disque **automatiquement**, exprès pour qu'aucun test futur ne puisse
+    écrire chez la personne « même par accident ». Le réseau n'avait aucune
+    garde équivalente, alors qu'un appel sortant est **irréversible** là où un
+    fichier écrit ne l'est pas. La protection existait, elle n'était juste pas
+    posée sur le côté qui pouvait sortir de la machine.
+
+    ⚠️ Elle refuse au lieu de simuler : un test qui a besoin du réseau doit le
+    **bouchonner explicitement**. Rendre une réponse vide à sa place laisserait
+    croire que le chemin réseau est couvert alors qu'il ne le serait pas.
+
+    La boucle locale reste ouverte : les tests d'interface parlent à un serveur
+    qu'ils viennent de démarrer, et c'est légitime.
+    """
+    import requests
+
+    envoi_reel = requests.Session.send
+
+    def envoi_garde(self, request, **kwargs):  # type: ignore[no-untyped-def]
+        hote = urlparse(request.url).hostname or ""
+        if hote in _HOTES_LOCAUX:
+            return envoi_reel(self, request, **kwargs)
+        raise RuntimeError(
+            f"Appel réseau sortant interdit dans les tests : {request.method} {request.url}\n"
+            "Bouchonne-le (monkeypatch sur la fonction appelée, ou une fausse "
+            "requests.Session). Voir la fixture `reseau_coupe` dans conftest.py : "
+            "la suite a déjà publié pour de vrai dans le Discord des joueurs."
+        )
+
+    monkeypatch.setattr(requests.Session, "send", envoi_garde)
 
 
 @pytest.fixture
@@ -97,17 +149,19 @@ def item_factory():
 
 
 @pytest.fixture
-def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fait échouer bruyamment tout accès réseau involontaire.
+def verifie_l_isolation() -> None:
+    """Vérifie que le bac à sable est bien en place, pour un test qui en doute.
 
-    Un test qui télécharge vraiment le catalogue serait lent, dépendrait
-    d'internet, et masquerait le fait que le cache ne fonctionne pas.
+    ⛔ Remplace `no_network`, retirée le 07/08/2026. Cette fixture-là promettait
+    de « faire échouer bruyamment tout accès réseau involontaire » et ne le
+    faisait pas :
+
+    1. elle ne couvrait que `get`, et la fuite réelle était un **`post`** ;
+    2. elle était **opt-in**, et plus aucun test ne la demandait.
+
+    Une garde morte est pire qu'une garde absente : elle se lit comme une
+    protection. Celle-ci a laissé la suite publier dans le vrai salon Discord
+    des joueurs pendant que sa docstring affirmait le contraire. Le réseau est
+    désormais coupé par `reseau_coupe`, automatique et sans exception.
     """
-    import requests
-
-    def refuse(*args: object, **kwargs: object):
-        raise AssertionError("accès réseau interdit dans les tests")
-
-    monkeypatch.setattr(requests.Session, "get", refuse)
-    monkeypatch.setattr(requests, "get", refuse)
     assert os.environ.get("BUTIN_HOME"), "isolated_home doit être actif"
