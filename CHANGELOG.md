@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.5.1] - 2026-08-07
+
 ### Modifié
 
 - **Le contrôle d'une session se fait maintenant objet par objet, et on ne
@@ -55,6 +57,20 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   souvent — elle n'apparaissait que comme une tache sombre. Le trait doré, fin,
   se noyait dans le fond en rapetissant. Il est désormais épaissi et éclairci
   aux petites tailles, et le sac se reconnaît à 16 px comme à 256.
+
+### Connu et non résolu
+
+- ⛔ **Le sur-comptage signalé le 07/08 n'est toujours pas résolu.** La cause
+  n'est pas tranchée : on ne sait pas encore si le jeu affiche réellement la
+  même ligne plusieurs fois ou si c'est la lecture qui la duplique.
+
+  Ce qui change avec cette version : le **contrôle objet par objet** et le
+  **fichier de diagnostic** donnent enfin de quoi le mesurer au lieu de le
+  deviner. Si un total te paraît trop élevé, compare à ton inventaire et dis-le
+  avec le bouton « Écart » — c'est la seule chose qui puisse trancher.
+
+- **La mise à jour en un clic fonctionne à partir de la 0.5.0.** Depuis une
+  version antérieure, il faut installer à la main une dernière fois.
 
 ## [0.5.0] - 2026-08-07
 
