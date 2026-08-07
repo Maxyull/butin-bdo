@@ -142,11 +142,25 @@ def download_installer(
 def launch_installer(installer: Path) -> None:
     """Lance l'installeur en silence, et laisse Windows fermer puis rouvrir Butin.
 
-    ⛔ **Ne ferme pas Butin, volontairement.** `/RESTARTAPPLICATIONS` s'appuie
-    sur `CloseApplications=force` posé dans `butin.iss` : c'est l'installeur,
-    via le Gestionnaire de redémarrage de Windows, qui ferme l'application et
-    la relance. Se fermer avant qu'il ait enregistré le processus lui retire
-    l'objet à rouvrir — le bogue exact que Rubin a trouvé en jouant.
+    ⛔ **Ne ferme pas Butin, volontairement.** `CloseApplications=force`, posé
+    dans `butin.iss`, fait fermer l'application par le Gestionnaire de
+    redémarrage de Windows. Se fermer avant qu'il ait enregistré le processus
+    l'empêche de faire ce travail proprement.
+
+    ⛔ **`/RELANCER` remplace `/RESTARTAPPLICATIONS` depuis le 07/08/2026.**
+    Constaté par Maxime en jouant : **Butin ne revenait pas** après une mise à
+    jour. Elle reposait entièrement sur le Gestionnaire de redémarrage pour
+    rouvrir l'application, et il ne l'a pas fait. Vu du joueur, une mise à jour
+    qui fait disparaître le logiciel pour de bon est pire que pas de mise à
+    jour du tout.
+
+    La réouverture est désormais une ligne explicite de la section [Run] de
+    l'installeur, conditionnée à ce commutateur. Un mécanisme qu'on peut lire
+    et voir échouer, au lieu d'un comportement du système qu'on espère.
+
+    ⚠️ Les deux ne doivent jamais coexister : le Gestionnaire de redémarrage et
+    la section [Run] rouvriraient chacun leur exemplaire, et deux Butin en
+    parallèle voudraient dire deux fils de capture sur la même session.
 
     `/NORESTART` porte sur **Windows**, jamais sur Butin : rien ici ne
     redémarre l'ordinateur.
@@ -159,7 +173,7 @@ def launch_installer(installer: Path) -> None:
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
-            "/RESTARTAPPLICATIONS",
+            "/RELANCER",
         ],
         close_fds=True,
     )
