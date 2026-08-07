@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Butin</title>
+<link rel="icon" href="/butin.png" type="image/png">
 <style>
   :root {
     --fond: #0d0f14;
@@ -92,6 +93,10 @@
     border: 1px solid var(--bord); border-radius: var(--rayon-petit);
   }
   h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+  /* La marque a la hauteur des majuscules du titre, alignee sur leur
+     ligne de base : plus grande, elle deviendrait le sujet de la page. */
+  .marque { width: 22px; height: 22px; vertical-align: -4px;
+            margin-right: var(--espace-2); }
   h1 span { color: var(--doux); font-weight: 400; font-size: 13px; margin-left: 10px; }
   .haut { display: flex; align-items: center; justify-content: space-between;
           flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
@@ -108,6 +113,27 @@
                letter-spacing: .8px; margin-bottom: var(--espace-2); }
   .or { color: var(--or); }
 
+  /* Le contrôle du joueur contre son inventaire. Trois états, et le troisième
+     n'est PAS un défaut : « pas encore contrôlé » se distingue de « c'était
+     juste », sans quoi une session que personne n'a regardée passerait pour
+     vérifiée. */
+  .verdict { display: inline-flex; align-items: center; gap: 6px;
+             padding: 3px 10px; border-radius: var(--rayon-pilule);
+             font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .verdict-exact  { background: rgba(111, 220, 111, .14); color: var(--vert);
+                    border: 1px solid rgba(111, 220, 111, .40); }
+  .verdict-ecart  { background: rgba(224, 113, 95, .14); color: var(--rouge);
+                    border: 1px solid rgba(224, 113, 95, .40); }
+  .verdict-vide   { color: var(--doux); }
+  .verdict-vide button {
+    background: transparent; border: 1px solid var(--bord); color: var(--doux);
+    border-radius: var(--rayon-pilule); padding: 3px 10px; cursor: pointer;
+    font: inherit; font-size: 12px; font-weight: 600;
+  }
+  .verdict-vide button:hover { border-color: var(--doux); color: var(--texte); }
+  .verdict-vide button.bon:hover { border-color: var(--vert); color: var(--vert); }
+  .verdict-vide button.mauvais:hover { border-color: var(--rouge); color: var(--rouge); }
+
   /* Bouton de mise à jour, à côté du numéro de version : une notification
      discrète, jamais un blocage. Il informe et laisse l'utilisateur
      cliquer, il ne l'empêche de rien faire d'autre. Voir update.py pour
@@ -121,14 +147,22 @@
 
   /* Couleur de marque Discord (#5865F2), la seule exception à la palette du
      reste de la page : sert justement à ce que ce lien précis se reconnaisse
-     au premier coup d'œil. */
-  .lien-discord { display: inline-flex; align-items: center; gap: 6px;
-                  padding: 6px 12px; border: 1px solid #5865f2;
-                  border-radius: 999px; background: rgba(88, 101, 242, .10);
-                  color: #8d95f5; text-decoration: none; font-size: 13px;
-                  font-weight: 600; }
-  .lien-discord:hover { background: rgba(88, 101, 242, .20); }
-  .lien-discord svg { width: 15px; height: 15px; fill: currentColor; }
+     au premier coup d'œil.
+
+     ⭐ Bouton PLEIN et non contour discret : c'est le seul endroit d'où un
+     joueur rejoint la communauté, et un contour à 10 % d'opacité se confondait
+     avec les sliders posés juste à côté. Rempli, il se voit sans crier : il
+     n'y a qu'un seul aplat coloré sur toute la page. */
+  .lien-discord { display: inline-flex; align-items: center; gap: 8px;
+                  padding: 8px 16px; border: 1px solid #5865f2;
+                  border-radius: var(--rayon-pilule); background: #5865f2;
+                  color: #fff; text-decoration: none; font-size: 14px;
+                  font-weight: 600; transition: background .12s, border-color .12s; }
+  .lien-discord:hover { background: #4752c4; border-color: #4752c4; }
+  /* La marque officielle, à sa taille lisible. Elle est monochrome et prend la
+     couleur du texte, ce que la charte de Discord autorise explicitement pour
+     un logo posé sur un aplat de leur bleu. */
+  .lien-discord svg { width: 18px; height: 18px; fill: currentColor; }
 
   /* Les deux sliders. Un vrai interrupteur a deux positions, pas une liste
      deroulante : le choix est binaire et doit se voir sans ouvrir quoi que ce soit. */
@@ -236,7 +270,7 @@
 <body>
 
 <div class="haut">
-  <h1>Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
+  <h1><img class="marque" src="/butin.png" alt="">Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
      type="button"></button><a class="bouton-maj" id="lien-maj" hidden
      target="_blank" rel="noopener">Voir la version</a>
      <span id="maj-etat" class="etat-en-ligne"></span></h1>
@@ -257,7 +291,7 @@
     </div>
   </div>
   <a class="lien-discord" href="https://discord.gg/qCuvN2Zna7" target="_blank" rel="noopener">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zM9.5 9a1.3 1.3 0 110 2.6A1.3 1.3 0 019.5 9zm5 0a1.3 1.3 0 110 2.6 1.3 1.3 0 010-2.6zM8 15.5c1.2.9 2.6 1.3 4 1.3s2.8-.4 4-1.3"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
     Discord
   </a>
 </div>
@@ -378,10 +412,11 @@
           <th class="num">Objets</th>
           <th class="num">Silver/heure</th>
           <th class="num">Total net</th>
+          <th>Contrôle</th>
         </tr>
       </thead>
       <tbody id="sessions">
-        <tr><td colspan="6">Aucune session enregistrée.</td></tr>
+        <tr><td colspan="7">Aucune session enregistrée.</td></tr>
       </tbody>
     </table>
   </div>
@@ -909,6 +944,91 @@ function duree(secondes) {
   return h ? h + " h " + String(m).padStart(2, "0") : m + " min";
 }
 
+// -- Controle du joueur contre son inventaire ------------------------------
+//
+// C'est la SEULE mesure de ce logiciel qui ne passe par aucune reconnaissance
+// d'ecran, donc la seule qui puisse contredire a la fois le compteur et le
+// banc d'essai : les deux lisent les memes pixels avec le meme moteur, et
+// peuvent donc se tromper ensemble.
+function celluleControle(session) {
+  const td = document.createElement("td");
+  if (session.verdict === "exact") {
+    const p = document.createElement("span");
+    p.className = "verdict verdict-exact";
+    p.textContent = "Exact";
+    td.appendChild(p);
+    return td;
+  }
+  if (session.verdict === "ecart") {
+    const p = document.createElement("span");
+    p.className = "verdict verdict-ecart";
+    const n = session.ecart || 0;
+    p.textContent = (n > 0 ? "+" : "") + n + (n > 0 ? " de trop" : " de moins");
+    td.appendChild(p);
+    return td;
+  }
+  // Pas encore controle : deux boutons, et rien qui ressemble a un verdict.
+  const zone = document.createElement("span");
+  zone.className = "verdict verdict-vide";
+  const bon = document.createElement("button");
+  bon.type = "button";
+  bon.className = "bon";
+  bon.textContent = "Exact";
+  bon.title = "Le compte correspond a mon inventaire";
+  const mauvais = document.createElement("button");
+  mauvais.type = "button";
+  mauvais.className = "mauvais";
+  mauvais.textContent = "Ecart";
+  mauvais.title = "Le compte ne correspond pas : dire de combien";
+  // `stopPropagation` : la ligne entiere ouvre le detail de la session, et
+  // cliquer un bouton de controle ne doit pas faire les deux a la fois.
+  bon.addEventListener("click", (e) => { e.stopPropagation(); envoyerVerdict(session.id, "exact", null, td); });
+  mauvais.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Une seule ligne, sans retour a la ligne echappe. Un retour ecrit comme
+    // une VRAIE fin de ligne est une erreur de syntaxe qui fait tomber tout le
+    // bloc de script : voila ce qui a rendu la fenetre inerte pendant six PR
+    // (numero 34). Le test du script vient de rattraper exactement ce cas.
+    const saisi = prompt(
+      "Combien d'unités d'écart ? Positif si Butin a compté TROP, négatif s'il en a compté moins. Exemple : 1413 si Butin annonce 2113 et que ton inventaire en a 700."
+    );
+    if (saisi === null) return;
+    const n = parseInt(saisi, 10);
+    if (!Number.isInteger(n) || n === 0) {
+      alert("Il faut un nombre entier non nul.");
+      return;
+    }
+    envoyerVerdict(session.id, "ecart", n, td);
+  });
+  zone.appendChild(bon);
+  zone.appendChild(mauvais);
+  td.appendChild(zone);
+  return td;
+}
+
+async function envoyerVerdict(id, verdict, ecart, td) {
+  td.textContent = "Enregistrement...";
+  try {
+    const reponse = await fetch("/api/historique/" + id + "/verdict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verdict: verdict, ecart: ecart }),
+    });
+    const corps = await reponse.json();
+    if (corps.erreur) { td.textContent = corps.erreur; return; }
+    // Le verdict est enregistre meme si l'envoi au salon echoue : on redessine
+    // donc a partir de ce qui est en base, et on ne mentionne l'envoi que
+    // quand il a rate.
+    td.replaceWith(celluleControle({ id: id, verdict: verdict, ecart: ecart }));
+    if (!corps.envoye && corps.message) {
+      const ligne = $("etat-dossier");
+      if (ligne) ligne.textContent = "Contrôle enregistré, mais pas envoyé : " + corps.message;
+    }
+  } catch (erreur) {
+    td.textContent = "Le serveur local n'a pas repondu.";
+  }
+}
+
 async function chargerHistorique() {
   const corps = $("sessions");
   const reponse = await (await fetch("/api/historique")).json();
@@ -917,7 +1037,7 @@ async function chargerHistorique() {
   if (!sessions.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 6;
+    td.colSpan = 7;
     td.textContent = "Aucune session enregistrée.";
     tr.appendChild(td);
     corps.appendChild(tr);
@@ -941,6 +1061,7 @@ async function chargerHistorique() {
       td.textContent = valeur;
       tr.appendChild(td);
     });
+    tr.appendChild(celluleControle(session));
     if (session.en_cours) tr.firstChild.classList.add("en-cours");
     // L'identifiant est porté par la ligne pour qu'on puisse la retrouver sans
     // la position : après un arrêt, on veut ouvrir CETTE session-là.

@@ -147,9 +147,14 @@ def send_report(
     des choses très différentes pour le joueur : « recommence », « c'est trop
     long », « ce n'est pas encore branché côté serveur, ce n'est pas ta faute ».
     """
+    # ⛔ On teste le MESSAGE, pas le corps composé. Le contexte technique est
+    # ajouté systématiquement, donc le corps n'est JAMAIS vide : tester le
+    # corps laissait passer un rapport où le joueur n'a rien écrit, et le
+    # salon recevait une fiche technique sans la moindre phrase. Trouvé en
+    # écrivant le test de la route, pas en relisant.
+    if not message.strip():
+        return ReportResult(False, "Le rapport est vide : écris d'abord ce qui ne va pas.")
     corps = compose(message, contexte)
-    if not corps.strip():
-        return ReportResult(False, "Le rapport est vide.")
 
     try:
         _check_host(url, stage="URL demandée")
