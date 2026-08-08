@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -258,6 +259,94 @@ class TestLesBarresDeDefilementSuiventLeTheme:
         _, marque, apres = source.partition("::-webkit-scrollbar-track")
         assert marque, f"{nom} : aucune règle de piste, la barre garde celle du système"
         assert "transparent" in apres.partition("}")[0]
+
+
+class TestLeParcoursGuide:
+    """⭐ Le parcours demandé par Maxime le 08/08/2026 : un seul bouton, une
+    étape à la fois.
+
+    ⛔ « Calibrer la zone » a disparu, et c'est le cœur de la demande. Le
+    calibrage se faisait à part, donc il s'oubliait — et une zone non calibrée
+    donne un compteur à zéro qui ressemble à un farm pauvre. Une session réelle
+    a tourné 462 secondes pour zéro objet compté.
+    """
+
+    #: L'ordre des étapes, tel que le parcours doit les enchaîner.
+    ETAPES: ClassVar[list[str]] = [
+        "parcoursCalibrer",
+        "parcoursDemarrer",
+        "parcoursInventaire",
+        "parcoursVerifier",
+        "parcoursArreter",
+        "parcoursSignaler",
+    ]
+
+    def test_le_bouton_calibrer_a_disparu_partout(self) -> None:
+        """⛔ Retirer le bouton sans retirer son `$()` arrête le
+        rafraîchissement : page présentable et morte, défaut #34."""
+        source = page("index.html")
+
+        assert "bouton-calibrer" not in identifiants_declares(source)
+        assert "bouton-calibrer" not in identifiants_demandes(source)
+
+    @pytest.mark.parametrize("etape", ETAPES)
+    def test_chaque_etape_du_parcours_existe(self, etape: str) -> None:
+        assert f"function {etape}(" in page("index.html").replace("async ", "")
+
+    def test_le_parcours_a_son_bloc_et_il_est_masque_au_depart(self) -> None:
+        """Il ne doit pas occuper l'écran tant que rien n'a commencé."""
+        source = page("index.html")
+        declares = identifiants_declares(source)
+
+        for identifiant in ("parcours", "parcours-titre", "parcours-texte", "parcours-boutons"):
+            assert identifiant in declares
+        bloc = source[source.index('<div id="parcours"') :][:120]
+        assert "hidden" in bloc
+
+    def test_la_session_demarre_AVANT_la_photo_de_depart(self) -> None:
+        """⚠️ L'ordre réel n'est pas celui qu'on décrirait à voix haute.
+
+        Une capture d'inventaire se range par session, et il n'y en a pas encore
+        avant le démarrage. La photo de départ vient donc après, et les quelques
+        secondes qui passent comptent pour le compteur et pas pour l'inventaire.
+        C'est dit à l'écran plutôt que découvert dans les chiffres.
+        """
+        source = page("index.html")
+        corps = source[source.index("async function parcoursDemarrer") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert "/api/session/demarrer" in corps
+        assert 'parcoursInventaire("avant")' in corps
+        assert corps.index("/api/session/demarrer") < corps.index('parcoursInventaire("avant")')
+
+    def test_un_calibrage_rate_ARRETE_le_parcours(self) -> None:
+        """⛔ Démarrer sur un calibrage raté donnerait une session qui ne compte
+        rien, et rien à l'écran ne le dirait. Le parcours s'arrête et propose de
+        recommencer."""
+        source = page("index.html")
+        corps = source[source.index("async function parcoursCalibrer") :]
+        corps = corps[: corps.index("\nasync function parcoursDemarrer")]
+
+        assert "Calibrage impossible" in corps
+        assert "Réessayer" in corps
+        # ⛔ Et un calibrage DOUTEUX est montré, pas avalé : le calibrage
+        # automatique a déjà rendu 448 px là où il en fallait 662.
+        assert "Calibrage douteux" in corps
+
+    def test_le_signalement_prepare_l_archive_sans_l_envoyer(self) -> None:
+        """⛔ « Prête à envoyer » n'est pas « envoyée ».
+
+        L'archive contient les messages des AUTRES joueurs et des captures
+        d'écran entier. Elle reste sur le disque, le dossier s'ouvre dessus, et
+        c'est le joueur qui dépose. Seul le rapport texte part tout seul.
+        """
+        source = page("index.html")
+        corps = source[source.index("async function parcoursSignaler") :]
+        corps = corps[: corps.index("\n// L'affichage du résultat")]
+
+        assert "/api/rapport" in corps
+        assert "/api/archive" in corps
+        assert "n'est envoyée à personne" in corps
 
 
 def _bloc_du_schema(source: str) -> str:

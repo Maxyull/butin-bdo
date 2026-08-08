@@ -58,7 +58,11 @@ class TestOuverture:
         assert lancer(store=store, window=fenetre) == 0
         assert vu["url"].startswith("http://127.0.0.1:")
         assert "bouton-session" in vu["page"]
-        assert "bouton-calibrer" in vu["page"]
+        # ⚠️ « bouton-calibrer » a disparu le 08/08/2026 : le calibrage n'est
+        # plus un geste à part, il fait partie du parcours guidé lancé par
+        # « Commencer le grind ». On vérifie donc le parcours, qui est ce qui
+        # doit maintenant se trouver dans la page servie.
+        assert "parcours" in vu["page"]
 
     def test_le_port_est_choisi_par_le_systeme(self, store: SessionStore) -> None:
         """L'utilisateur n'a rien à savoir d'un numéro de port.

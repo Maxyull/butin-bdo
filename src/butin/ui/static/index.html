@@ -163,6 +163,20 @@
   .etiquette { color: var(--doux); font-size: 12px; text-transform: uppercase;
                letter-spacing: .8px; margin-bottom: var(--espace-2); }
 
+  /* Le parcours guidé. Volontairement PLUS gros que le reste de la page : il
+     s'adresse à quelqu'un qui est en train de basculer sur son jeu, et une
+     consigne qu'on ne lit pas ne guide personne. */
+  .parcours { margin-top: var(--espace-4); padding: var(--espace-4) var(--espace-5);
+              border: 1px solid var(--or); border-radius: var(--rayon);
+              background: rgba(212, 169, 85, .07); }
+  .parcours-titre { color: var(--or); font-size: 15px; font-weight: 600;
+                    margin-bottom: var(--espace-2); }
+  .parcours-texte { font-size: 15px; line-height: 1.5; margin-bottom: var(--espace-3); }
+  .parcours-texte b { color: var(--texte); }
+  /* Un parcours qui a échoué ne doit pas ressembler à un parcours qui avance. */
+  .parcours.rate { border-color: var(--rouge); background: rgba(224, 113, 95, .10); }
+  .parcours.rate .parcours-titre { color: var(--rouge); }
+
   /* Les schémas de « Ce qu'il faut voir ». Ils passent à la ligne plutôt que
      de rétrécir indéfiniment : un schéma trop petit ne montre plus rien, et
      cette fenêtre est souvent étroite. */
@@ -495,11 +509,26 @@
 <div class="page" id="page-session" role="tabpanel" aria-labelledby="onglet-session">
 
 <div class="panneau">
+  <!-- ⭐ UN SEUL bouton pour tout commencer, et « Calibrer la zone » a disparu.
+       Tranché par Maxime le 08/08/2026 : le calibrage est un geste qu'on
+       oubliait, et l'oublier donne un compteur à zéro qui ressemble à un farm
+       pauvre. « Commencer le grind » calibre, démarre, et guide.
+
+       ⚠️ Le parcours ne remplace aucune brique : il enchaîne celles qui
+       existent déjà et qui sont testées — calibrage, aperçu de la zone,
+       captures d'inventaire aux deux bouts, rapport, archive. -->
   <div class="rangee">
     <button class="action demarrer" id="bouton-session">Commencer le grind</button>
     <button class="action" id="bouton-pause" hidden>Pause</button>
-    <button class="action" id="bouton-calibrer">Calibrer la zone</button>
     <span id="etat-session" class="etat-en-ligne">Aucune session en cours</span>
+  </div>
+
+  <!-- Le parcours guidé. Une étape à la fois, avec ce qu'il faut faire écrit
+       en grand : personne ne devine l'ordre des gestes tout seul. -->
+  <div id="parcours" class="parcours" hidden>
+    <div class="parcours-titre" id="parcours-titre"></div>
+    <div class="parcours-texte" id="parcours-texte"></div>
+    <div class="rangee" id="parcours-boutons"></div>
   </div>
   <div id="etat-capture" class="note note-large"></div>
   <div id="etat-calibrage" class="note note-large"></div>
@@ -1226,202 +1255,389 @@ $("bouton-pause").addEventListener("click", async () => {
   }
 });
 
+// ⭐ Le bouton unique. Il n'ouvre plus une session directement : il lance le
+// PARCOURS, qui calibre, démarre, photographie l'inventaire et vérifie l'écran.
+// À l'arrêt, il repasse par le parcours pour la photo d'arrivée et la question
+// « le compte est bon ? ».
 $("bouton-session").addEventListener("click", async () => {
   const etat = await (await fetch("/api/etat")).json();
-  const enCours = Boolean(etat.session && etat.session.en_cours);
-  const route = enCours ? "/api/session/arreter" : "/api/session/demarrer";
-
-  // Décompte avant de commencer, pas avant d'arrêter : on part dans le jeu
-  // pour farmer, on n'a aucune raison d'attendre pour s'arrêter. Il est
-  // affiché dans la page plutôt que côté serveur, pour que la requête reste
-  // courte et que le joueur voie le temps qu'il lui reste.
-  const bouton = $("bouton-session");
-  if (!enCours) {
-    bouton.disabled = true;
-    try {
-      for (let reste = 5; reste > 0; reste--) {
-        bouton.textContent = "Bascule dans le jeu… " + reste;
-        await new Promise((suite) => setTimeout(suite, 1000));
-      }
-    } finally {
-      bouton.disabled = false;
-    }
-  }
-
-  const reponse = await fetch(route, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({}),
-  });
-  const corps = await reponse.json();
-  if (!reponse.ok) {
-    // Un refus de démarrer n'est pas une panne : c'est une condition que
-    // l'utilisateur peut lever, typiquement un calibrage jamais fait. Le
-    // message le dit, il faut donc l'afficher plutôt que l'avaler.
-    const ligne = $("etat-capture");
-    ligne.classList.add("avertissement");
-    ligne.textContent = corps.erreur || "impossible de démarrer la capture";
-    return;
-  }
-  afficher(corps);
-
-  // ⭐ Arrêter emmène sur la session qu'on vient de finir. Sans ça, l'écran se
-  // vide d'un coup : les quatre chiffres retombent à zéro et le tableau du
-  // butin se vide, parce qu'il n'y a plus de session en cours. Du point de vue
-  // de quelqu'un qui vient de farmer deux minutes, tout ce qu'il a ramassé
-  // vient de disparaître, et rien ne dit que c'est enregistré ailleurs.
-  if (enCours && etat.session) {
-    basculer("historique");
-    await ouvrirSessionParId(etat.session.id);
+  if (etat.session && etat.session.en_cours) {
+    await parcoursInventaire("apres");
+  } else {
+    await parcoursCalibrer();
   }
 });
 
-$("bouton-calibrer").addEventListener("click", async () => {
-  const bouton = $("bouton-calibrer");
-  const ligne = $("etat-calibrage");
-  const extrait = $("extrait-calibrage");
-  const apercu = $("apercu-calibrage");
-  bouton.disabled = true;
-  // `hidden` plutot que `style.display` : c'est deja la facon dont le reste
-  // de la page cache un element, et ca laisse la mise en forme dans le CSS.
-  extrait.hidden = true;
-  apercu.hidden = true;
+// -- Le parcours guidé -------------------------------------------------------
+//
+// ⭐ Demandé par Maxime le 08/08/2026. Un seul bouton pour tout commencer, et
+// une étape à la fois : personne ne devine l'ordre des gestes tout seul, et
+// chaque geste oublié coûte une session.
+//
+// ⛔ « Calibrer la zone » a DISPARU. Le calibrage se faisait à part, donc il
+// s'oubliait — et une zone non calibrée donne un compteur à zéro qui ressemble
+// à un farm pauvre.
+//
+// ⚠️ L'ORDRE RÉEL n'est pas celui qu'on décrirait à voix haute : la session
+// démarre AVANT la photo de l'inventaire de départ, parce qu'une capture se
+// range par session et qu'il n'y en a pas encore avant. Les quelques secondes
+// entre les deux comptent pour le compteur et pas pour l'inventaire ; c'est dit
+// à l'écran plutôt que découvert dans les chiffres.
+//
+// ⚠️ Le parcours n'implémente AUCUNE brique : il enchaîne celles qui existent
+// et qui sont testées — calibrage, aperçu, captures aux deux bouts, rapport,
+// archive.
 
-  // Le décompte est affiché ici plutôt que côté serveur : la requête reste
-  // courte, et l'utilisateur voit combien de temps il lui reste pour basculer
-  // dans le jeu. Une requête de sept secondes ressemblerait à un blocage.
-  for (let reste = 5; reste > 0; reste--) {
-    ligne.textContent = "Bascule dans le jeu, journal d'acquisition visible… " + reste;
+const DELAI_BASCULE_S = 5;
+
+function etape(titre, texte, boutons, rate) {
+  const bloc = $("parcours");
+  bloc.hidden = false;
+  bloc.classList.toggle("rate", Boolean(rate));
+  $("parcours-titre").textContent = titre;
+  // innerHTML : ce texte est ÉCRIT ICI, jamais reçu de l'extérieur. Il porte du
+  // gras sur les mots qui comptent, et quelqu'un qui bascule sur son jeu ne lit
+  // que les gras.
+  $("parcours-texte").innerHTML = texte;
+  const zone = $("parcours-boutons");
+  zone.innerHTML = "";
+  for (const bouton of boutons || []) {
+    const b = document.createElement("button");
+    b.className = bouton.principal ? "action demarrer" : "action-mince";
+    b.textContent = bouton.libelle;
+    b.addEventListener("click", bouton.action);
+    zone.appendChild(b);
+  }
+}
+
+function fermerLeParcours() {
+  $("parcours").hidden = true;
+  $("parcours").classList.remove("rate");
+}
+
+async function compteARebours(titre, invite) {
+  for (let reste = DELAI_BASCULE_S; reste > 0; reste--) {
+    etape(titre, invite + " — <b>" + reste + " s</b>", []);
     await new Promise((suite) => setTimeout(suite, 1000));
   }
-  ligne.textContent = "Recherche de la fenêtre de chat…";
+  etape(titre, "Un instant…", []);
+}
 
+// ⛔ Le calibrage peut RATER, et le parcours s'arrête là plutôt que de démarrer
+// une session qui ne comptera rien. C'est la panne la plus coûteuse mesurée sur
+// ce logiciel : 462 secondes pour zéro objet.
+async function parcoursCalibrer() {
+  await compteARebours(
+    "1 / 4 — Calibrage de la zone",
+    "Bascule dans le jeu, <b>journal d'acquisition visible</b>. Butin cherche " +
+      "ta fenêtre de chat tout seul",
+  );
+  let corps;
   try {
     const reponse = await fetch("/api/calibrer", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: "{}",
     });
-    const corps = await reponse.json();
+    corps = await reponse.json();
     if (!reponse.ok) {
-      ligne.classList.add("avertissement");
-      ligne.textContent = corps.erreur || "calibrage impossible";
+      etape(
+        "Calibrage impossible",
+        (corps.erreur || "Butin n'a pas trouvé ta fenêtre de chat.") +
+          "<br><br>Ouvre le chat sur le canal <b>Système</b>, laisse-le visible, " +
+          "puis recommence.",
+        [
+          {libelle: "Réessayer", action: parcoursCalibrer, principal: true},
+          {libelle: "Abandonner", action: fermerLeParcours},
+        ],
+        true,
+      );
       return;
     }
-    // ⛔ Un calibrage douteux est ACCEPTE mais annonce. Le 07/08/2026, un
-    // recalibrage en cours de session a remplace une zone de 22 rangees a
-    // force 0,53 par une de 5 rangees a force 0,16 : plus rien n'etait lu
-    // pendant une minute de farm, et l'ecran disait « Zone calibree » comme si
-    // tout allait bien. Un compteur qui ne compte rien ressemble a un farm
-    // pauvre — c'est le mode de defaillance que ce projet refuse partout.
-    const doutes = corps.doutes || [];
-    ligne.classList.toggle("avertissement", doutes.length > 0);
-    ligne.textContent = doutes.length
-      ? "⚠️ Calibrage douteux : " + corps.zone
-      : "Zone calibrée : " + corps.zone;
-    const bloc = $("calibrage-doutes");
-    if (doutes.length) {
-      bloc.innerHTML = "";
-      const titre = document.createElement("b");
-      titre.textContent = "Recommence le calibrage. Ce qui cloche :";
-      bloc.appendChild(titre);
-      const liste = document.createElement("ul");
-      for (const raison of doutes) {
-        const item = document.createElement("li");
-        item.textContent = raison;
-        liste.appendChild(item);
-      }
-      bloc.appendChild(liste);
-      bloc.hidden = false;
-    } else {
-      bloc.hidden = true;
-    }
-    // Montrer ce qui a été lu, et pas seulement « c'est calibré » : la
-    // détection ne sait pas d'où vient l'image, et un essai réel a calibré
-    // proprement sur une capture du chat ouverte dans une visionneuse.
-    extrait.hidden = false;
-    extrait.textContent =
-      (corps.gains
-        ? corps.gains + " lignes de gain reconnues. Vérifie que c'est bien ton chat :"
-        : "AUCUNE ligne de journal dans cette zone. Si ce n'est pas ton chat, recommence :") +
-      "\n" + (corps.extrait.length ? corps.extrait.join("\n") : "(aucun texte lu)");
-    // Le cadre orangé montre EXACTEMENT ce que le compteur va lire, posé sur
-    // la capture qui vient d'être prise : un nombre de pixels ne dit rien à
-    // l'œil, un cadre sur sa propre capture d'écran ne laisse aucun doute.
-    if (corps.apercu) {
-      apercu.src = corps.apercu;
-      apercu.hidden = false;
-    }
-    afficher(await (await fetch("/api/etat")).json());
-  } finally {
-    bouton.disabled = false;
-  }
-});
-
-// -- Ce qu'il faut voir, et mon écran --------------------------------------
-//
-// Deux boutons demandés par Maxime le 08/08/2026, et ils vont par paire : le
-// premier montre ce à quoi un bon écran ressemble, le second montre le sien.
-// Séparés, chacun laisse la question en suspens ; côte à côte, la comparaison
-// se fait à l'œil en une seconde.
-//
-// ⚠️ Le schéma est du HTML STATIQUE qu'on dévoile, pas du balisage construit
-// ici. Trois dessins écrits en JavaScript feraient trois chaînes de plusieurs
-// lignes, c'est-à-dire exactement la forme qui a tué tout le bloc de script
-// en #34.
-//
-// ⛔ Et une balise de script écrite en toutes lettres, même dans ce
-// commentaire, faisait échouer `test_page_script.py` : il découpe le fichier
-// sur la balise littérale et en comptait deux. Le test a raison — c'est aussi
-// comme ça qu'une balise fermante écrite dans une chaîne referme vraiment le
-// bloc pour le navigateur.
-$("bouton-schema").addEventListener("click", () => {
-  const bouton = $("bouton-schema");
-  const bloc = $("schema-zone");
-  const ouvert = bloc.hidden;
-  bloc.hidden = !ouvert;
-  bouton.setAttribute("aria-expanded", String(ouvert));
-  bouton.textContent = ouvert ? "Masquer le schéma" : "Ce qu'il faut voir";
-});
-
-$("bouton-mon-ecran").addEventListener("click", async () => {
-  const bouton = $("bouton-mon-ecran");
-  const etat = $("mon-ecran-etat");
-  const image = $("mon-ecran-apercu");
-  bouton.disabled = true;
-  image.hidden = true;
-  etat.classList.remove("avertissement");
-
-  // Même décompte que le calibrage et la capture d'inventaire, et pour la même
-  // raison : cliquer met Butin DEVANT le jeu. Sans ces secondes, l'aperçu
-  // montrerait cette fenêtre-ci posée sur la zone, ce qui est exactement
-  // l'erreur qu'il sert à détecter.
-  for (let reste = 5; reste > 0; reste--) {
-    etat.textContent = "Bascule dans le jeu — photo de ton écran dans " + reste + " s";
-    await new Promise((suite) => setTimeout(suite, 1000));
-  }
-  etat.textContent = "Photo…";
-
-  try {
-    const reponse = await fetch("/api/apercu", {method: "POST"});
-    const corps = await reponse.json();
-    if (!corps.apercu) {
-      etat.classList.add("avertissement");
-      etat.textContent = corps.erreur || "Aperçu impossible.";
-      return;
-    }
-    image.src = corps.apercu;
-    image.hidden = false;
-    etat.textContent =
-      "Ton écran à l'instant, cadre orangé sur la zone que Butin lit. " +
-      "Les lignes du journal doivent être dedans, et rien ne doit passer devant.";
   } catch (erreur) {
-    etat.classList.add("avertissement");
-    etat.textContent = "Le serveur local n'a pas répondu.";
-  } finally {
-    bouton.disabled = false;
+    etape(
+      "Calibrage impossible",
+      "Le serveur local n'a pas répondu.",
+      [
+        {libelle: "Réessayer", action: parcoursCalibrer, principal: true},
+        {libelle: "Abandonner", action: fermerLeParcours},
+      ],
+      true,
+    );
+    return;
   }
-});
+
+  afficherLeCalibrage(corps);
+  const doutes = corps.doutes || [];
+  if (doutes.length) {
+    // ⛔ On MONTRE le doute au lieu de l'avaler. Le calibrage automatique s'est
+    // déjà trompé : 448 px de large là où la même fenêtre en demandait 662, et
+    // l'écran affichait « Zone calibrée » comme si tout allait bien.
+    etape(
+      "Calibrage douteux",
+      "Butin a trouvé une zone, mais elle ne lui inspire pas confiance :<br>• " +
+        doutes.join("<br>• ") +
+        "<br><br>Regarde le cadre orangé plus bas : est-ce bien ton journal ?",
+      [
+        {libelle: "Recommencer le calibrage", action: parcoursCalibrer, principal: true},
+        {libelle: "Continuer quand même", action: parcoursDemarrer},
+      ],
+      true,
+    );
+    return;
+  }
+  await parcoursDemarrer();
+}
+
+async function parcoursDemarrer() {
+  etape("2 / 4 — Démarrage", "Ouverture de la session…", []);
+  const reponse = await fetch("/api/session/demarrer", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: "{}",
+  });
+  const corps = await reponse.json();
+  if (!reponse.ok) {
+    etape(
+      "Démarrage refusé",
+      corps.erreur || "impossible de démarrer la capture",
+      [
+        {libelle: "Réessayer", action: parcoursCalibrer, principal: true},
+        {libelle: "Abandonner", action: fermerLeParcours},
+      ],
+      true,
+    );
+    return;
+  }
+  afficher(corps);
+  parcoursInventaire("avant");
+}
+
+// ⭐ La photo de l'inventaire est la SEULE vérité de ce logiciel qui ne passe
+// par aucune lecture d'écran. Sans les deux bouts, on ne peut que comparer le
+// compteur à lui-même.
+function parcoursInventaire(moment) {
+  const depart = moment === "avant";
+  etape(
+    depart ? "3 / 4 — Inventaire de départ" : "Inventaire d'arrivée",
+    "Bascule dans le jeu et <b>ouvre ton inventaire</b>.<br>" +
+      (depart
+        ? "C'est la photo de ce que tu as <b>avant</b> de farmer."
+        : "C'est la photo de ce que tu as <b>après</b>. La différence entre les " +
+          "deux dira si le compte est juste.") +
+      (depart
+        ? "<br><br>⚠️ La session tourne déjà : les secondes qui passent ici " +
+          "comptent pour le compteur et pas pour l'inventaire."
+        : ""),
+    [
+      {
+        libelle: "C'est ouvert, prends la photo",
+        action: () => photographier(moment),
+        principal: true,
+      },
+    ],
+  );
+}
+
+async function photographier(moment) {
+  const depart = moment === "avant";
+  await compteARebours(
+    depart ? "3 / 4 — Inventaire de départ" : "Inventaire d'arrivée",
+    "Va sur le jeu, inventaire ouvert",
+  );
+  try {
+    const corps = await (
+      await fetch("/api/inventaire", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({moment: moment}),
+      })
+    ).json();
+    $("inventaire-etat").textContent = corps.message || "";
+  } catch (erreur) {
+    $("inventaire-etat").textContent = "Le serveur local n'a pas répondu.";
+  }
+  if (depart) {
+    await parcoursVerifier();
+  } else {
+    await parcoursArreter();
+  }
+}
+
+// ⭐ Le chat et l'inventaire se vérifient dans le MÊME passage : c'est ce que
+// Maxime a demandé, et c'est aussi le seul moment où il a les deux sous les yeux.
+async function parcoursVerifier() {
+  etape("4 / 4 — Vérification", "Photo de ton écran…", []);
+  let corps = {};
+  try {
+    corps = await (await fetch("/api/apercu", {method: "POST"})).json();
+  } catch (erreur) {
+    corps = {};
+  }
+  if (corps.apercu) {
+    $("mon-ecran-apercu").src = corps.apercu;
+    $("mon-ecran-apercu").hidden = false;
+  }
+  etape(
+    "4 / 4 — Vérification",
+    "Regarde l'image plus bas : le <b>cadre orangé</b> doit contenir les lignes " +
+      "de ton journal, et <b>rien ne doit passer devant</b>.<br><br>" +
+      "⚠️ Une fenêtre du jeu qui ne mange que le <b>haut</b> de la zone est le " +
+      "pire des cas : Butin continue de compter, sur un tiers de ce qui passe.",
+    [
+      {
+        libelle: "C'est bon, je farme",
+        principal: true,
+        action: () => {
+          fermerLeParcours();
+          $("mon-ecran-apercu").hidden = true;
+        },
+      },
+      {
+        libelle: "Quelque chose passe devant",
+        action: () => {
+          if ($("schema-zone").hidden) $("bouton-schema").click();
+          etape(
+            "Dégage la zone",
+            "Ferme la fenêtre du jeu qui recouvre le chat — <b>menu Échap</b>, " +
+              "<b>Mes informations</b>, <b>boîte aux lettres</b> — puis reprends " +
+              "la photo. Les trois schémas plus bas montrent ce qu'il faut voir.",
+            [
+              {libelle: "Revérifier", action: parcoursVerifier, principal: true},
+              {libelle: "Tant pis, je farme", action: fermerLeParcours},
+            ],
+            true,
+          );
+        },
+      },
+    ],
+  );
+}
+
+async function parcoursArreter() {
+  etape("Arrêt", "Fermeture de la session…", []);
+  const corps = await (
+    await fetch("/api/session/arreter", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: "{}",
+    })
+  ).json();
+  const session = corps.session ? corps.session.id : null;
+  afficher(corps);
+  // ⛔ La question qui ferme la boucle. Sans elle, un compte faux repart avec le
+  // joueur et personne ne le saura jamais.
+  etape(
+    "Le compte est bon ?",
+    "Compare ce que Butin a compté avec ce que ton inventaire a réellement " +
+      "gagné.<br><br>Si c'est faux, tout part d'un coup : le rapport, et " +
+      "l'archive prête à déposer.",
+    [
+      {
+        libelle: "Oui, c'est juste",
+        principal: true,
+        action: async () => {
+          fermerLeParcours();
+          if (session) {
+            basculer("historique");
+            await ouvrirSessionParId(session);
+          }
+        },
+      },
+      {
+        libelle: "Non, le compte est faux",
+        action: () => parcoursSignaler(session),
+      },
+    ],
+  );
+}
+
+// ⛔ « Prête à envoyer » n'est pas « envoyée ». L'archive reste sur le disque et
+// le dossier s'ouvre dessus : elle contient les messages des AUTRES joueurs et
+// des captures d'écran entier. Seul le rapport texte part tout seul.
+async function parcoursSignaler(session) {
+  etape("Signalement", "Envoi du rapport et préparation de l'archive…", []);
+  let message = "";
+  try {
+    const rapport = await poster("/api/rapport", {
+      message: "Le compte de la session est FAUX (signalé depuis le parcours guidé).",
+    });
+    message = rapport.message || "";
+  } catch (erreur) {
+    message = "Le rapport n'est pas parti.";
+  }
+  let archive = "";
+  try {
+    const preparee = await (await fetch("/api/archive", {method: "POST"})).json();
+    archive = preparee.message || "";
+    if (preparee.contenu) {
+      $("archive-contenu").textContent = preparee.contenu;
+      $("archive-contenu").hidden = false;
+    }
+  } catch (erreur) {
+    archive = "L'archive n'a pas pu être préparée.";
+  }
+  etape(
+    "Signalé",
+    message +
+      "<br><br>" +
+      archive +
+      "<br><br>⚠️ L'archive n'est envoyée à personne : le dossier s'est ouvert, " +
+      "c'est toi qui déposes le fichier. Elle contient la zone de chat, donc les " +
+      "messages des autres joueurs.",
+    [
+      {
+        libelle: "Fermer",
+        principal: true,
+        action: () => {
+          fermerLeParcours();
+          basculer("rapport");
+        },
+      },
+    ],
+  );
+}
+
+// L'affichage du résultat de calibrage, extrait de l'ancien bouton pour que le
+// parcours le réutilise tel quel plutôt que de le réécrire.
+function afficherLeCalibrage(corps) {
+  const ligne = $("etat-calibrage");
+  const doutes = corps.doutes || [];
+  ligne.classList.toggle("avertissement", doutes.length > 0);
+  ligne.textContent =
+    (doutes.length ? "⚠️ Calibrage douteux : " : "Zone calibrée : ") + corps.zone;
+
+  const bloc = $("calibrage-doutes");
+  bloc.innerHTML = "";
+  if (doutes.length) {
+    const titre = document.createElement("b");
+    titre.textContent = "Ce qui cloche :";
+    bloc.appendChild(titre);
+    const liste = document.createElement("ul");
+    for (const raison of doutes) {
+      const item = document.createElement("li");
+      item.textContent = raison;
+      liste.appendChild(item);
+    }
+    bloc.appendChild(liste);
+  }
+  bloc.hidden = doutes.length === 0;
+
+  const extrait = $("extrait-calibrage");
+  extrait.hidden = false;
+  extrait.textContent =
+    (corps.gains
+      ? corps.gains + " lignes de gain reconnues. Vérifie que c'est bien ton chat :"
+      : "AUCUNE ligne de journal dans cette zone. Si ce n'est pas ton chat, recommence :") +
+    "\n" +
+    (corps.extrait.length ? corps.extrait.join("\n") : "(aucun texte lu)");
+
+  const apercu = $("apercu-calibrage");
+  if (corps.apercu) {
+    apercu.src = corps.apercu;
+    apercu.hidden = false;
+  }
+}
 
 brancherBascule("langue", "langue");
 brancherBascule("region", "region");
