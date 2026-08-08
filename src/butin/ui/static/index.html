@@ -108,12 +108,31 @@
              border-radius: var(--rayon); padding: var(--espace-5);
              margin-bottom: var(--espace-5); }
   .panneau:last-child { margin-bottom: 0; }
-  .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: var(--espace-4); margin-bottom: var(--espace-5); }
-  .chiffre { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .etiquette { color: var(--doux); font-size: 12px; text-transform: uppercase;
                letter-spacing: .8px; margin-bottom: var(--espace-2); }
-  .or { color: var(--or); }
+
+  /* Les schémas de « Ce qu'il faut voir ». Ils passent à la ligne plutôt que
+     de rétrécir indéfiniment : un schéma trop petit ne montre plus rien, et
+     cette fenêtre est souvent étroite. */
+  .schemas { display: flex; gap: var(--espace-4); flex-wrap: wrap;
+             margin: var(--espace-4) 0 0; }
+  .schema { flex: 1 1 240px; margin: 0; }
+  .schema svg { width: 100%; height: auto; display: block;
+                border-radius: var(--rayon-petit); }
+  .schema figcaption { margin-top: var(--espace-2); color: var(--doux);
+                       font-size: 13px; }
+  .schema figcaption b { color: var(--texte); }
+  /* Le verdict est une pilule sur sa propre ligne : collé au texte, il se
+     lisait comme le début de la phrase. */
+  .schema figcaption .verdict { display: flex; width: fit-content;
+                                margin-bottom: var(--espace-1); }
+  /* Le décor du schéma, nommé plutôt que peint au cas par cas : les trois
+     dessins doivent rester identiques sauf sur ce qui les distingue. */
+  .schema .ecran { fill: #10141c; stroke: var(--bord); stroke-width: 1; }
+  .schema .ligne-chat rect { fill: #3c4657; }
+  .schema .cadre { fill: none; stroke: var(--or); stroke-width: 2; }
+  .schema .obstacle > rect { fill: #1c2432; stroke: var(--rouge); stroke-width: 2; }
+  .schema .obstacle .case { fill: #2a3446; stroke: none; }
 
   /* Le contrôle du joueur contre son inventaire. Trois états, et le troisième
      n'est PAS un défaut : « pas encore contrôlé » se distingue de « c'était
@@ -255,10 +274,16 @@
   #fil .drop.neuf { animation: arrivee 1.2s ease-out; }
   #fil .vide { color: var(--doux); padding: 10px 8px; }
 
-  /* Les onglets. Deux écrans dans une fenêtre : ce qu'on farme maintenant,
-     et ce qu'on a farmé avant. Les mélanger sur un seul écran obligerait à
-     chercher le chiffre du jour au milieu de l'historique. */
-  .onglets { display: flex; gap: 6px; margin-bottom: 18px; }
+  /* Les onglets. Quatre écrans dans une fenêtre, séparés par la FRÉQUENCE à
+     laquelle on y revient : ce qu'on refait à chaque lancement (Session), ce
+     qu'on regarde après coup (Historique), ce qu'on règle une fois (Réglages),
+     et ce qu'on n'ouvre qu'en cas de problème (Rapport). Tout sur un seul
+     écran obligeait à passer devant les trois autres pour atteindre le bouton
+     qu'on cherche.
+
+     `flex-wrap` : quatre onglets débordent d'une fenêtre étroite là où deux
+     tenaient toujours. Ils passent à la ligne au lieu de sortir de l'écran. */
+  .onglets { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
   .onglets button {
     background: transparent; color: var(--doux); border: 1px solid #2a2e39;
     border-radius: 8px 8px 0 0; padding: 9px 18px; cursor: pointer; font-size: 15px;
@@ -323,115 +348,156 @@
 </head>
 <body>
 
+<!-- ⭐ L'en-tête ne porte plus QUE l'identité du logiciel et sa mise à jour.
+     Les quatre chiffres (silver/heure, total, durée, objets valorisés) en ont
+     été retirés le 08/08/2026 à la demande de Maxime : ils sont déjà dans le
+     panneau posé sur le jeu, qui est le seul écran regardé en farmant, et dans
+     l'Historique, qui est l'écran regardé après. Les tenir à trois endroits
+     n'ajoutait pas une information, ça allongeait la page.
+
+     Les deux sliders et le bloc Discord sont partis dans leurs onglets : un
+     réglage qu'on fait une fois n'a rien à faire au-dessus de tout le reste,
+     à chaque lancement. -->
 <div class="haut">
   <h1><img class="marque" src="/butin.png" alt="">Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
      type="button"></button>
      <span id="maj-etat" class="etat-en-ligne"></span></h1>
-  <div class="sliders">
-    <div class="slider">
-      <span>Langue</span>
-      <div class="bascule" id="langue">
-        <button data-valeur="fr" aria-pressed="true">FR</button>
-        <button data-valeur="us" aria-pressed="false">EN</button>
-      </div>
-    </div>
-    <div class="slider">
-      <span>Région</span>
-      <div class="bascule" id="region">
-        <button data-valeur="eu" aria-pressed="true">EU</button>
-        <button data-valeur="na" aria-pressed="false">NA</button>
-      </div>
-    </div>
-  </div>
-  <!-- ⚠️ Les trois éléments Discord sont dans UN conteneur, pas côte à côte
-       dans l'en-tête. Celui-ci est en `space-between` : posés directement
-       dedans, le lien vers le salon et le bouton de connexion se retrouvaient
-       séparés de 84 px, comme s'ils n'avaient rien à voir. Mesuré dans un
-       navigateur le 07/08/2026, invisible pour la suite de tests. -->
-  <div class="groupe-discord">
-    <a class="lien-discord" href="https://discord.gg/qCuvN2Zna7" target="_blank" rel="noopener">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
-      Discord
-    </a>
-    <!-- Masqué tant que l'état n'est pas connu, pour ne pas proposer « se
-         connecter » à quelqu'un qui l'est déjà. -->
-    <button class="bouton-discord-compte" id="discord-connexion" hidden>Se connecter à Discord</button>
-    <span class="compte-discord" id="discord-compte" hidden></span>
-  </div>
-</div>
-<!-- ⛔ Dit AVANT d'ouvrir le navigateur, pas après. Discord affichera « Rubin »
-     parce que les deux logiciels partagent le même serveur, et c'est lui qui y
-     est enregistré. Un joueur à qui l'on demande d'autoriser une application
-     qu'il n'a jamais installée a toutes les raisons de croire à du
-     hameçonnage — et il aurait raison de refuser.
-
-     Masqué une fois le compte rattaché : la phrase ne sert qu'au moment de
-     décider. -->
-<p class="note note-discord" id="discord-avertissement" hidden>
-  ⚠️ L'écran d'autorisation de Discord affichera <b>Rubin</b>, pas Butin. C'est
-  normal : les deux logiciels partagent le même serveur, et c'est lui qui est
-  enregistré auprès de Discord. Butin ne verra jamais ton mot de passe.
-</p>
-
-<div class="grille">
-  <div class="panneau">
-    <div class="etiquette">Silver par heure</div>
-    <div class="chiffre or" id="par-heure">0</div>
-  </div>
-  <div class="panneau">
-    <div class="etiquette">Total net</div>
-    <div class="chiffre" id="total">0</div>
-  </div>
-  <div class="panneau">
-    <div class="etiquette">Durée</div>
-    <div class="chiffre" id="duree">00:00:00</div>
-  </div>
-  <div class="panneau">
-    <div class="etiquette">Objets valorisés</div>
-    <div class="chiffre" id="couverture">100 %</div>
-  </div>
 </div>
 
 <div class="onglets" role="tablist">
-  <button id="onglet-session" role="tab" aria-selected="true">Réglages</button>
-  <button id="onglet-historique" role="tab" aria-selected="false">Historique</button>
+  <button id="onglet-session" role="tab" aria-selected="true"
+          aria-controls="page-session">Session</button>
+  <button id="onglet-historique" role="tab" aria-selected="false"
+          aria-controls="page-historique">Historique</button>
+  <button id="onglet-reglages" role="tab" aria-selected="false"
+          aria-controls="page-reglages">Réglages</button>
+  <button id="onglet-rapport" role="tab" aria-selected="false"
+          aria-controls="page-rapport">Rapport</button>
 </div>
 
-<div class="page" id="page-session">
+<!-- ============================================================== Session ==
+     Ce qu'on refait à CHAQUE lancement, et rien d'autre : vérifier la zone,
+     démarrer, regarder tomber. Tout ce qui se règle une fois pour toutes est
+     dans les deux autres onglets. -->
+<div class="page" id="page-session" role="tabpanel" aria-labelledby="onglet-session">
 
 <div class="panneau">
-  <div class="etiquette">Dossier des sessions</div>
   <div class="rangee">
-    <input id="dossier" class="champ champ-large" type="text" spellcheck="false">
-    <button class="action" id="bouton-dossier">Changer</button>
+    <button class="action demarrer" id="bouton-session">Commencer le grind</button>
+    <button class="action" id="bouton-pause" hidden>Pause</button>
+    <button class="action" id="bouton-calibrer">Calibrer la zone</button>
+    <span id="etat-session" class="etat-en-ligne">Aucune session en cours</span>
   </div>
-  <div id="etat-dossier" class="note"></div>
-</div>
-
-<div class="panneau">
-  <div class="etiquette">Taxe de l'hôtel des ventes</div>
-  <!--
-    Des cases à cocher et non un pourcentage : le joueur sait s'il a un
-    abonnement, il ne sait pas forcément que ça fait 84,5 %. Lui demander le
-    taux reviendrait à lui demander de faire le calcul, donc de se tromper.
-  -->
-  <div class="rangee rangee-aeree">
-    <label class="case"><input id="abonnement" type="checkbox"> Abonnement</label>
-    <label class="case"><input id="anneau-marchand" type="checkbox"> Anneau de marchand</label>
-    <label class="case">Renommée familiale
-      <input id="renommee" class="champ champ-etroit" type="number"
-             min="0" step="1"></label>
-  </div>
-  <div id="etat-taxe" class="note"></div>
-</div>
-
-<div class="panneau">
-  <button class="action demarrer" id="bouton-session">Commencer le grind</button>
-  <button class="action" id="bouton-pause" hidden>Pause</button>
-  <button class="action" id="bouton-calibrer">Calibrer la zone</button>
-  <span id="etat-session" class="etat-en-ligne">Aucune session en cours</span>
   <div id="etat-capture" class="note note-large"></div>
   <div id="etat-calibrage" class="note note-large"></div>
+
+  <!-- ⭐ Les deux boutons demandés par Maxime le 08/08/2026, posés juste sous
+       le calibrage parce que c'est là qu'on se pose la question : « est-ce que
+       la zone est la bonne ? ».
+
+       « Ce qu'il faut voir » est un SCHÉMA DESSINÉ, pas une capture d'écran.
+       Décision explicite : toutes les captures disponibles contiennent le chat
+       de guilde, donc les pseudonymes d'autres joueurs, et ce dépôt est
+       public. Un schéma dit la même chose sans exposer personne.
+
+       « Mon écran » va chercher l'écran réel avec le cadre de la zone posé
+       dessus. Les deux se lisent côte à côte : le schéma dit ce qu'il faut,
+       l'aperçu dit ce qu'on a. -->
+  <div class="rangee note-apres-action">
+    <button class="action-mince" id="bouton-schema" aria-expanded="false"
+            aria-controls="schema-zone">Ce qu'il faut voir</button>
+    <button class="action-mince" id="bouton-mon-ecran">Mon écran</button>
+  </div>
+  <!-- ⛔ Le troisième schéma n'est PAS décoratif. Le 07/08/2026, la session
+       0014 a laissé le menu Échap par-dessus le chat pendant 247 secondes
+       d'affilée : 560 objets manquants sur 4 080, et le compteur affichait son
+       total comme si de rien n'était. C'est la panne la plus coûteuse
+       rencontrée sur ce logiciel, et elle est entièrement évitable — à
+       condition que quelqu'un l'ait dit une fois. -->
+  <div id="schema-zone" hidden>
+    <div class="schemas">
+      <figure class="schema schema-bon">
+        <svg viewBox="0 0 200 120" role="img"
+             aria-label="Écran de jeu, journal d'acquisition en bas à gauche, cadre orangé autour, rien devant">
+          <rect class="ecran" x="1" y="1" width="198" height="118" rx="5"/>
+          <g class="ligne-chat">
+            <rect x="16" y="62" width="74" height="4" rx="2"/>
+            <rect x="16" y="71" width="62" height="4" rx="2"/>
+            <rect x="16" y="80" width="70" height="4" rx="2"/>
+            <rect x="16" y="89" width="55" height="4" rx="2"/>
+            <rect x="16" y="98" width="66" height="4" rx="2"/>
+          </g>
+          <rect class="cadre" x="10" y="55" width="90" height="55" rx="3"/>
+        </svg>
+        <figcaption><span class="verdict verdict-exact">Ce qu'il faut voir</span>
+          Le journal d'acquisition entier dans le cadre, et <b>rien</b> par-dessus.
+        </figcaption>
+      </figure>
+
+      <figure class="schema schema-mauvais">
+        <svg viewBox="0 0 200 120" role="img"
+             aria-label="Le même écran, l'inventaire ouvert recouvre la moitié du cadre">
+          <rect class="ecran" x="1" y="1" width="198" height="118" rx="5"/>
+          <g class="ligne-chat">
+            <rect x="16" y="62" width="74" height="4" rx="2"/>
+            <rect x="16" y="71" width="62" height="4" rx="2"/>
+            <rect x="16" y="80" width="70" height="4" rx="2"/>
+            <rect x="16" y="89" width="55" height="4" rx="2"/>
+            <rect x="16" y="98" width="66" height="4" rx="2"/>
+          </g>
+          <rect class="cadre" x="10" y="55" width="90" height="55" rx="3"/>
+          <g class="obstacle">
+            <rect x="52" y="40" width="78" height="72" rx="4"/>
+            <rect class="case" x="60" y="56" width="12" height="12" rx="2"/>
+            <rect class="case" x="77" y="56" width="12" height="12" rx="2"/>
+            <rect class="case" x="94" y="56" width="12" height="12" rx="2"/>
+            <rect class="case" x="111" y="56" width="12" height="12" rx="2"/>
+            <rect class="case" x="60" y="73" width="12" height="12" rx="2"/>
+            <rect class="case" x="77" y="73" width="12" height="12" rx="2"/>
+            <rect class="case" x="94" y="73" width="12" height="12" rx="2"/>
+            <rect class="case" x="111" y="73" width="12" height="12" rx="2"/>
+          </g>
+        </svg>
+        <figcaption><span class="verdict verdict-ecart">À ne pas faire</span>
+          L'<b>inventaire</b> posé sur la zone. Butin ne lit plus rien, et
+          continue d'afficher le total d'avant.
+        </figcaption>
+      </figure>
+
+      <figure class="schema schema-mauvais">
+        <svg viewBox="0 0 200 120" role="img"
+             aria-label="Le même écran, le menu Échap recouvre le cadre">
+          <rect class="ecran" x="1" y="1" width="198" height="118" rx="5"/>
+          <g class="ligne-chat">
+            <rect x="16" y="62" width="74" height="4" rx="2"/>
+            <rect x="16" y="71" width="62" height="4" rx="2"/>
+            <rect x="16" y="80" width="70" height="4" rx="2"/>
+            <rect x="16" y="89" width="55" height="4" rx="2"/>
+            <rect x="16" y="98" width="66" height="4" rx="2"/>
+          </g>
+          <rect class="cadre" x="10" y="55" width="90" height="55" rx="3"/>
+          <g class="obstacle">
+            <rect x="34" y="28" width="96" height="76" rx="4"/>
+            <rect class="case" x="46" y="44" width="72" height="9" rx="2"/>
+            <rect class="case" x="46" y="60" width="72" height="9" rx="2"/>
+            <rect class="case" x="46" y="76" width="72" height="9" rx="2"/>
+          </g>
+        </svg>
+        <figcaption><span class="verdict verdict-ecart">À ne pas faire</span>
+          Le <b>menu Échap</b>, la carte, une fenêtre du jeu. Quatre minutes
+          ainsi ont coûté <b>560 objets sur 4 080</b> à une vraie session.
+        </figcaption>
+      </figure>
+    </div>
+    <p class="note note-large">
+      Le chat peut rester estompé, ça se lit quand même. Ce qui casse le
+      comptage, c'est qu'<b>une fenêtre passe devant</b> — et rien à l'écran ne
+      te le dira à ta place, c'est pour ça que c'est écrit ici.
+    </p>
+  </div>
+  <div id="mon-ecran-etat" class="note"></div>
+  <img id="mon-ecran-apercu" class="apercu" alt="Ton écran, cadre orangé sur la zone lue" hidden>
+
   <pre id="extrait-calibrage" class="extrait" hidden></pre>
   <!-- Ce qui cloche dans le calibrage qu'on vient d'accepter. Masqué quand il
        n'y a rien à dire : un avertissement qui s'affiche aussi sur les bons
@@ -439,6 +505,134 @@
   <div id="calibrage-doutes" class="doutes" hidden></div>
   <img id="apercu-calibrage" class="apercu" alt="Zone calibrée, cadre en surbrillance" hidden>
 </div>
+
+<div class="panneau">
+  <div class="etiquette">Derniers drops</div>
+  <div id="fil"><div class="vide">Rien pour l'instant.</div></div>
+</div>
+
+<div class="panneau">
+  <table>
+    <thead>
+      <tr>
+        <th>Objet</th>
+        <th class="num">Quantité</th>
+        <th class="num">Valeur unitaire</th>
+        <th class="num">Total</th>
+        <th>Provenance</th>
+      </tr>
+    </thead>
+    <tbody id="butin"></tbody>
+  </table>
+  <div class="vide" id="vide">Aucun butin enregistré pour l'instant.</div>
+</div>
+
+<div id="avertissements"></div>
+
+</div>
+
+<!-- =========================================================== Historique == -->
+<div class="page" id="page-historique" role="tabpanel"
+     aria-labelledby="onglet-historique" hidden>
+  <div class="panneau">
+    <table>
+      <thead>
+        <tr>
+          <th>Session</th>
+          <th>Spot</th>
+          <th class="num">Durée</th>
+          <th class="num">Objets</th>
+          <th class="num">Silver/heure</th>
+          <th class="num">Total net</th>
+          <th>Contrôle</th>
+        </tr>
+      </thead>
+      <tbody id="sessions">
+        <tr><td colspan="7">Aucune session enregistrée.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panneau" id="detail-session" hidden>
+    <div class="etiquette" id="detail-titre"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Objet</th>
+          <th class="num">Quantité</th>
+          <th class="num">Valeur unitaire</th>
+          <th class="num">Total</th>
+          <th>Provenance</th>
+        </tr>
+      </thead>
+      <tbody id="detail-butin"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============================================================= Réglages ==
+     Ce qu'on règle UNE FOIS : où vont les sessions, ce qu'on touche vraiment
+     sur une vente, dans quelle langue et sur quelle région on lit les prix.
+     Rien ici ne se refait à chaque lancement, donc rien ici n'a de raison
+     d'occuper l'écran pendant qu'on farme. -->
+<div class="page" id="page-reglages" role="tabpanel"
+     aria-labelledby="onglet-reglages" hidden>
+
+  <div class="panneau">
+    <div class="etiquette">Dossier des sessions</div>
+    <div class="rangee">
+      <input id="dossier" class="champ champ-large" type="text" spellcheck="false">
+      <button class="action" id="bouton-dossier">Changer</button>
+    </div>
+    <div id="etat-dossier" class="note"></div>
+  </div>
+
+  <div class="panneau">
+    <div class="etiquette">Taxe de l'hôtel des ventes</div>
+    <!--
+      Des cases à cocher et non un pourcentage : le joueur sait s'il a un
+      abonnement, il ne sait pas forcément que ça fait 84,5 %. Lui demander le
+      taux reviendrait à lui demander de faire le calcul, donc de se tromper.
+    -->
+    <div class="rangee rangee-aeree">
+      <label class="case"><input id="abonnement" type="checkbox"> Abonnement</label>
+      <label class="case"><input id="anneau-marchand" type="checkbox"> Anneau de marchand</label>
+      <label class="case">Renommée familiale
+        <input id="renommee" class="champ champ-etroit" type="number"
+               min="0" step="1"></label>
+    </div>
+    <div id="etat-taxe" class="note"></div>
+  </div>
+
+  <div class="panneau">
+    <div class="etiquette">Langue et région</div>
+    <div class="sliders">
+      <div class="slider">
+        <span>Langue</span>
+        <div class="bascule" id="langue">
+          <button data-valeur="fr" aria-pressed="true">FR</button>
+          <button data-valeur="us" aria-pressed="false">EN</button>
+        </div>
+      </div>
+      <div class="slider">
+        <span>Région</span>
+        <div class="bascule" id="region">
+          <button data-valeur="eu" aria-pressed="true">EU</button>
+          <button data-valeur="na" aria-pressed="false">NA</button>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      La langue est celle des noms d'objets, la région celle des prix du marché.
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================== Rapport ==
+     Signaler, et de quoi le faire sérieusement : une phrase, une archive, une
+     photo de l'inventaire, et le compte Discord qui dit qui parle. -->
+<div class="page" id="page-rapport" role="tabpanel"
+     aria-labelledby="onglet-rapport" hidden>
 
 <div class="panneau">
   <div class="etiquette">Signaler un problème</div>
@@ -496,65 +690,37 @@
 </div>
 
 <div class="panneau">
-  <div class="etiquette">Derniers drops</div>
-  <div id="fil"><div class="vide">Rien pour l'instant.</div></div>
-</div>
-
-<div class="panneau">
-  <table>
-    <thead>
-      <tr>
-        <th>Objet</th>
-        <th class="num">Quantité</th>
-        <th class="num">Valeur unitaire</th>
-        <th class="num">Total</th>
-        <th>Provenance</th>
-      </tr>
-    </thead>
-    <tbody id="butin"></tbody>
-  </table>
-  <div class="vide" id="vide">Aucun butin enregistré pour l'instant.</div>
-</div>
-
-<div id="avertissements"></div>
-
-</div>
-
-<div class="page" id="page-historique" hidden>
-  <div class="panneau">
-    <table>
-      <thead>
-        <tr>
-          <th>Session</th>
-          <th>Spot</th>
-          <th class="num">Durée</th>
-          <th class="num">Objets</th>
-          <th class="num">Silver/heure</th>
-          <th class="num">Total net</th>
-          <th>Contrôle</th>
-        </tr>
-      </thead>
-      <tbody id="sessions">
-        <tr><td colspan="7">Aucune session enregistrée.</td></tr>
-      </tbody>
-    </table>
+  <div class="etiquette">Discord</div>
+  <!-- ⚠️ Les trois éléments Discord sont dans UN conteneur, pas côte à côte
+       dans un parent en `space-between` : posés directement dedans, le lien
+       vers le salon et le bouton de connexion se retrouvaient séparés de
+       84 px, comme s'ils n'avaient rien à voir. Mesuré dans un navigateur le
+       07/08/2026, invisible pour la suite de tests. -->
+  <div class="groupe-discord">
+    <a class="lien-discord" href="https://discord.gg/qCuvN2Zna7" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
+      Discord
+    </a>
+    <!-- Masqué tant que l'état n'est pas connu, pour ne pas proposer « se
+         connecter » à quelqu'un qui l'est déjà. -->
+    <button class="bouton-discord-compte" id="discord-connexion" hidden>Se connecter à Discord</button>
+    <span class="compte-discord" id="discord-compte" hidden></span>
   </div>
+  <!-- ⛔ Dit AVANT d'ouvrir le navigateur, pas après. Discord affichera
+       « Rubin » parce que les deux logiciels partagent le même serveur, et
+       c'est lui qui y est enregistré. Un joueur à qui l'on demande d'autoriser
+       une application qu'il n'a jamais installée a toutes les raisons de
+       croire à du hameçonnage — et il aurait raison de refuser.
 
-  <div class="panneau" id="detail-session" hidden>
-    <div class="etiquette" id="detail-titre"></div>
-    <table>
-      <thead>
-        <tr>
-          <th>Objet</th>
-          <th class="num">Quantité</th>
-          <th class="num">Valeur unitaire</th>
-          <th class="num">Total</th>
-          <th>Provenance</th>
-        </tr>
-      </thead>
-      <tbody id="detail-butin"></tbody>
-    </table>
-  </div>
+       Masqué une fois le compte rattaché : la phrase ne sert qu'au moment de
+       décider. -->
+  <p class="note note-large note-discord" id="discord-avertissement" hidden>
+    ⚠️ L'écran d'autorisation de Discord affichera <b>Rubin</b>, pas Butin. C'est
+    normal : les deux logiciels partagent le même serveur, et c'est lui qui est
+    enregistré auprès de Discord. Butin ne verra jamais ton mot de passe.
+  </p>
+</div>
+
 </div>
 
 <script>
@@ -563,12 +729,12 @@
 const $ = (id) => document.getElementById(id);
 const nombre = (v) => new Intl.NumberFormat("fr-FR").format(Math.round(v || 0));
 
-function duree(secondes) {
-  const s = Math.max(0, Math.floor(secondes || 0));
-  const h = String(Math.floor(s / 3600)).padStart(2, "0");
-  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  return `${h}:${m}:${String(s % 60).padStart(2, "0")}`;
-}
+// ⚠️ Il y avait ICI une seconde fonction `duree`, qui rendait `00:00:00`, et
+// elle n'a JAMAIS servi : une déclaration de fonction plus bas dans le même
+// bloc écrase silencieusement celle du dessus, et le fichier en portait une
+// autre (`1 h 05`) plus loin. L'en-tête affichait donc « 5 min » sous un
+// gabarit qui annonçait `00:00:00`, sans qu'aucun test ne puisse le voir.
+// Retirée avec les quatre chiffres qu'elle prétendait servir.
 
 // Clés des drops déjà affichés, pour n'animer que ce qui vient d'arriver.
 // Sans ça, chaque rafraîchissement rejouerait l'animation sur toute la liste,
@@ -782,12 +948,14 @@ function afficher(etat) {
 
   afficherLaTaxe(etat.reglages);
 
+  // ⛔ Les quatre chiffres de l'en-tête ont été retirés le 08/08/2026, et
+  // c'est ICI qu'il fallait couper aussi : quatre lignes les écrivaient encore
+  // sur des éléments disparus, ce qui lève un TypeError dans `afficher`,
+  // c'est-à-dire arrête le rafraîchissement d'une seconde — le même mode de
+  // défaillance que #34, une page qui s'affiche normalement et ne réagit plus
+  // à rien. `test_page_structure.py` garde la règle. `stats` reste lu plus
+  // bas, pour les avertissements.
   const stats = etat.stats;
-  $("par-heure").textContent = nombre(stats ? stats.par_heure : 0);
-  $("total").textContent = nombre(stats ? stats.total : 0);
-  $("duree").textContent = duree(etat.session ? etat.session.duree_s : 0);
-  $("couverture").textContent =
-    Math.round((stats ? stats.couverture : 1) * 100) + " %";
 
   const enCours = Boolean(etat.session && etat.session.en_cours);
   const enPause = Boolean(etat.session && etat.session.en_pause);
@@ -1051,6 +1219,71 @@ $("bouton-calibrer").addEventListener("click", async () => {
   }
 });
 
+// -- Ce qu'il faut voir, et mon écran --------------------------------------
+//
+// Deux boutons demandés par Maxime le 08/08/2026, et ils vont par paire : le
+// premier montre ce à quoi un bon écran ressemble, le second montre le sien.
+// Séparés, chacun laisse la question en suspens ; côte à côte, la comparaison
+// se fait à l'œil en une seconde.
+//
+// ⚠️ Le schéma est du HTML STATIQUE qu'on dévoile, pas du balisage construit
+// ici. Trois dessins écrits en JavaScript feraient trois chaînes de plusieurs
+// lignes, c'est-à-dire exactement la forme qui a tué tout le bloc de script
+// en #34.
+//
+// ⛔ Et une balise de script écrite en toutes lettres, même dans ce
+// commentaire, faisait échouer `test_page_script.py` : il découpe le fichier
+// sur la balise littérale et en comptait deux. Le test a raison — c'est aussi
+// comme ça qu'une balise fermante écrite dans une chaîne referme vraiment le
+// bloc pour le navigateur.
+$("bouton-schema").addEventListener("click", () => {
+  const bouton = $("bouton-schema");
+  const bloc = $("schema-zone");
+  const ouvert = bloc.hidden;
+  bloc.hidden = !ouvert;
+  bouton.setAttribute("aria-expanded", String(ouvert));
+  bouton.textContent = ouvert ? "Masquer le schéma" : "Ce qu'il faut voir";
+});
+
+$("bouton-mon-ecran").addEventListener("click", async () => {
+  const bouton = $("bouton-mon-ecran");
+  const etat = $("mon-ecran-etat");
+  const image = $("mon-ecran-apercu");
+  bouton.disabled = true;
+  image.hidden = true;
+  etat.classList.remove("avertissement");
+
+  // Même décompte que le calibrage et la capture d'inventaire, et pour la même
+  // raison : cliquer met Butin DEVANT le jeu. Sans ces secondes, l'aperçu
+  // montrerait cette fenêtre-ci posée sur la zone, ce qui est exactement
+  // l'erreur qu'il sert à détecter.
+  for (let reste = 5; reste > 0; reste--) {
+    etat.textContent = "Bascule dans le jeu — photo de ton écran dans " + reste + " s";
+    await new Promise((suite) => setTimeout(suite, 1000));
+  }
+  etat.textContent = "Photo…";
+
+  try {
+    const reponse = await fetch("/api/apercu", {method: "POST"});
+    const corps = await reponse.json();
+    if (!corps.apercu) {
+      etat.classList.add("avertissement");
+      etat.textContent = corps.erreur || "Aperçu impossible.";
+      return;
+    }
+    image.src = corps.apercu;
+    image.hidden = false;
+    etat.textContent =
+      "Ton écran à l'instant, cadre orangé sur la zone que Butin lit. " +
+      "Les lignes du journal doivent être dedans, et rien ne doit passer devant.";
+  } catch (erreur) {
+    etat.classList.add("avertissement");
+    etat.textContent = "Le serveur local n'a pas répondu.";
+  } finally {
+    bouton.disabled = false;
+  }
+});
+
 brancherBascule("langue", "langue");
 brancherBascule("region", "region");
 
@@ -1100,16 +1333,23 @@ $("anneau-marchand").addEventListener("change", envoyerLaTaxe);
 // requête par chiffre tapé, et « 11 » partirait avant « 11952 ».
 $("renommee").addEventListener("change", envoyerLaTaxe);
 
+// ⚠️ Ce mécanisme était codé en dur pour DEUX onglets : un `surSession`
+// booléen, et chaque ligne écrite deux fois en niant l'autre. Passer à quatre
+// de cette façon aurait demandé une condition par onglet dans chaque ligne,
+// donc seize endroits où oublier le nouveau. La liste est la seule chose à
+// tenir à jour désormais.
+const ONGLETS = ["session", "historique", "reglages", "rapport"];
+
 function basculer(page) {
-  const surSession = page === "session";
-  $("page-session").hidden = !surSession;
-  $("page-historique").hidden = surSession;
-  $("onglet-session").setAttribute("aria-selected", String(surSession));
-  $("onglet-historique").setAttribute("aria-selected", String(!surSession));
+  for (const nom of ONGLETS) {
+    const actif = nom === page;
+    $("page-" + nom).hidden = !actif;
+    $("onglet-" + nom).setAttribute("aria-selected", String(actif));
+  }
   // L'historique est chargé à l'ouverture et pas dans le rafraîchissement
   // d'une seconde : recalculer trente sessions par seconde coûterait cher
   // pour un écran que personne ne regarde en farmant.
-  if (!surSession) chargerHistorique();
+  if (page === "historique") chargerHistorique();
 }
 
 function duree(secondes) {
@@ -1454,8 +1694,9 @@ $("bouton-dossier").addEventListener("click", async () => {
     "prend effet au prochain lancement.";
 });
 
-$("onglet-session").addEventListener("click", () => basculer("session"));
-$("onglet-historique").addEventListener("click", () => basculer("historique"));
+for (const nom of ONGLETS) {
+  $("onglet-" + nom).addEventListener("click", () => basculer(nom));
+}
 
 // -- Rapport de bogue ------------------------------------------------------
 // Le compteur est affiche pendant la frappe plutot qu'apres l'envoi : le

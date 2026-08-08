@@ -9,6 +9,33 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Ajouté
+
+- **Deux boutons « Ce qu'il faut voir » et « Mon écran », sous le calibrage.**
+  Le premier montre un schéma : le journal d'acquisition entier dans le cadre,
+  et rien par-dessus. Il montre aussi les **deux erreurs qui coûtent des
+  objets** — l'inventaire ou le menu Échap posés sur la zone lue.
+
+  ⛔ Ce n'est pas décoratif. Une vraie session a laissé le menu Échap devant le
+  chat pendant **4 minutes** : **560 objets manquants sur 4 080**, et le
+  compteur affichait son total comme si de rien n'était.
+
+  Le second prend une photo de ton écran, cadre orangé sur la zone que Butin
+  lit, pour que tu compares. Compte à rebours de 5 secondes, le temps de
+  basculer sur le jeu. L'image reste chez toi.
+
+### Modifié
+
+- **La fenêtre principale est passée à quatre onglets** : `Session`,
+  `Historique`, `Réglages`, `Rapport`. Ce qu'on refait à chaque lancement
+  (calibrer, démarrer) est séparé de ce qu'on règle une fois (dossier, taxe,
+  langue, région) et de ce qu'on n'ouvre qu'en cas de problème.
+
+- **Les quatre chiffres de l'en-tête ont été retirés** (silver par heure, total
+  net, durée, objets valorisés). Ils sont déjà dans le panneau posé sur le jeu,
+  qui est le seul écran regardé en farmant, et dans l'Historique, qui est
+  l'écran regardé après.
+
 ## [0.10.0] - 2026-08-08
 
 ### Modifié
