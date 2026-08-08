@@ -825,7 +825,8 @@
        fermé, l'image ne contiendra rien d'utile et personne ne s'en rendra
        compte avant d'ouvrir le fichier. -->
   <div class="rangee note">
-    <button class="action-mince" id="bouton-inventaire">Capturer mon inventaire</button>
+    <button class="action-mince" id="bouton-inventaire-avant">Inventaire de départ</button>
+    <button class="action-mince" id="bouton-inventaire-apres">Inventaire d'arrivée</button>
     <button class="action-mince" id="bouton-archive">Préparer une archive</button>
   </div>
   <div class="note-avant note-apres-action">
@@ -833,6 +834,24 @@
     part <b>6 secondes</b> après le clic, le temps que tu y sois : sinon elle
     prendrait cette fenêtre-ci, qui est devant le jeu au moment où tu cliques.
     Elle reste sur ton disque et part avec l'archive.
+  </div>
+  <!-- ⭐ DEUX boutons, et c'est ce qui rend la mesure possible. Il n'y en avait
+       qu'un jusqu'au 08/08/2026, et la seconde capture écrasait la première :
+       une session ne pouvait pas être comparée à elle-même. Faute de mieux, un
+       « avant » a été pris sur la session PRÉCÉDENTE, à 1 h 42 d'écart, et le
+       verdict annoncé — sur-comptage de ×4,7 — était faux d'un facteur cent.
+       Le vrai écart, mesuré sur les deux bouts de la même session, est de
+       +2,6 %. -->
+  <div class="note-avant">
+    <b>Les deux boutons servent ensemble</b>, et dans cet ordre : démarre la
+    session, prends l'<b>inventaire de départ</b>, farme, prends
+    l'<b>inventaire d'arrivée</b>, arrête. La différence entre les deux est la
+    seule vérité de ce logiciel qui ne passe par aucune lecture d'écran, donc
+    la seule qui puisse dire si le compteur se trompe.
+    <br>⚠️ Le départ se prend <b>après</b> avoir lancé la session : sinon il n'y
+    a pas de session à quoi le rattacher. Les quelques secondes entre les deux
+    comptent pour le compteur et pas pour l'inventaire, ce qui gonfle très
+    légèrement l'écart mesuré. Prends-le tout de suite après avoir démarré.
   </div>
   <div id="inventaire-etat" class="note"></div>
   <div id="archive-etat" class="note"></div>
@@ -1894,33 +1913,59 @@ async function rafraichir() {
 // on reclique.
 const DELAI_CAPTURE_S = 6;
 
-$("bouton-inventaire").addEventListener("click", async () => {
-  const bouton = $("bouton-inventaire");
-  const etat = $("inventaire-etat");
-  bouton.disabled = true;
+// ⭐ Les DEUX bouts, et le meme code pour les deux : ce qui les distingue est
+// le `moment` envoye au serveur, rien d'autre. Deux gestionnaires recopies
+// auraient fini par diverger sur le compte a rebours ou sur le message
+// d'erreur, qui sont pourtant la meme chose.
+function brancherLaCapture(id, moment, invite) {
+  $(id).addEventListener("click", async () => {
+    const bouton = $(id);
+    const etat = $("inventaire-etat");
+    // Les deux boutons sont desactives ensemble : deux captures qui partent en
+    // meme temps se disputeraient l'ecran, et la seconde photographierait la
+    // premiere en train de s'ecrire.
+    const boutons = ["bouton-inventaire-avant", "bouton-inventaire-apres"];
+    for (const autre of boutons) $(autre).disabled = true;
 
-  let reste = DELAI_CAPTURE_S;
-  etat.textContent = "Va sur le jeu et ouvre ton inventaire — capture dans " + reste + " s";
-  const compte = setInterval(() => {
-    reste -= 1;
-    if (reste > 0) {
-      etat.textContent = "Va sur le jeu et ouvre ton inventaire — capture dans " + reste + " s";
-    } else {
-      etat.textContent = "Capture…";
+    let reste = DELAI_CAPTURE_S;
+    const dire = () => {
+      etat.textContent = invite + " — capture dans " + reste + " s";
+    };
+    dire();
+    const compte = setInterval(() => {
+      reste -= 1;
+      if (reste > 0) {
+        dire();
+      } else {
+        etat.textContent = "Capture…";
+        clearInterval(compte);
+      }
+    }, 1000);
+
+    try {
+      const reponse = await fetch("/api/inventaire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moment: moment }),
+      });
+      etat.textContent = (await reponse.json()).message || "Réponse illisible.";
+    } catch (erreur) {
+      etat.textContent = "Le serveur local n'a pas répondu.";
+    } finally {
       clearInterval(compte);
+      for (const autre of boutons) $(autre).disabled = false;
     }
-  }, 1000);
+  });
+}
 
-  try {
-    const corps = await (await fetch("/api/inventaire", { method: "POST" })).json();
-    etat.textContent = corps.message || "Réponse illisible.";
-  } catch (erreur) {
-    etat.textContent = "Le serveur local n'a pas répondu.";
-  } finally {
-    clearInterval(compte);
-    bouton.disabled = false;
-  }
-});
+brancherLaCapture(
+  "bouton-inventaire-avant", "avant",
+  "Va sur le jeu et ouvre ton inventaire, AVANT de farmer",
+);
+brancherLaCapture(
+  "bouton-inventaire-apres", "apres",
+  "Va sur le jeu et ouvre ton inventaire, avant d'arrêter",
+);
 
 $("bouton-archive").addEventListener("click", async () => {
   const bouton = $("bouton-archive");

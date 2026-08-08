@@ -48,6 +48,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from ..diagnostic import dossier_des_rapports
 
@@ -72,14 +73,45 @@ class Capture:
         return self.chemin is not None
 
 
-def chemin_pour(session_id: int, racine: Path | None = None) -> Path:
-    """Où vit la capture d'une session donnée.
+Moment = Literal["avant", "apres"]
+"""Les deux bouts d'une session, et il en faut **deux**.
 
-    Une par session et pas une par clic : recapturer après avoir rangé son
-    inventaire doit **remplacer** la précédente, sinon l'archive emporterait
-    trois images dont personne ne saurait laquelle fait foi.
+⛔ Il n'y en avait qu'un jusqu'au 08/08/2026, et c'est ce qui a rendu la seule
+mesure sans OCR de ce logiciel **inutilisable**. Une capture par session, la
+seconde écrasant la première : impossible de tenir un avant ET un après.
+
+Le 08/08, faute de mieux, une session a été mesurée en prenant comme « avant »
+la capture de la session PRÉCÉDENTE, à une heure quarante-deux d'écart. Le
+verdict annoncé était un sur-comptage de **×4,7**. Le vrai, une fois le bon
+point de départ connu, est de **+2,6 %**. Deux ordres de grandeur, et une
+conclusion fausse annoncée avec assurance.
+
+Comparer deux sessions n'est pas une mesure. Il faut les deux bouts de la même.
+"""
+
+
+def chemin_pour(
+    session_id: int, racine: Path | None = None, *, moment: Moment | None = None
+) -> Path:
+    """Où vit la capture d'un bout de session.
+
+    Sans `moment`, l'ancien nom : c'est celui des captures déjà sur le disque
+    des joueurs, et `captures_existantes` doit continuer à les trouver. Une
+    version qui cesserait de voir les fichiers d'avant les perdrait pour
+    l'archive sans rien dire.
+
+    Avec `moment`, un fichier par bout. Recapturer le MÊME bout remplace :
+    quelqu'un qui range son sac puis recommence corrige son geste, il n'en
+    ajoute pas un troisième dont personne ne saurait lequel fait foi.
+
+    ⚠️ `moment` est **après** `racine` et réservé au mot-clé, ce qui n'est pas
+    un détail de style : la première version l'avait glissé en deuxième
+    position, et tous les appels existants passaient `racine` là. Ils
+    écrivaient donc dans un fichier dont le nom contenait un chemin. Attrapé
+    par les tests, jamais par la relecture.
     """
-    return dossier_des_rapports(racine) / f"{PREFIXE}-{session_id:04d}.png"
+    suffixe = f"-{moment}" if moment else ""
+    return dossier_des_rapports(racine) / f"{PREFIXE}-{session_id:04d}{suffixe}.png"
 
 
 DELAI_S = 6.0
@@ -103,6 +135,7 @@ en attendant.
 def capturer(
     session_id: int,
     *,
+    moment: Moment | None = None,
     racine: Path | None = None,
     monitor: int = 1,
     delai_s: float = DELAI_S,
@@ -117,7 +150,7 @@ def capturer(
     doit pas pouvoir interrompre quoi que ce soit. Une machine sans écran, un
     pilote graphique fâché, un disque plein descendent en message affichable.
     """
-    destination = chemin_pour(session_id, racine)
+    destination = chemin_pour(session_id, racine, moment=moment)
     if delai_s > 0:
         dormir(delai_s)
     try:

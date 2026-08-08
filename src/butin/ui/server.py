@@ -46,6 +46,7 @@ from ..bundle import decrire_le_contenu as _decrire_archive
 from ..bundle import ouvrir_le_dossier as _ouvrir_le_dossier
 from ..bundle import preparer as _preparer_archive
 from ..capture.calibrate import Calibration, CalibrationError
+from ..capture.inventaire import Moment
 from ..capture.inventaire import capturer as _capturer_inventaire
 from ..capture.lines import PART_AVEC_HEURE_ATTENDUE, part_avec_heure
 from ..capture.worker import CaptureUnavailable, CaptureWorker
@@ -745,7 +746,9 @@ class AppState:
         resultat = _envoyer_rapport(message, contexte=contexte)
         return {"envoye": resultat.envoye, "message": resultat.raison}
 
-    def capturer_l_inventaire(self, session_id: int | None = None) -> dict[str, Any]:
+    def capturer_l_inventaire(
+        self, session_id: int | None = None, moment: str | None = None
+    ) -> dict[str, Any]:
         """Fige l'écran, pour garder la seule vérité qui n'est pas de l'OCR.
 
         ⚠️ **Hors verrou**, comme le reste de ce qui touche à l'écran.
@@ -756,15 +759,39 @@ class AppState:
 
         Sans session précisée, on rattache à la dernière : le geste normal est
         « j'arrête, je compare », donc juste après.
+
+        ⭐ `moment` vaut « avant » ou « apres », et c'est ce qui rend la mesure
+        possible. Les deux vont dans des fichiers distincts : sans ça, la
+        seconde capture écrasait la première et une session ne pouvait pas être
+        mesurée contre elle-même. Voir `inventaire.Moment` pour ce que cette
+        limite a coûté le 08/08/2026.
+
+        ⛔ Une valeur inconnue retombe sur l'ancien nom plutôt que d'être
+        refusée. Une capture reste toujours mieux que pas de capture, et le
+        joueur ne saurait pas quoi faire d'un refus.
         """
         cible = session_id if session_id is not None else self._derniere_session()
+        # ⛔ Le typage n'est pas cosmétique ici : `Moment` est un littéral, et
+        # une chaîne quelconque venue de la requête ne doit pas s'y glisser.
+        bout: Moment | None = (
+            "avant" if moment == "avant" else "apres" if moment == "apres" else None
+        )
         if cible is None:
             return {
                 "capture": False,
                 "message": "Aucune session à rattacher : lance un farm d'abord.",
             }
-        resultat = _capturer_inventaire(cible)
-        return {"capture": resultat.reussie, "message": resultat.message, "session": cible}
+        resultat = _capturer_inventaire(cible, moment=bout)
+        libelle = {"avant": "de départ", "apres": "d'arrivée"}.get(bout or "", "")
+        message = resultat.message
+        if resultat.reussie and libelle:
+            message = f"Inventaire {libelle} enregistré. " + message.split(". ", 1)[-1]
+        return {
+            "capture": resultat.reussie,
+            "message": message,
+            "session": cible,
+            "moment": bout,
+        }
 
     def _derniere_session(self) -> int | None:
         """L'identifiant de la session la plus récente, ou `None`."""
@@ -1352,7 +1379,12 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/inventaire":
             # Toujours 200 : le corps porte `capture` et un message
             # affichable tel quel, comme /api/rapport et /api/archive.
-            self._send_json(self.state.capturer_l_inventaire())
+            moment = self._read_json().get("moment")
+            self._send_json(
+                self.state.capturer_l_inventaire(
+                    moment=str(moment) if isinstance(moment, str) else None
+                )
+            )
         elif self.path == "/api/panneau/taille":
             hauteur = self._read_json().get("hauteur", 0)
             try:

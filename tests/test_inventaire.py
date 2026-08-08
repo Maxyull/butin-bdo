@@ -219,7 +219,8 @@ class TestLaConsigneEstAvantLeBouton:
         page = (
             Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static" / "index.html"
         ).read_text(encoding="utf-8")
-        assert 'id="bouton-inventaire"' in page
+        assert 'id="bouton-inventaire-avant"' in page
+        assert 'id="bouton-inventaire-apres"' in page
         # ⚠️ La consigne a CHANGÉ le 08/08/2026, et l'ancienne était fausse :
         # elle disait « ouvre ton inventaire AVANT de cliquer », ce qui est
         # impossible puisque cliquer met Butin devant le jeu. Elle dit
@@ -233,5 +234,67 @@ class TestLaConsigneEstAvantLeBouton:
         page = (
             Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static" / "index.html"
         ).read_text(encoding="utf-8")
-        debut = page.index('id="bouton-inventaire"')
+        debut = page.index('id="bouton-inventaire-avant"')
         assert "style=" not in page[debut : debut + 700]
+
+
+class TestLesDeuxBoutsDeLaSession:
+    """⭐ Ce qui rend la seule mesure sans OCR de ce logiciel utilisable.
+
+    Il n'y avait qu'une capture par session jusqu'au 08/08/2026, et la seconde
+    écrasait la première. Une session ne pouvait donc pas être comparée à
+    elle-même.
+
+    ⛔ Ce que cette limite a coûté, le jour même : faute de mieux, une session a
+    été mesurée en prenant comme « avant » la capture de la session PRÉCÉDENTE,
+    à une heure quarante-deux d'écart. Le verdict annoncé était un sur-comptage
+    de **×4,7**. Le vrai, une fois le bon point de départ connu, est de
+    **+2,6 %**. Une conclusion fausse de deux ordres de grandeur, annoncée avec
+    assurance.
+    """
+
+    def test_les_deux_bouts_vont_dans_des_fichiers_DIFFERENTS(self, racine: Path) -> None:
+        """Le cœur du correctif, en une ligne : sinon il n'y a pas de mesure."""
+        avant = chemin_pour(7, racine, moment="avant")
+        apres = chemin_pour(7, racine, moment="apres")
+
+        assert avant != apres
+        assert avant.name == "inventaire-0007-avant.png"
+        assert apres.name == "inventaire-0007-apres.png"
+
+    def test_l_ancien_nom_reste_celui_par_defaut(self, racine: Path) -> None:
+        """⛔ Les captures déjà sur le disque des joueurs portent ce nom-là.
+
+        Une version qui cesserait de le produire — et donc `captures_existantes`
+        de le trouver — les perdrait pour l'archive sans rien dire.
+        """
+        assert chemin_pour(7, racine).name == "inventaire-0007.png"
+
+    def test_les_deux_bouts_sont_joints_a_l_archive(self, racine: Path) -> None:
+        dossier = racine / "rapports"
+        dossier.mkdir(parents=True, exist_ok=True)
+        for moment in ("avant", "apres"):
+            chemin_pour(7, racine, moment=moment).write_bytes(b"faux PNG")
+
+        trouvees = {c.name for c in captures_existantes(racine)}
+
+        assert "inventaire-0007-avant.png" in trouvees
+        assert "inventaire-0007-apres.png" in trouvees
+
+    def test_recapturer_le_meme_bout_REMPLACE(self, racine: Path) -> None:
+        """Quelqu'un qui range son sac puis recommence corrige son geste, il
+        n'en ajoute pas un troisième dont personne ne saurait lequel fait foi."""
+        dossier = racine / "rapports"
+        dossier.mkdir(parents=True, exist_ok=True)
+        cible = chemin_pour(7, racine, moment="avant")
+        cible.write_bytes(b"premier")
+        cible.write_bytes(b"second")
+
+        assert len([c for c in captures_existantes(racine) if "avant" in c.name]) == 1
+
+    def test_racine_reste_le_deuxieme_parametre_POSITIONNEL(self, racine: Path) -> None:
+        """⛔ Régression du 08/08/2026, attrapée par les tests et pas par la
+        relecture. La première version glissait `moment` en deuxième position ;
+        tous les appels existants passaient `racine` là, et écrivaient donc dans
+        un fichier dont le NOM contenait un chemin."""
+        assert chemin_pour(7, racine).parent == racine / "rapports"

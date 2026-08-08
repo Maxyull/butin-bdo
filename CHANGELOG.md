@@ -9,6 +9,19 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Ajouté
+
+- **⭐ Deux captures d'inventaire par session : « Inventaire de départ » et
+  « Inventaire d'arrivée ».** C'est ce qui rend enfin utilisable la seule vérité
+  de Butin qui ne passe par aucune lecture d'écran.
+
+  Il n'y en avait qu'une, et la seconde écrasait la première : une session ne
+  pouvait donc pas être comparée à elle-même. La différence entre les deux bouts
+  est la seule chose qui puisse dire si le compteur se trompe.
+
+  L'ordre : démarre la session, prends le départ, farme, prends l'arrivée,
+  arrête. ⚠️ Le départ se prend **après** avoir lancé la session.
+
 ### Corrigé
 
 - **La pastille dorée vide, à côté du numéro de version, a disparu.** C'était le
