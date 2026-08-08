@@ -72,6 +72,29 @@
      borne haute : defiler dans un panneau pose sur le jeu est le dernier
      recours, pas le comportement normal. */
   #drops { max-height: calc(100vh - 200px); overflow-y: auto; }
+
+  /* ⚠️ La barre de defilement de cette liste restait au theme CLAIR du
+     systeme : une bande blanche pleine hauteur, posee sur le jeu, dans un
+     panneau dont toute la raison d'etre est de ne rien cacher.
+
+     Elle est donc plus discrete qu'ailleurs, et sa piste est TRANSPARENTE :
+     une piste peinte serait un rectangle opaque de plus par-dessus le decor,
+     visible en permanence meme quand la liste tient entierement.
+
+     ⛔ Pas de `scrollbar-color` ici non plus : le poser fait IGNORER les regles
+     `::-webkit-scrollbar` par Chromium, donc la piste redeviendrait opaque.
+     Mesure et detail dans `index.html`. */
+  :root { color-scheme: dark; }
+
+  #drops::-webkit-scrollbar { width: 8px; }
+  #drops::-webkit-scrollbar-track { background: transparent; }
+  #drops::-webkit-scrollbar-thumb {
+    background: rgba(120, 130, 150, .45); border-radius: 999px;
+    border: 2px solid transparent; background-clip: content-box;
+  }
+  #drops::-webkit-scrollbar-thumb:hover {
+    background: rgba(160, 172, 195, .65); background-clip: content-box;
+  }
   .drop { display: flex; gap: 9px; align-items: center; padding: 2px 0; font-size: 14px; }
   .drop .qte { color: #97a0b5; font-variant-numeric: tabular-nums; }
   .drop .valeur { margin-left: auto; font-variant-numeric: tabular-nums; color: #cfd4e0; }

@@ -41,6 +41,39 @@
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
 
+  /* ⚠️ Les barres de défilement restaient au thème CLAIR du système, sur une
+     page entièrement sombre : une bande blanche le long de la fenêtre et une
+     autre le long du fil des drops. Elles ne sont pas peintes par le CSS de la
+     page tant qu'on ne le demande pas, donc rien dans la palette ci-dessus ne
+     les atteignait.
+
+     `color-scheme: dark` fait le gros du travail, et c'est le vrai correctif :
+     il dit au moteur que cette page est sombre, ce qui reteint la barre ET tout
+     ce que le système dessine lui-même (champs, menus, sélection). À lui seul,
+     il suffirait déjà à faire disparaître le blanc.
+
+     ⛔ `scrollbar-color` a été essayé EN PLUS et retiré, parce que les deux
+     s'excluent : dès qu'on le pose, Chromium **ignore** les règles
+     `::-webkit-scrollbar`. Mesuré dans un navigateur, la barre du fil restait à
+     15 px alors que la règle en demandait 10. Ce n'était pas une ceinture avec
+     des bretelles, c'était une ceinture qui coupait les bretelles.
+
+     Le repli reste sain : si un moteur ignorait les pseudo-éléments,
+     `color-scheme` lui donnerait quand même une barre sombre. */
+  :root { color-scheme: dark; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--bord); border-radius: var(--rayon-pilule);
+    /* Le liseré transparent amincit le curseur sans réduire la zone qu'on peut
+       attraper : viser une barre de 4 px est pénible, en attraper une de 10 ne
+       l'est pas. */
+    border: 2px solid transparent; background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #333d4e; background-clip: content-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
   /* ⭐ Un seul anneau de focus, pour TOUT ce qui se manipule. La page comptait
      dix-neuf éléments interactifs et deux règles de focus : quelqu'un qui
      navigue au clavier ne voyait pas où il se trouvait dans les dix-sept
