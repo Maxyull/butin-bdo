@@ -448,7 +448,7 @@ class TestDossierDesSessions:
         reglages = state.snapshot()["reglages"]
 
         assert reglages["dossier"]
-        assert reglages["dossier_defaut"].endswith("BDO Tracker")
+        assert reglages["dossier_defaut"].endswith("BDO Butin")
 
     def test_changer_de_dossier_le_retient(
         self, app, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -18,7 +18,7 @@ Ses sessions de farm ne sont pas un cache : ce sont **ses** données, celles
 qu'il voudra sauvegarder, copier sur une autre machine ou simplement retrouver.
 Les enterrer dans `%LOCALAPPDATA%` reviendrait à les cacher.
 
-Elles vont donc par défaut dans **Documents\\BDO Tracker**, et l'emplacement se
+Elles vont donc par défaut dans **Documents\\BDO Butin**, et l'emplacement se
 change. Le chemin choisi est retenu dans un fichier repère, lui-même rangé à
 l'emplacement standard : il faut bien que quelque chose de fixe dise où est le
 reste.
@@ -26,7 +26,7 @@ reste.
 Sous Windows, cela donne :
     cache          : %LOCALAPPDATA%\\Butin\\Cache
     repère         : %LOCALAPPDATA%\\Butin\\emplacement.json
-    données        : Documents\\BDO Tracker
+    données        : Documents\\BDO Butin
 
 `BUTIN_HOME` permet de tout rediriger et **gagne sur tout le reste**, ce dont
 les tests se servent pour ne jamais toucher aux vrais dossiers de
@@ -46,9 +46,22 @@ from platformdirs import user_cache_path, user_data_path, user_documents_path
 
 APP_NAME = "Butin"
 
-FOLDER_NAME = "BDO Tracker"
+FOLDER_NAME = "BDO Butin"
 """Nom du dossier créé dans Documents. En clair et sans accent : c'est le nom
-que l'utilisateur verra dans son explorateur, et qu'il tapera peut-être."""
+que l'utilisateur verra dans son explorateur, et qu'il tapera peut-être.
+
+⚠️ Renommé depuis « BDO Tracker » le 08/08/2026. Changer cette constante SEULE
+ferait disparaître l'historique de tous les joueurs : les fichiers resteraient
+dans l'ancien dossier et le programme regarderait ailleurs. C'est
+`migrate_ancien_dossier()` qui rend ce renommage possible, et les deux ne se
+séparent pas."""
+
+ANCIEN_FOLDER_NAME = "BDO Tracker"
+"""Nom d'avant le renommage du 08/08/2026.
+
+Gardé indéfiniment. Un joueur qui n'ouvre Butin que tous les six mois doit
+retrouver ses sessions le jour où il revient, pas découvrir un historique vide
+parce que la migration n'a été proposée que pendant deux versions."""
 
 _ENV_HOME = "BUTIN_HOME"
 _POINTER = "emplacement.json"
@@ -79,7 +92,7 @@ def pointer_path() -> Path:
 
 
 def default_storage_root() -> Path:
-    """Emplacement par défaut : Documents\\BDO Tracker.
+    """Emplacement par défaut : Documents\\BDO Butin.
 
     Dans Documents et non dans les données d'application, parce que ce sont les
     sessions de farm de l'utilisateur : il voudra les sauvegarder, les copier,
@@ -111,7 +124,21 @@ def storage_root() -> Path:
             # sur le défaut, et l'utilisateur reverra ses données au prochain
             # choix. Refuser de lancer lui retirerait aussi le moyen de corriger.
             _log.warning("repère d'emplacement illisible (%s), retour au défaut", exc)
-    return default_storage_root()
+
+    # ⛔ Repli sur l'ANCIEN nom de dossier, et c'est lui la vraie garantie du
+    # renommage du 08/08/2026. `migrate_ancien_dossier()` renomme au lancement,
+    # mais il peut échouer : dossier ouvert dans l'explorateur, antivirus,
+    # disque plein. Sans ce repli, un échec ferait regarder un dossier
+    # inexistant, et l'historique du joueur disparaîtrait de son écran alors
+    # qu'il est intact sur le disque.
+    #
+    # Le renommage est donc un CONFORT ; ceci est la garantie.
+    defaut = default_storage_root()
+    if not defaut.exists():
+        ancien = ancien_dossier_par_defaut()
+        if ancien.is_dir():
+            return ancien
+    return defaut
 
 
 def set_storage_root(path: Path) -> Path:
@@ -162,6 +189,69 @@ def migrate_legacy() -> Path | None:
     for fichier in a_deplacer:
         shutil.move(str(ancien / fichier), str(nouveau / fichier))
     _log.info("données déplacées de %s vers %s : %s", ancien, nouveau, ", ".join(a_deplacer))
+    return ancien
+
+
+def ancien_dossier_par_defaut() -> Path:
+    """L'emplacement d'avant le renommage, `Documents\\BDO Tracker`."""
+    return user_documents_path() / ANCIEN_FOLDER_NAME
+
+
+def migrate_ancien_dossier() -> Path | None:
+    """Renomme `Documents\\BDO Tracker` en `Documents\\BDO Butin`.
+
+    ⛔ Ce n'est pas un confort, c'est ce qui rend le renommage possible. Sans
+    lui, changer `FOLDER_NAME` ferait **disparaître l'historique** de tout le
+    monde : les fichiers resteraient sur le disque, intacts, et le programme
+    regarderait à côté. Du point de vue du joueur, c'est une perte de données.
+
+    ⭐ On renomme le DOSSIER, on ne copie pas fichier par fichier. `sessions.sqlite3`
+    a besoin de venir avec `reglages.json`, `contributeur.txt`, `calibrage.json`
+    ET tout `rapports/` — journaux de lecture et captures d'inventaire compris.
+    Une liste de fichiers à emporter serait fausse le jour où l'on en ajoute un,
+    et personne ne s'en apercevrait avant d'en avoir besoin.
+
+    Ne fait rien dans trois cas, et chacun a sa raison :
+
+    - le joueur a **choisi** son dossier (fichier repère) : ce n'est pas à nous
+      de renommer ce qu'il a nommé ;
+    - la destination **existe déjà** : il a peut-être les deux, et fusionner
+      deux historiques sans savoir lequel fait foi serait pire que ne rien
+      faire ;
+    - `BUTIN_HOME` est posé : c'est une redirection de test, on n'y touche pas.
+
+    Rend l'ancien chemin s'il y a eu renommage, sinon `None`. **Ne lève jamais.**
+    """
+    if _override() is not None:
+        return None
+    if pointer_path().exists():
+        # Le joueur a déplacé ses données lui-même : son choix prime.
+        return None
+
+    ancien = ancien_dossier_par_defaut()
+    nouveau = default_storage_root()
+    if ancien == nouveau or not ancien.is_dir():
+        return None
+    if nouveau.exists():
+        _log.info(
+            "les deux dossiers existent (%s et %s), aucun renommage : "
+            "fusionner deux historiques demanderait de savoir lequel fait foi",
+            ancien,
+            nouveau,
+        )
+        return None
+
+    try:
+        nouveau.parent.mkdir(parents=True, exist_ok=True)
+        ancien.rename(nouveau)
+    except OSError as exc:
+        # Un dossier ouvert dans l'explorateur, un antivirus, un disque plein :
+        # rien de tout ça ne justifie d'empêcher Butin de démarrer. On continue
+        # sur l'ancien nom, qui marche encore.
+        _log.warning("dossier non renommé, on garde %s : %s", ancien, exc)
+        return None
+
+    _log.info("dossier renommé de %s vers %s", ancien, nouveau)
     return ancien
 
 

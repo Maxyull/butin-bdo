@@ -188,7 +188,7 @@ def install_update(
     """Enchaîne téléchargement, vérification et lancement. **Ne lève jamais.**
 
     Rend un message écrit pour être affiché tel quel. L'installeur va dans le
-    dossier temporaire du système et non dans `Documents\\BDO Tracker` : ce
+    dossier temporaire du système et non dans `Documents\\BDO Butin` : ce
     n'est pas une donnée de l'utilisateur, et Windows le nettoiera.
     """
     racine = dossier or Path(tempfile.gettempdir())

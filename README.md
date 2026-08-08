@@ -141,8 +141,13 @@ Le bouton **Arrêter** du panneau referme la session et le panneau avec elle.
 
 ### Où sont vos sessions
 
-Dans **Documents\BDO Tracker** par défaut. Ce sont vos données : vous voudrez
+Dans **Documents\BDO Butin** par défaut. Ce sont vos données : vous voudrez
 les sauvegarder ou les retrouver, pas les chercher dans `%LOCALAPPDATA%`.
+
+⚠️ Le dossier s'appelait **BDO Tracker** avant la version 0.10.0. Il est
+renommé automatiquement au premier lancement, sans rien perdre. Si le
+renommage échoue — dossier ouvert dans l'explorateur, antivirus — Butin
+continue d'utiliser l'ancien nom plutôt que de vous montrer un historique vide.
 
 Le dossier est affiché dans les réglages et se change. ⚠️ Le changement ne
 déplace rien et prend effet **au prochain lancement** : la base de sessions est
