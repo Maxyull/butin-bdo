@@ -9,6 +9,22 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Ajouté
+
+- **Un bouton « Se déconnecter » à côté de ton compte Discord.** Il n'y avait
+  aucun moyen de détacher un compte une fois rattaché.
+
+  ⚠️ **Ce qu'il fait exactement, parce que ça compte ici :** Butin oublie qui tu
+  es sur Discord, et tes prochains rapports partent sous un nouveau pseudonyme
+  anonyme. Deux choses qu'il ne peut pas faire à ta place : le serveur de
+  rapports garde l'ancien rattachement, et l'autorisation reste donnée côté
+  Discord tant que tu ne la retires pas toi-même dans *Paramètres →
+  Applications autorisées*.
+
+- **Un bouton « Soutenir Butin »**, sous les boutons Discord dans l'onglet
+  Rapport. Entièrement facultatif : Butin est gratuit et le restera, sans
+  version payante ni publicité.
+
 ## [0.11.0] - 2026-08-08
 
 ### Ajouté

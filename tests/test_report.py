@@ -78,6 +78,71 @@ class TestIdentifiantDeContributeur:
         assert a != b
 
 
+class TestRemplacementDeLIdentifiant:
+    """⭐ C'est le seul mécanisme de « se déconnecter » dont Butin dispose.
+
+    Le rattachement Discord est indexé sur cet identifiant côté relais : en
+    changer coupe le lien vu d'ici, parce que le relais ne connaît aucun compte
+    pour le nouveau. Voir `report.reset_contributor_id` pour ce que ça ne fait
+    pas, et `COORDINATION.md` pour la route qui manque au relais.
+    """
+
+    def test_l_identifiant_change_vraiment(self, tmp_path: Path) -> None:
+        avant = report.contributor_id(tmp_path)
+
+        apres = report.reset_contributor_id(tmp_path)
+
+        assert apres != avant
+
+    def test_le_nouvel_identifiant_est_celui_qu_on_relit(self, tmp_path: Path) -> None:
+        """⛔ Régression du bouton entier : rendre un identifiant neuf sans
+        l'écrire laisserait le joueur rattaché au relancement suivant, alors
+        que l'écran vient de lui annoncer qu'il est détaché."""
+        report.contributor_id(tmp_path)
+
+        apres = report.reset_contributor_id(tmp_path)
+
+        assert report.contributor_id(tmp_path) == apres
+
+    def test_il_respecte_le_format_impose_par_le_relais(self, tmp_path: Path) -> None:
+        """Même contrainte que la création : hors `[0-9A-Za-z_-]{8,64}`, tous
+        les envois suivants échoueraient en 422."""
+        remplace = report.reset_contributor_id(tmp_path)
+
+        assert 8 <= len(remplace) <= 64
+        assert all(c.isalnum() or c in "_-" for c in remplace)
+
+    def test_il_marche_meme_sans_identifiant_prealable(self, tmp_path: Path) -> None:
+        """Se déconnecter sans s'être connecté n'est pas une erreur : le
+        bouton peut être cliqué sur un dossier tout neuf."""
+        remplace = report.reset_contributor_id(tmp_path / "jamais-servi")
+
+        assert 8 <= len(remplace) <= 64
+
+    def test_deux_appels_donnent_deux_identifiants(self, tmp_path: Path) -> None:
+        """Sinon se déconnecter deux fois de suite laisserait le second sans
+        effet, en l'annonçant quand même."""
+        assert report.reset_contributor_id(tmp_path) != report.reset_contributor_id(tmp_path)
+
+    def test_un_disque_en_panne_ne_leve_pas(self, tmp_path: Path, monkeypatch) -> None:
+        """⛔ Ne pas pouvoir écrire ne doit pas laisser le joueur rattaché
+        contre son gré pour le reste de la session : on rend un identifiant
+        neuf, utilisé en mémoire, et on journalise."""
+        monkeypatch.setattr(
+            report.Path, "write_text", lambda *a, **k: (_ for _ in ()).throw(OSError("disque"))
+        )
+
+        remplace = report.reset_contributor_id(tmp_path)
+
+        assert 8 <= len(remplace) <= 64
+
+    def test_aucun_fichier_temporaire_ne_traine(self, tmp_path: Path) -> None:
+        """L'écriture est atomique : le `.tmp` est renommé, jamais laissé."""
+        report.reset_contributor_id(tmp_path)
+
+        assert [f.name for f in tmp_path.iterdir()] == [report.CONTRIBUTOR_FILE]
+
+
 class TestComposition:
     def test_le_contexte_est_joint_au_message(self) -> None:
         corps = report.compose("ça ne compte rien", {"version": "0.4.0", "zone": "476x567"})

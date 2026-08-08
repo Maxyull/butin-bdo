@@ -54,6 +54,7 @@ from ..discord_link import fetch_account as _compte_discord
 from ..discord_link import open_login as _ouvrir_connexion_discord
 from ..market import PriceBook
 from ..report import contributor_id as _identifiant_contributeur
+from ..report import reset_contributor_id as _remplacer_identifiant_contributeur
 from ..report import send_report as _envoyer_rapport
 from ..store import SessionStore, Settings, compute
 from ..update import UpdateInfo, check_for_update
@@ -897,6 +898,39 @@ class AppState:
             "message": "Impossible d'ouvrir le navigateur. Vérifie ta connexion, puis réessaie.",
         }
 
+    def deconnecter_discord(self) -> dict[str, Any]:
+        """Détache le compte Discord, autant que Butin puisse le faire.
+
+        Le rattachement est indexé sur l'identifiant anonyme du contributeur :
+        en changer coupe le lien vu d'ici. Voir `report.reset_contributor_id`
+        pour le mécanisme et ses limites.
+
+        ⛔ **Le message dit exactement ce qui se passe, y compris ce qui ne se
+        passe pas.** Le relais garde l'ancien lien, faute de route pour le
+        défaire, et l'autorisation reste donnée côté Discord. Un bouton
+        « Se déconnecter » qui laisserait croire à une révocation complète
+        serait un mensonge de plus dans un endroit où la confiance est tout le
+        sujet — et c'est exactement la faute que ce dépôt s'est déjà faite en
+        écrivant une justification sans l'implémenter.
+
+        ⚠️ **Hors verrou**, comme les autres appels Discord : rien ici ne touche
+        l'état de la session.
+
+        Toujours 200 : le corps porte `deconnecte` et un message affichable.
+        """
+        _remplacer_identifiant_contributeur()
+        return {
+            "deconnecte": True,
+            "message": (
+                "Compte détaché. Butin ne sait plus qui tu es sur Discord, et tes "
+                "prochains rapports partiront sous un nouveau pseudonyme anonyme. "
+                "⚠️ Deux choses que Butin ne peut pas faire à ta place : le serveur "
+                "de rapports garde l'ancien rattachement, et l'autorisation reste "
+                "donnée côté Discord tant que tu ne la retires pas toi-même dans "
+                "Paramètres → Applications autorisées."
+            ),
+        }
+
     def loot_a_controler(self, session_id: int) -> list[dict[str, Any]]:
         """Ce que la session a compté, objet par objet, pour le contrôle.
 
@@ -1313,6 +1347,10 @@ class Handler(BaseHTTPRequestHandler):
             # Toujours 200, comme /api/rapport : le corps porte le nom de
             # l'archive, son contenu détaillé et ce qui a manqué.
             self._send_json(self.state.preparer_l_archive())
+        elif self.path == "/api/discord/deconnexion":
+            # Toujours 200, comme /api/discord/connexion : le corps porte
+            # `deconnecte` et un message affichable tel quel.
+            self._send_json(self.state.deconnecter_discord())
         elif self.path == "/api/discord/connexion":
             # Toujours 200, même raison que /api/rapport : le corps porte
             # `ouvert` et un message affichable tel quel.
