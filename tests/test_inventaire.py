@@ -62,6 +62,59 @@ class TestIlNeToucheJamaisAuJeu:
             assert mot not in source, f"« {mot} » ferait sortir l'image de la machine"
 
 
+class TestLeDelaiAvantLaCapture:
+    """⛔ Sans lui, la fonctionnalité ne pouvait PAS marcher.
+
+    Pour cliquer sur le bouton, la fenêtre de Butin doit être au premier plan,
+    et elle recouvre le jeu. La capture prenait donc Butin devant l'inventaire.
+
+    ⭐ Ce qui rend ce défaut instructif : ma propre capture de test du
+    08/08/2026 le montrait déjà — le jeu visible, l'inventaire fermé — et j'en
+    avais conclu « il faudra penser à l'ouvrir » au lieu de « le geste demandé
+    est impossible ». La preuve était sous les yeux, mal lue.
+    """
+
+    def test_elle_attend_AVANT_de_capturer(self, racine: Path, monkeypatch) -> None:
+        from butin.capture import screen
+
+        ordre: list[str] = []
+
+        def dormir(secondes: float) -> None:
+            ordre.append(f"attendu {secondes}")
+
+        def capture_factice(*args: object, **kwargs: object) -> object:
+            ordre.append("capture")
+            raise RuntimeError("pas d'écran en test")
+
+        monkeypatch.setattr(screen, "ScreenCapture", capture_factice)
+        capturer(1, racine=racine, dormir=dormir)
+
+        assert ordre == [f"attendu {inventaire.DELAI_S}", "capture"], (
+            f"la capture ne suit pas l'attente : {ordre}"
+        )
+
+    def test_le_delai_laisse_le_temps_de_basculer(self) -> None:
+        """Six secondes : assez pour aller au jeu sans courir, assez peu pour
+        ne pas avoir envie de faire autre chose en attendant."""
+        assert 4.0 <= inventaire.DELAI_S <= 10.0
+
+    def test_il_est_annonce_a_l_ecran(self) -> None:
+        """⛔ Six secondes de silence ressemblent à un bouton cassé, et on
+        reclique. Le compte à rebours n'est pas cosmétique."""
+        page = (
+            Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static" / "index.html"
+        ).read_text(encoding="utf-8")
+        assert "capture dans " in page, "le compte à rebours a disparu"
+        assert "bascule sur le jeu" in page.lower(), "la consigne ne dit plus quoi faire pendant"
+
+    def test_on_peut_le_desactiver_pour_les_tests(self, racine: Path, monkeypatch) -> None:
+        """Sans quoi chaque test de ce fichier paierait six secondes."""
+        from butin.capture import screen
+
+        monkeypatch.setattr(screen, "ScreenCapture", lambda *a, **k: 1 / 0)
+        capturer(1, racine=racine, delai_s=0)  # ne doit pas attendre, ni lever
+
+
 class TestOuElleVit:
     def test_elle_vit_avec_les_journaux(self, racine: Path) -> None:
         """Le joueur n'a qu'un seul dossier à connaître."""
@@ -97,7 +150,9 @@ class TestElleNeLeveJamais:
             raise RuntimeError("pas d'écran")
 
         monkeypatch.setattr(screen, "ScreenCapture", casse)
-        resultat = capturer(1, racine=racine)
+        # `delai_s=0` : la suite n'a pas à payer six secondes d'attente pour
+        # vérifier un chemin d'erreur qui n'a rien à voir avec le délai.
+        resultat = capturer(1, racine=racine, delai_s=0)
         assert resultat.reussie is False
         assert "impossible" in resultat.message.lower()
         assert resultat.chemin is None
@@ -165,7 +220,12 @@ class TestLaConsigneEstAvantLeBouton:
             Path(__file__).resolve().parents[1] / "src" / "butin" / "ui" / "static" / "index.html"
         ).read_text(encoding="utf-8")
         assert 'id="bouton-inventaire"' in page
-        assert "Ouvre ton inventaire dans le jeu avant de cliquer" in page
+        # ⚠️ La consigne a CHANGÉ le 08/08/2026, et l'ancienne était fausse :
+        # elle disait « ouvre ton inventaire AVANT de cliquer », ce qui est
+        # impossible puisque cliquer met Butin devant le jeu. Elle dit
+        # maintenant l'ordre réel, et annonce le délai.
+        assert "bascule sur le jeu et ouvre ton inventaire" in page.lower()
+        assert "6 secondes" in page, "le délai n'est plus annoncé au joueur"
 
     def test_la_page_n_utilise_pas_de_style_en_ligne_pour_cette_note(self) -> None:
         """Ce fichier en comptait vingt-huit, avec sept valeurs pour la même
