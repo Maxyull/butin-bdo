@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.12.1] - 2026-08-08
+
 ### Ajouté
 
 - **⭐ Deux captures d'inventaire par session : « Inventaire de départ » et
