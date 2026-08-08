@@ -297,6 +297,9 @@
               color: var(--or); text-decoration: none; font-size: 14px;
               font-weight: 600; transition: background .12s; }
   .lien-don:hover { background: rgba(212, 169, 85, .20); }
+  /* Taille fixe : sans elle, une icône de 256 px pousserait l'en-tête hors
+     de l'écran le temps du chargement. */
+  .lien-don img { width: 18px; height: 18px; flex: 0 0 18px; }
 
   /* L'identité Discord de l'en-tête. Une pastille, pas un bouton : elle ne se
      clique pas, elle informe. Contour et non aplat de marque — l'aplat bleu
@@ -470,10 +473,20 @@
        invite à se connecter : un en-tête qui réclame quelque chose à chaque
        lancement est un en-tête qu'on apprend à ne plus lire. -->
   <div class="groupe-entete">
-  <div class="identite-discord" id="identite-discord" hidden>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
-    <span id="identite-discord-nom"></span>
-  </div>
+  <!-- ⚠️ « Soutenir Butin » et le pseudonyme ont ÉCHANGÉ leur place le
+       08/08/2026, à la demande de Maxime. La déconnexion reste entre les deux,
+       donc toujours adjacente au nom qu'elle retire — c'est ce qui comptait
+       dans la demande précédente. -->
+  <!-- ⭐ La vraie icône du kit, demandée par Maxime : `don-butin-256.png`, un
+       cœur facetté doré en 256x256. Elle remplace le caractère ❤, qui était un
+       pis-aller parce que la seule image disponible était une bannière de
+       560x120 illisible à cette taille.
+
+       Servie depuis `static/` comme `butin.png`, donc elle suit la
+       distribution figée sans réglage supplémentaire. 38 Ko. -->
+  <a class="lien-don" href="https://paypal.me/maxyull" target="_blank" rel="noopener">
+    <img src="/don.png" alt="">Soutenir Butin
+  </a>
   <!-- ⛔ La deconnexion vit a cote du nom qu'elle retire, pas dans un autre
        onglet. Demande par Maxime le 08/08/2026 : « l'icone connexion discord en
        haut a droite avec l'image et le pseudo puis deconnecter a cote ». Se
@@ -485,9 +498,10 @@
        une icone. A la taille d'un en-tete elle serait illisible, et l'embarquer
        demanderait de l'ajouter au paquet fige et a une route du serveur pour
        15 Ko qu'un contour dore rend mieux. -->
-  <a class="lien-don" href="https://paypal.me/maxyull" target="_blank" rel="noopener">
-    ❤ Soutenir Butin
-  </a>
+  <div class="identite-discord" id="identite-discord" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
+    <span id="identite-discord-nom"></span>
+  </div>
   </div>
 </div>
 
@@ -652,27 +666,19 @@
   <img id="apercu-calibrage" class="apercu" alt="Zone calibrée, cadre en surbrillance" hidden>
 </div>
 
-<div class="panneau">
-  <div class="etiquette">Derniers drops</div>
-  <div id="fil"><div class="vide">Rien pour l'instant.</div></div>
-</div>
+<!-- ⛔ Le fil des drops et le tableau du butin ont été RETIRÉS de cet onglet le
+     08/08/2026, à la demande de Maxime : « ça sert à que dalle, non ? ».
 
-<div class="panneau">
-  <table>
-    <thead>
-      <tr>
-        <th>Objet</th>
-        <th class="num">Quantité</th>
-        <th class="num">Valeur unitaire</th>
-        <th class="num">Total</th>
-        <th>Provenance</th>
-      </tr>
-    </thead>
-    <tbody id="butin"></tbody>
-  </table>
-  <div class="vide" id="vide">Aucun butin enregistré pour l'instant.</div>
-</div>
+     Il a raison, et c'est du triple emploi. Le panneau posé sur le jeu montre
+     le récap pendant le farm — c'est le seul écran qu'on regarde en farmant —
+     et l'Historique le montre après, avec le détail par objet. Personne n'a
+     jamais lu cette fenêtre-ci pendant une session : elle est derrière le jeu.
 
+     ⚠️ Ce qu'on perd, dit franchement : si le panneau ne s'ouvre pas, il n'y a
+     plus rien qui montre la session en cours dans la fenêtre principale. Le
+     cas est bordé ailleurs — un démarrage refusé referme la session et n'ouvre
+     pas le panneau — mais un panneau fermé à la main laisse maintenant l'écran
+     muet jusqu'à l'arrêt. -->
 <div id="avertissements"></div>
 
 </div>
@@ -904,67 +910,13 @@ const nombre = (v) => new Intl.NumberFormat("fr-FR").format(Math.round(v || 0));
 // gabarit qui annonçait `00:00:00`, sans qu'aucun test ne puisse le voir.
 // Retirée avec les quatre chiffres qu'elle prétendait servir.
 
-// Clés des drops déjà affichés, pour n'animer que ce qui vient d'arriver.
-// Sans ça, chaque rafraîchissement rejouerait l'animation sur toute la liste,
-// une fois par seconde, ce qui rendrait la fenêtre insupportable en farm.
-let dejaVus = new Set();
-
-function rendreLeFil(drops) {
-  const fil = $("fil");
-  if (!drops.length) {
-    dejaVus = new Set();
-    fil.innerHTML = "";
-    const vide = document.createElement("div");
-    vide.className = "vide";
-    vide.textContent = "Rien pour l'instant.";
-    fil.appendChild(vide);
-    return;
-  }
-
-  const vues = new Set();
-  fil.innerHTML = "";
-  for (const drop of drops) {
-    const cle = drop.item_id + ":" + drop.il_y_a_s + ":" + drop.quantite;
-    vues.add(cle);
-
-    const ligne = document.createElement("div");
-    ligne.className = "drop" + (dejaVus.size && !dejaVus.has(cle) ? " neuf" : "");
-
-    const quand = document.createElement("span");
-    quand.className = "quand";
-    quand.textContent = ilYA(drop.il_y_a_s);
-
-    const icone = document.createElement("img");
-    icone.className = "icone";
-    icone.alt = "";
-    icone.src = "/icone/" + drop.item_id;
-    icone.addEventListener("error", () => icone.classList.add("absente"));
-
-    const nom = document.createElement("span");
-    // textContent : un nom d'objet vient d'une source externe, l'injecter en
-    // HTML ouvrirait une porte pour rien.
-    nom.className = "rarete-" + (drop.rarete || 0);
-    nom.textContent = drop.nom;
-
-    const qte = document.createElement("span");
-    qte.className = "qte";
-    qte.textContent = "x" + drop.quantite;
-
-    const valeur = document.createElement("span");
-    valeur.className = "valeur";
-    valeur.textContent = drop.valeur ? nombre(drop.valeur) : "—";
-
-    ligne.append(quand, icone, nom, qte, valeur);
-    fil.appendChild(ligne);
-  }
-  dejaVus = vues;
-}
-
-function ilYA(secondes) {
-  if (secondes < 60) return "il y a " + Math.round(secondes) + " s";
-  if (secondes < 3600) return "il y a " + Math.round(secondes / 60) + " min";
-  return "il y a " + Math.round(secondes / 3600) + " h";
-}
+// ⛔ `rendreLeFil`, `ilYA` et `dejaVus` ont été retirés avec le fil des
+// drops, le 08/08/2026. Le panneau posé sur le jeu montre le récap pendant
+// le farm, l'Historique le montre après : cette fenêtre-ci est derrière le
+// jeu et personne ne l'a jamais lue pendant une session.
+//
+// ⚠️ Retirés AVEC leurs appels. Un identifiant demandé sur un élément disparu
+// aurait arrêté le rafraîchissement, page présentable et morte.
 
 async function poster(chemin, corps) {
   const reponse = await fetch(chemin, {
@@ -1172,37 +1124,6 @@ function afficher(etat) {
   $("etat-calibrage").textContent = calibrage
     ? "Zone calibrée : " + calibrage
     : "Zone non calibrée — la capture ne peut pas démarrer.";
-
-  rendreLeFil(etat.derniers || []);
-
-  const corps = $("butin");
-  corps.innerHTML = "";
-  for (const ligne of etat.butin || []) {
-    const [libelle, classe] = LIBELLES[ligne.source] || ["?", "inconnu"];
-    const tr = document.createElement("tr");
-    tr.appendChild(celluleObjet(ligne));
-    // textContent partout : un nom d'objet vient d'une source externe, l'injecter
-    // en HTML serait une porte d'entree pour du balisage arbitraire.
-    const cellules = [
-      [nombre(ligne.quantite), "num"],
-      [nombre(ligne.valeur_unitaire), "num"],
-      [nombre(ligne.valeur_totale), "num"],
-    ];
-    for (const [texte, classeCellule] of cellules) {
-      const td = document.createElement("td");
-      td.textContent = texte;
-      if (classeCellule) td.className = classeCellule;
-      tr.appendChild(td);
-    }
-    const tdSource = document.createElement("td");
-    const badge = document.createElement("span");
-    badge.className = "badge " + classe;
-    badge.textContent = libelle;
-    tdSource.appendChild(badge);
-    tr.appendChild(tdSource);
-    corps.appendChild(tr);
-  }
-  $("vide").style.display = (etat.butin || []).length ? "none" : "block";
 
   // Ce qui rend le chiffre interpretable plutot que decoratif.
   const avertissements = [];

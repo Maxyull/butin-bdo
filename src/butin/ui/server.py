@@ -1288,6 +1288,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_file("index.html")
         elif self.path == "/overlay":
             self._send_file("overlay.html")
+        elif self.path == "/don.png":
+            # L'icône du bouton de soutien, cœur facetté doré du kit. Servie
+            # depuis `static/` comme la marque, donc elle suit la distribution
+            # figée sans réglage supplémentaire.
+            self._send_file("don.png")
         elif self.path == "/butin.png":
             # La marque du logiciel : favicon des deux fenêtres, et logo dans
             # l'en-tête. Servie depuis `static/` comme les pages, donc elle

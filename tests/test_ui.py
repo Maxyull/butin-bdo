@@ -1271,11 +1271,14 @@ class TestBoutonDeDon:
         assert 'id="identite-discord"' in entete, "l'identité Discord n'est plus dans l'en-tête"
         assert 'id="discord-deconnexion"' in entete, "la déconnexion n'est plus dans l'en-tête"
         assert "paypal.me/maxyull" in entete, "le bouton de don n'est plus dans l'en-tête"
-        # Dans cet ordre : le nom, puis ce qui le retire, puis le soutien.
+        # ⚠️ L'ordre a changé le 08/08/2026 : Maxime a demandé d'ÉCHANGER le
+        # soutien et le pseudonyme. La déconnexion reste entre les deux, donc
+        # toujours adjacente au nom qu'elle retire — c'est ce qui comptait dans
+        # la demande précédente, et c'est ce que ce test garde.
         assert (
-            entete.index('id="identite-discord"')
+            entete.index("paypal.me")
             < entete.index('id="discord-deconnexion"')
-            < entete.index("paypal.me")
+            < entete.index('id="identite-discord"')
         )
 
     def test_se_connecter_reste_dans_les_reglages(self, app) -> None:
