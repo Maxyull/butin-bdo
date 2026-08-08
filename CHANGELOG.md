@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.13.0] - 2026-08-08
+
 ### Ajouté
 
 - **⭐ Un parcours guidé, et un seul bouton pour tout commencer.** « Commencer le
