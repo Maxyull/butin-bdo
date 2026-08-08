@@ -9,6 +9,12 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Corrigé
+
+- **La pastille dorée vide, à côté du numéro de version, a disparu.** C'était le
+  bouton de mise à jour : il ne devait s'afficher que lorsqu'une version plus
+  récente existe, et il restait là en permanence, vide, même à jour.
+
 ### Modifié
 
 - **Ton pseudonyme Discord s'affiche en haut à droite, sur la ligne du titre.**

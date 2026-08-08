@@ -252,3 +252,69 @@ def _bloc_du_schema(source: str) -> str:
     bloc, fin, _ = reste.partition('<div id="mon-ecran-etat"')
     assert fin, "impossible de délimiter le bloc du schéma"
     return bloc
+
+
+class TestHiddenCacheVraiment:
+    """⛔ `hidden` ne cachait RIEN sur deux éléments, dont un bouton VIDE.
+
+    Trouvé le 08/08/2026 par Maxime, à l'œil : « c'est quoi le truc jaune qui
+    sert à rien ». C'était le bouton de mise à jour, affiché en permanence,
+    vide, y compris sur la dernière version.
+
+    La règle `[hidden] { display: none }` vient de la feuille du **navigateur**.
+    N'importe quelle règle d'auteur qui pose un `display` la bat, sans le moindre
+    avertissement. `.bouton-maj` était en `inline-block` ; `.identite-discord`,
+    posée le jour même, avait le même défaut au même endroit.
+
+    ⚠️ **Et le contrôle au navigateur ne pouvait pas le voir** : il lisait
+    `element.hidden`, qui dit que l'ATTRIBUT est posé, pas que l'élément est
+    invisible. Deux questions différentes, et une seule des deux compte.
+    """
+
+    _DISPLAY = re.compile(r"\.([a-z-]+)\s*\{([^}]*)\}")
+    _BALISE = re.compile(r"<[a-z]+[^>]*>")
+
+    def _classes_qui_posent_un_display(self, source: str) -> set[str]:
+        return {
+            m.group(1)
+            for m in self._DISPLAY.finditer(source)
+            if re.search(r"(^|[;\s])display\s*:", m.group(2))
+        }
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_la_regle_globale_est_posee(self, nom: str) -> None:
+        """Une seule ligne rend la classe d'erreur impossible, et `!important`
+        est délibéré : c'est une règle qui doit gagner contre celles qu'on
+        écrira demain."""
+        assert "[hidden] { display: none !important; }" in page(nom)
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_aucun_element_masque_ne_porte_une_classe_qui_le_reaffiche(self, nom: str) -> None:
+        """La règle globale suffit, mais ce test dit CE QU'ELLE GARDE.
+
+        Sans lui, on pourrait la retirer un jour en la croyant décorative. Il
+        nomme les éléments qui redeviendraient visibles.
+        """
+        source = page(nom)
+        avec_display = self._classes_qui_posent_un_display(source)
+
+        coupables = []
+        for m in self._BALISE.finditer(source):
+            balise = m.group(0)
+            if "hidden" not in balise:
+                continue
+            classes = re.search(r'class="([^"]+)"', balise)
+            if not classes:
+                continue
+            touchees = avec_display & set(classes.group(1).split())
+            if touchees:
+                ident = re.search(r'id="([^"]+)"', balise)
+                coupables.append((ident.group(1) if ident else "?", sorted(touchees)))
+
+        # ⚠️ On n'exige PAS zéro coupable : la règle globale les neutralise, et
+        # interdire la combinaison obligerait à contorsionner le style. Ce qui
+        # est exigé, c'est que la règle globale soit là quand il y en a.
+        if coupables:
+            assert "[hidden] { display: none !important; }" in source, (
+                f"{nom} : {coupables} redeviennent visibles sans la règle globale"
+            )

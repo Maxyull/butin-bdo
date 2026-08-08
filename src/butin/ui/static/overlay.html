@@ -6,6 +6,14 @@
      page : elle se pose PAR-DESSUS le jeu, et tout pixel opaque qu'elle
      ajoute est un pixel de jeu que le joueur ne voit plus. Seules les
      pastilles de texte ont un fond, et il est translucide. */
+  /* ⛔ Meme garde que dans `index.html`, et pour la meme raison : la regle
+     `[hidden] { display: none }` vient de la feuille du NAVIGATEUR, et toute
+     regle d'auteur qui pose un `display` la bat en silence. Deux elements de la
+     fenetre principale sont restes affiches ainsi pendant des semaines, dont un
+     bouton VIDE. Aucun element de cette page-ci n'est concerne aujourd'hui : la
+     regle est posee pour celui qu'on ajoutera demain. */
+  [hidden] { display: none !important; }
+
   html, body {
     margin: 0; padding: 0; background: transparent;
     font-family: "Segoe UI", system-ui, sans-serif;
