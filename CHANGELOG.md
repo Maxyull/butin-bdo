@@ -9,6 +9,24 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Ajouté
+
+- **⭐ Un parcours guidé, et un seul bouton pour tout commencer.** « Commencer le
+  grind » calibre ta zone, démarre la session, te demande d'ouvrir ton
+  inventaire pour la photo de départ, puis te montre ton écran pour que tu
+  vérifies que rien ne recouvre le chat.
+
+  À l'arrêt, il reprend la photo d'arrivée et te pose la seule question qui
+  compte : **le compte est bon ?** Si tu réponds non, le rapport part et
+  l'archive complète est préparée, prête à déposer.
+
+### Retiré
+
+- **Le bouton « Calibrer la zone ».** Il se faisait à part, donc il s'oubliait —
+  et une zone non calibrée donne un compteur à zéro qui ressemble à un farm
+  pauvre. Le calibrage fait maintenant partie du démarrage, avec son message et
+  ses doutes affichés.
+
 ## [0.12.1] - 2026-08-08
 
 ### Ajouté
