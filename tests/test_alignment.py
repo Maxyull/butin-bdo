@@ -147,6 +147,94 @@ class TestMurDeLignesIdentiques:
         assert [line.item_id for line in result.new_lines] == [D]
 
 
+class TestUnePredictionFausseNeVidePasLeRecouvrement:
+    """⛔ Régression : la moitié d'une vraie session comptée en trop.
+
+    Session 0018 du 08/08/2026, aux Ruines de Sycraia, dix-huit secondes après
+    le démarrage. L'écran montrait deux lignes déjà vues à l'amorce plus une
+    neuve, donc un recouvrement de 2. La fenêtre de chat se remplissait encore,
+    donc la mesure de défilement n'avait aucun sens : elle a prédit **3**
+    nouvelles lignes.
+
+    `k = 0` est toujours un recouvrement « valide » — il n'a aucune paire à
+    contredire — et il était candidat à égalité avec les autres. La cible étant
+    zéro, il a gagné. Les deux emplacements posés par l'amorce sont sortis de la
+    liste, trois emplacements neufs et non validés les ont remplacés, et six
+    secondes plus tard un « Élixir d'expérience splendide » que le joueur
+    possédait **avant** la session a été crédité **6 261 unités** : la moitié du
+    total de la session.
+
+    ⭐ L'amorce avait parfaitement fait son travail. C'est l'alignement qui l'a
+    défaite, et c'est donc là que le correctif va.
+
+    ⚠️ Le banc d'essai ne peut pas valider ce correctif : sa rafale ne contient
+    pas le cas (aucune image sans recouvrement sur les 300). Il montre
+    seulement l'absence de régression — 47/47 drops et 140/140 unités, inchangés.
+    """
+
+    def test_le_cas_reel_de_la_session_0018(self, catalog: ItemCatalog) -> None:
+        """Deux lignes déjà vues, une neuve, et les pixels qui en annoncent trois."""
+        previous = [ligne(catalog, A), ligne(catalog, B)]
+        current = [ligne(catalog, A), ligne(catalog, B), ligne(catalog, C)]
+
+        result = align(previous, current, expected_new=3)
+
+        assert result.overlap == 2, "les deux lignes déjà vues seraient recomptées"
+        assert [line.item_id for line in result.new_lines] == [C]
+        assert result.zero_overlap is False
+
+    def test_sans_le_correctif_le_choix_serait_zero(self, catalog: ItemCatalog) -> None:
+        """⛔ Le banc doit pouvoir montrer ce qu'il garde, sinon il ne garde rien.
+
+        Ce test fige les deux faits qui rendaient l'erreur possible : le
+        recouvrement vide EST valide, et la cible visée par les pixels EST zéro.
+        Si l'un des deux disparaissait un jour, le test ci-dessus passerait pour
+        une raison qui n'a rien à voir avec le correctif.
+        """
+        previous = [ligne(catalog, A), ligne(catalog, B)]
+        current = [ligne(catalog, A), ligne(catalog, B), ligne(catalog, C)]
+
+        result = align(previous, current, expected_new=3)
+
+        assert 0 in result.diagnostics["valid_overlaps"]
+        assert result.diagnostics["target_overlap"] == 0
+        assert result.diagnostics["vide_ecarte"] is True
+
+    def test_le_vide_reste_atteignable_quand_le_texte_n_offre_RIEN(
+        self, catalog: ItemCatalog
+    ) -> None:
+        """⛔ Le correctif ne doit pas rendre le recouvrement nul impossible.
+
+        Un vrai renouvellement complet de l'écran existe — le joueur change de
+        zone, le chat est vidé — et `is_glitch_frame` a besoin de le voir pour
+        écarter l'image. Écarter le vide *par principe* le rendrait aveugle.
+        """
+        previous = [ligne(catalog, A), ligne(catalog, B)]
+        current = [ligne(catalog, C), ligne(catalog, D)]
+
+        result = align(previous, current, expected_new=2)
+
+        assert result.overlap == 0
+        assert result.zero_overlap is True
+
+    def test_les_pixels_arbitrent_toujours_entre_deux_recouvrements_REELS(
+        self, catalog: ItemCatalog
+    ) -> None:
+        """Le mur de lignes identiques ne doit pas être cassé par le correctif.
+
+        C'est tout l'intérêt de la prédiction, et elle porte sur des
+        recouvrements que le texte soutient tous : le correctif ne touche que le
+        cas où elle désigne le vide.
+        """
+        previous = [ligne(catalog, A) for _ in range(5)]
+        current = [ligne(catalog, A) for _ in range(5)]
+
+        result = align(previous, current, expected_new=2)
+
+        assert result.overlap == 3
+        assert len(result.new_lines) == 2
+
+
 class TestBruitDeLecture:
     def test_un_chiffre_mal_lu_ne_casse_pas_l_alignement(self, catalog: ItemCatalog) -> None:
         """Régression : sinon le drop mal lu est recompté.

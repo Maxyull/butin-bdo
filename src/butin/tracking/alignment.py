@@ -214,10 +214,40 @@ def align(
     else:
         target = max(0, lc - expected_new)
         diagnostics["target_overlap"] = target
-        # Recouvrement valide le plus proche de la prédiction. À égalité de
-        # distance, on préfère le plus grand, qui déclare moins de nouveautés.
-        chosen = min(scores, key=lambda k: (abs(k - target), -k))
+        # ⛔ La prédiction choisit PARMI CE QUE LE TEXTE SOUTIENT, et le
+        # recouvrement vide n'en fait pas partie tant qu'il existe autre chose.
+        #
+        # `k = 0` est toujours dans `scores`, avec la note maximale : il n'a
+        # aucune paire à contredire. Tant qu'il restait candidat à égalité, une
+        # prédiction pointant sur zéro le choisissait **quelle que soit** la
+        # force du recouvrement textuel — et « rien en commun » est une
+        # affirmation sur le CONTENU, que les pixels n'ont pas qualité à faire.
+        # Ils peuvent dire « trois lignes ont défilé » ; ils ne peuvent pas dire
+        # que ces deux lignes identiques sont deux lignes différentes.
+        #
+        # ⭐ Cas réel, session 0018 du 08/08/2026, à 18 secondes de session :
+        # l'écran montrait deux lignes déjà vues plus une neuve, donc un
+        # recouvrement de 2. La fenêtre de chat se remplissait encore, donc la
+        # mesure de défilement n'avait aucun sens, et elle a prédit 3 nouvelles
+        # lignes. Cible 0, recouvrements valides [2, 0], zéro choisi. Les deux
+        # emplacements posés par l'amorce sont sortis de la liste, trois neufs
+        # les ont remplacés, et un « Élixir d'expérience splendide » que le
+        # joueur possédait AVANT la session a été crédité **6 261 unités**,
+        # soit la moitié du total de la session.
+        #
+        # L'amorce avait parfaitement fait son travail ; c'est l'alignement qui
+        # l'a défaite.
+        #
+        # ⚠️ Ce que ça coûte, dit franchement : un vrai renouvellement complet
+        # de l'écran qui laisserait par hasard un recouvrement faible mais
+        # valide sera sous-estimé, donc des drops manqués. C'est le bon sens de
+        # l'erreur — un chiffre bas se rattrape, un chiffre inventé ne se voit
+        # pas — et `is_glitch_frame` garde toujours le cas du recouvrement
+        # réellement nul, que ce choix ne touche pas.
+        candidats = positive or list(scores)
+        chosen = min(candidats, key=lambda k: (abs(k - target), -k))
         diagnostics["disagreement"] = chosen != largest_valid
+        diagnostics["vide_ecarte"] = bool(positive) and target == 0
 
     confidence = scores[chosen] if chosen > 0 else 0.0
     # Combien de paires du recouvrement retenu ne se ressemblaient pas. Une
