@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.12.0] - 2026-08-08
+
 ### Ajouté
 
 - **Un bouton « Se déconnecter » à côté de ton compte Discord.** Il n'y avait
