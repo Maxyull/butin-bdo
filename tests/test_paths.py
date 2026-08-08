@@ -27,6 +27,17 @@ def sans_redirection(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     reglages = tmp_path / "config"
     reglages.mkdir()
     monkeypatch.setattr(paths, "_settings_dir", lambda: reglages)
+
+    # ⛔ Documents est isolé lui aussi, et ça manquait. Sans ça ces tests
+    # lisaient le VRAI dossier Documents de la machine : leur résultat
+    # dépendait donc de ce qu'on y trouvait, et trois d'entre eux ont basculé
+    # au rouge le 08/08/2026 sur une machine qui possédait encore l'ancien
+    # dossier « BDO Tracker » — alors que le code faisait exactement ce qu'on
+    # lui demandait. Un test qui dépend de l'état du poste ne mesure pas le
+    # code.
+    documents = tmp_path / "Documents"
+    documents.mkdir()
+    monkeypatch.setattr(paths, "user_documents_path", lambda: documents)
     return tmp_path
 
 

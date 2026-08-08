@@ -217,6 +217,15 @@ def build_state(store: SessionStore | None = None) -> AppState:
     # l'historique. Les fichiers seraient toujours là, mais le programme
     # regarderait ailleurs, ce qui du point de vue de la personne revient au
     # même.
+    # ⛔ Le renommage du dossier D'ABORD. `migrate_legacy` déplace des fichiers
+    # VERS `storage_root()` : le faire avant le renommage les déposerait dans
+    # le nouveau dossier, puis le renommage échouerait parce que la destination
+    # existe désormais — et l'ancien dossier, avec tout l'historique, resterait
+    # sur le côté. L'ordre n'est pas cosmétique.
+    renomme = paths.migrate_ancien_dossier()
+    if renomme is not None:
+        _log.info("dossier renommé depuis %s", renomme)
+
     ancien = paths.migrate_legacy()
     if ancien is not None:
         _log.info("données reprises depuis %s", ancien)
