@@ -47,6 +47,7 @@ from ..bundle import ouvrir_le_dossier as _ouvrir_le_dossier
 from ..bundle import preparer as _preparer_archive
 from ..capture.calibrate import Calibration, CalibrationError
 from ..capture.inventaire import capturer as _capturer_inventaire
+from ..capture.lines import PART_AVEC_HEURE_ATTENDUE, part_avec_heure
 from ..capture.worker import CaptureUnavailable, CaptureWorker
 from ..catalog import IconStore, ItemCatalog, ItemMatcher
 from ..catalog.icons import TYPES_MIME
@@ -540,13 +541,33 @@ class AppState:
         if self.catalog is not None:
             gains = len(parse_frame(list(rangees), ItemMatcher(self.catalog)))
         apercu = base64.b64encode(draw_preview(image, calibrage)).decode("ascii")
+
+        # ⛔ Le doute qu'aucun critère GÉOMÉTRIQUE ne pouvait voir : une zone
+        # assez haute et assez régulière, mais trop ÉTROITE. Elle coupe la fin
+        # de chaque ligne, donc le nom de l'objet, donc le drop — en silence.
+        #
+        # Session 0017 du 08/08/2026 : 462 secondes, ZÉRO objet compté, zone de
+        # 448 px là où la même fenêtre de chat en demandait 662. Force 0,41 et
+        # 25 rangées : tous les critères de `Calibration.doutes()` passaient,
+        # parce qu'aucun ne regardait le texte lu.
+        doutes = list(calibrage.doutes(precedent))
+        part = part_avec_heure(rangees)
+        if part is not None and part < PART_AVEC_HEURE_ATTENDUE:
+            doutes.append(
+                f"la zone est trop étroite : seulement {part * 100:.0f} % des lignes lues "
+                "se terminent par leur heure, alors que le jeu la met à la fin de "
+                "chacune. Les noms d'objets sont donc coupés, et un nom coupé est un "
+                "drop perdu sans que rien ne le dise. Élargis la fenêtre de chat "
+                "vers la droite, puis recalibre."
+            )
+
         return {
             "zone": calibrage.describe(),
             "rangees": calibrage.rows,
             "extrait": [ligne[:90] for ligne in rangees[:4]],
             "gains": gains,
             "apercu": f"data:image/png;base64,{apercu}",
-            "doutes": calibrage.doutes(precedent),
+            "doutes": doutes,
         }
 
     def start(self, spot: str, *, now: float | None = None) -> int:

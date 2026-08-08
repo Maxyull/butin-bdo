@@ -37,6 +37,7 @@ examen : c'est la petite icône de l'objet, que l'OCR rend en glyphes parasites.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
@@ -88,6 +89,55 @@ def stamp_minutes(stamp: str) -> int | None:
     if not (0 <= h < 24 and 0 <= m < 60):
         return None
     return h * 60 + m
+
+
+MIN_LIGNES_POUR_JUGER = 3
+"""En dessous, on ne se prononce pas sur la largeur de la zone.
+
+Une ou deux lignes mal lues arrivent tout le temps. Trois qui finissent toutes
+au mauvais endroit, non : c'est la zone.
+"""
+
+PART_AVEC_HEURE_ATTENDUE = 0.5
+"""Part des lignes qui doivent porter leur heure pour qu'on croie à la zone.
+
+⛔ Posé entre deux populations MESURÉES sur de vraies sessions du 08/08/2026 :
+
+| session | zone | lignes finissant par leur heure |
+| --- | --- | --- |
+| 0018 | 662 px de large | **13 621 sur 13 686, soit 100 %** |
+| 0017 | **448 px** | **0 sur 18** |
+
+Il n'y a rien entre les deux. Le seuil est à mi-chemin par confort de lecture,
+pas par arbitrage : n'importe quelle valeur entre 0,05 et 0,95 sépare ces deux
+sessions-là.
+"""
+
+
+def part_avec_heure(lignes: Sequence[str]) -> float | None:
+    """Part des lignes lues qui se terminent par leur heure. `None` si trop peu.
+
+    ⭐ **Le seul signe de troncature qui ne demande aucune géométrie.** Le jeu
+    finit CHAQUE ligne du journal d'acquisition par son heure entre parenthèses
+    — c'est relevé sur de vraies captures dans `docs/journal-acquisition.md`,
+    pas supposé. Si la zone est trop étroite, l'heure est la première chose qui
+    sort du cadre, et le nom de l'objet suit.
+
+    ⛔ Pourquoi ça compte plus qu'un défaut d'affichage : un nom coupé n'est pas
+    reconnu, donc le drop est **perdu en silence**. Et sans heure, le filtre du
+    vieux journal (`is_stale`) ne peut plus rien refuser non plus. Une zone trop
+    étroite casse donc les deux protections d'un coup, en n'affichant rien.
+
+    Vécu le 08/08/2026, session 0017 : 462 secondes, **zéro objet compté**,
+    zone de 448 px là où la même fenêtre de chat en demandait 662. Le calibrage
+    passait pourtant tous les critères de justesse — force 0,41, 25 rangées —
+    parce qu'aucun ne regardait le TEXTE.
+    """
+    utiles = [ligne for ligne in lignes if ligne.strip()]
+    if len(utiles) < MIN_LIGNES_POUR_JUGER:
+        return None
+    avec = sum(1 for ligne in utiles if _STAMP_RE.search(ligne) is not None)
+    return avec / len(utiles)
 
 
 def is_stale(stamp: str, session_start_min: int) -> bool:
