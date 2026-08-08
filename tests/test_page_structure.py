@@ -178,12 +178,38 @@ class TestCeQuIlFautVoir:
 
     def test_les_trois_erreurs_sont_montrees(self) -> None:
         """⛔ Ce n'est pas décoratif : la session 0014 a laissé le menu Échap
-        par-dessus le chat 247 secondes, et perdu 560 objets sur 4 080."""
+        par-dessus le chat 247 secondes, et perdu 560 objets sur 4 080.
+
+        ⚠️ Les schémas ont été REDESSINÉS le 08/08/2026 d'après quatre captures
+        du vrai écran de Maxime. Le précédent accusait l'inventaire, qui chez
+        lui s'ouvre à DROITE et ne recouvre rien : les coupables sont les
+        fenêtres de gauche, menu Échap, Mes informations, boîte aux lettres.
+        Un schéma qui accuse la mauvaise fenêtre apprend à surveiller la
+        mauvaise chose.
+        """
         bloc = _bloc_du_schema(page("index.html"))
 
-        assert "inventaire" in bloc.lower()
         assert "menu Échap" in bloc
+        assert "Mes informations" in bloc
+        assert "boîte aux lettres" in bloc
         assert bloc.count("<figure") == 3
+
+    def test_l_obstruction_PARTIELLE_est_montree(self) -> None:
+        """⭐ Le cas le plus dangereux, et il manquait aux trois schémas.
+
+        Vu sur une capture réelle : « Mes informations » ne couvre que le HAUT
+        de la zone, deux lignes restent visibles en dessous. Butin continue donc
+        de lire et de compter, sur un tiers de ce qui passe.
+
+        C'est pire qu'un recouvrement total, pour la raison qui revient partout
+        dans ce projet : un compteur arrêté finit par se voir, un compteur qui
+        compte à moitié ressemble à un farm calme. Et l'alerte « je ne vois plus
+        le chat » de la 0.8.1 se tait, puisqu'il reste des lignes.
+        """
+        bloc = _bloc_du_schema(page("index.html"))
+
+        assert "haut" in bloc.lower()
+        assert "farm calme" in bloc
 
 
 class TestLesBarresDeDefilementSuiventLeTheme:

@@ -30,6 +30,16 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Modifié
 
+- **⛔ Les schémas « ce qu'il faut voir » sont redessinés d'après de vrais
+  écrans, et l'un d'eux accusait la mauvaise fenêtre.** L'inventaire s'ouvre à
+  droite et ne recouvre rien : ce sont les fenêtres de **gauche** qui gênent,
+  menu Échap, Mes informations, boîte aux lettres.
+
+  Et il manquait le cas le plus dangereux : une fenêtre qui ne mange que le
+  **haut** de la zone. Butin continue alors de compter, sur un tiers de ce qui
+  passe. Un compteur arrêté finit par se voir ; un compteur qui compte à moitié
+  ressemble à un farm calme.
+
 - **Tout ce qui te concerne est passé en haut à droite** : ton pseudonyme
   Discord, le bouton pour t'en détacher, et le soutien. Sur la ligne du titre.
 
