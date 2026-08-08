@@ -1183,6 +1183,105 @@ class TestButin:
         assert etat["butin"] == []
 
 
+class TestDeconnexionDiscord:
+    """Le bouton « Se déconnecter », demandé par Maxime le 08/08/2026.
+
+    ⛔ Ce qu'il teste avant tout, c'est que le message ne promet **pas** plus
+    que ce qui a lieu. Le relais n'expose aucune route pour défaire un
+    rattachement — vérifié sur son `openapi.json` — donc Butin ne peut se
+    détacher que de son côté, en changeant l'identifiant qui sert de clé.
+    """
+
+    def test_la_deconnexion_change_l_identifiant(self, app, tmp_path, monkeypatch) -> None:
+        from butin import report
+
+        racine = tmp_path / "maison"
+        monkeypatch.setattr(paths, "storage_root", lambda: racine)
+        _, base = app
+        avant = report.contributor_id()
+
+        post(base, "/api/discord/deconnexion")
+
+        assert report.contributor_id() != avant
+
+    def test_le_message_dit_ce_que_butin_ne_peut_PAS_faire(self, app, tmp_path, monkeypatch):
+        """⛔ Régression sur une promesse, pas sur du code.
+
+        Un bouton « Se déconnecter » qui laisserait croire à une révocation
+        complète mentirait deux fois : le relais garde l'ancien rattachement,
+        et l'autorisation reste donnée côté Discord tant que le joueur ne la
+        retire pas lui-même. C'est exactement la faute que ce dépôt s'est déjà
+        faite en écrivant une justification sans l'implémenter, et elle est
+        plus grave ici : le sujet est la confiance.
+        """
+        monkeypatch.setattr(paths, "storage_root", lambda: tmp_path / "maison")
+        _, base = app
+
+        corps = post(base, "/api/discord/deconnexion")
+
+        assert corps["deconnecte"] is True
+        assert "Discord" in corps["message"]
+        # Les deux limites, chacune nommée : ni l'une ni l'autre ne doit
+        # disparaître d'une reformulation.
+        assert "rattachement" in corps["message"]
+        assert "autorisation" in corps["message"]
+
+    def test_le_bouton_existe_dans_la_page(self, app) -> None:
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        assert 'id="discord-deconnexion"' in corps
+        assert "Se déconnecter" in corps
+
+
+class TestBoutonDeDon:
+    """Posé à côté des boutons Discord, demandé par Maxime le 08/08/2026.
+
+    Il a fallu le lui demander : le bouton était réclamé depuis la 0.4.0 sans
+    que l'endroit soit dit, et le poser au jugé aurait été le poser deux fois.
+    """
+
+    def test_le_lien_de_don_est_dans_la_page(self, app) -> None:
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        assert "https://paypal.me/maxyull" in corps
+        assert "Soutenir Butin" in corps
+
+    def test_il_est_a_cote_des_boutons_discord(self, app) -> None:
+        """L'endroit fait partie de la demande, pas seulement la présence.
+
+        Découpage sur les balises littérales plutôt qu'une expression
+        régulière sur du HTML : CodeQL refuse la seconde (`py/bad-tag-filter`),
+        et le fichier lu est le nôtre.
+        """
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        _, marque, apres = corps.partition('id="page-rapport"')
+        assert marque, "l'onglet Rapport a disparu"
+        assert "paypal.me/maxyull" in apres.partition("<script>")[0]
+        # Dans le même panneau que Discord, donc après le lien du salon.
+        assert apres.index("discord.gg") < apres.index("paypal.me")
+
+    def test_il_s_ouvre_dans_le_navigateur_du_systeme(self, app) -> None:
+        """⛔ `rel="noopener"`, comme le lien Discord. Sans lui, la page
+        ouverte garde une référence vers celle-ci et peut la faire naviguer
+        ailleurs — sur une fenêtre sans barre d'adresse, personne ne le
+        verrait."""
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        _, _, apres = corps.partition('href="https://paypal.me/maxyull"')
+        balise = apres.partition(">")[0]
+        assert 'target="_blank"' in balise
+        assert 'rel="noopener"' in balise
+
+
 class TestMonEcran:
     """Le bouton « Mon écran », demandé par Maxime le 08/08/2026.
 
@@ -1226,12 +1325,18 @@ class TestMonEcran:
     def test_un_echec_de_capture_reste_un_200(self, app, monkeypatch) -> None:
         """Comme `/api/rapport` : le serveur local a fait son travail, la cause
         est ailleurs. Un code d'erreur HTTP ferait afficher « erreur serveur »
-        à la page pour un calibrage qui manque."""
+        à la page pour un calibrage qui manque.
+
+        ⚠️ Par `post()`, comme tout ce fichier, et pas par une requête bâtie à
+        la main : `urlopen` lève sur tout code hors 2xx, donc **obtenir un
+        corps EST la preuve du 200**. La première version ouvrait sa propre
+        connexion pour lire `reponse.status`, ce qui n'apprenait rien de plus
+        et a échoué une fois sur quatre en `ConnectionAbortedError` sur le
+        démontage du vrai serveur, sous Windows.
+        """
         state, base = app
         monkeypatch.setattr(state, "_apercu_de_la_zone", lambda: None)
 
-        with urllib.request.urlopen(  # noqa: S310
-            urllib.request.Request(base + "/api/apercu", data=b"{}", method="POST"),  # noqa: S310
-            timeout=5,
-        ) as reponse:
-            assert reponse.status == 200
+        corps = post(base, "/api/apercu")
+
+        assert "erreur" in corps

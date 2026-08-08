@@ -36,6 +36,7 @@ que Butin ne propose pas.
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
@@ -104,6 +105,52 @@ def contributor_id(root: Path | None = None) -> str:
         # Pas de disque, pas de dossier : on envoie quand même. Le rapport
         # compte plus que la continuité de l'identifiant.
         _log.warning("identifiant de contributeur non enregistré : %s", exc)
+    return nouveau
+
+
+def reset_contributor_id(root: Path | None = None) -> str:
+    """Remplace l'identifiant anonyme par un neuf, et le rend.
+
+    ⭐ C'est le seul mécanisme de « se déconnecter » dont Butin dispose. Le
+    rattachement Discord est **indexé sur cet identifiant** côté relais : en
+    changer coupe le lien vu d'ici, puisque le relais ne connaît aucun compte
+    pour le nouveau.
+
+    ⛔ Ce que ça ne fait PAS, et l'interface doit le dire :
+
+    - **le relais garde l'ancien lien.** Il n'expose aucune route pour le
+      défaire — vérifié le 08/08/2026 sur son `openapi.json`, qui n'a que
+      `/v1/discord/compte`, `/connexion` et `/retour`. Demandé dans
+      `COORDINATION.md` ;
+    - **l'autorisation reste donnée côté Discord.** Seul le joueur peut la
+      retirer, dans ses propres réglages Discord. Personne d'autre ne le peut,
+      et c'est très bien ainsi.
+
+    ⚠️ Effet de bord assumé : les rapports envoyés ensuite partent sous un
+    **nouveau** pseudonyme anonyme. C'est la conséquence directe du mécanisme,
+    pas un défaut — se déconnecter, c'est justement cesser d'être la même
+    personne aux yeux du salon.
+
+    Écriture atomique : un fichier tronqué par une coupure au mauvais moment
+    rendrait un identifiant invalide, que `contributor_id` remplacerait au
+    prochain appel. Le résultat serait juste, mais on aurait perdu la trace de
+    ce qui s'est passé.
+    """
+    chemin = contributor_path(root)
+    nouveau = secrets.token_hex(_ID_BYTES)
+    temporaire = chemin.with_suffix(chemin.suffix + ".tmp")
+    try:
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        temporaire.write_text(nouveau, encoding="utf-8")
+        # `os.replace` et non `Path.replace` : voir la note de `market/cache.py`,
+        # un test de régression remplace cette fonction et patcher la méthode
+        # l'échangerait pour tous les chemins du processus, pytest compris.
+        os.replace(temporaire, chemin)  # noqa: PTH105
+    except OSError as exc:
+        # Comme `contributor_id` : on rend quand même un identifiant. Ne pas
+        # pouvoir écrire ne doit pas laisser le joueur rattaché contre son gré
+        # pour le reste de la session.
+        _log.warning("identifiant de contributeur non remplacé : %s", exc)
     return nouveau
 
 

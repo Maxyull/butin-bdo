@@ -221,6 +221,16 @@
     border-radius: var(--rayon-pilule); padding: 8px 14px; }
   .bouton-discord-compte:hover { color: var(--texte); border-color: #5865f2; }
   .bouton-discord-compte[disabled] { cursor: progress; opacity: .6; }
+
+  /* Le bouton de don. Contour doré et non aplat : voir le commentaire posé sur
+     le lien lui-même, la page n'a qu'un seul aplat coloré et c'est ce qui rend
+     celui de Discord reconnaissable. */
+  .lien-don { display: inline-flex; align-items: center; gap: 8px;
+              padding: 8px 16px; border: 1px solid var(--or);
+              border-radius: var(--rayon-pilule); background: rgba(212, 169, 85, .10);
+              color: var(--or); text-decoration: none; font-size: 14px;
+              font-weight: 600; transition: background .12s; }
+  .lien-don:hover { background: rgba(212, 169, 85, .20); }
   .compte-discord { color: var(--doux); font-size: 13px; }
   /* L'avertissement sur le nom affiché par Discord. Sous l'en-tête et pleine
      largeur : il doit se lire avant de cliquer, pas se deviner à côté d'un
@@ -705,7 +715,12 @@
          connecter » à quelqu'un qui l'est déjà. -->
     <button class="bouton-discord-compte" id="discord-connexion" hidden>Se connecter à Discord</button>
     <span class="compte-discord" id="discord-compte" hidden></span>
+    <!-- ⛔ Affiché seulement quand un compte est rattaché. Proposer de se
+         déconnecter à quelqu'un qui ne l'est pas laisserait croire qu'il
+         l'était. -->
+    <button class="bouton-discord-compte" id="discord-deconnexion" hidden>Se déconnecter</button>
   </div>
+  <div id="discord-deconnexion-etat" class="note note-large" hidden></div>
   <!-- ⛔ Dit AVANT d'ouvrir le navigateur, pas après. Discord affichera
        « Rubin » parce que les deux logiciels partagent le même serveur, et
        c'est lui qui y est enregistré. Un joueur à qui l'on demande d'autoriser
@@ -719,6 +734,31 @@
     normal : les deux logiciels partagent le même serveur, et c'est lui qui est
     enregistré auprès de Discord. Butin ne verra jamais ton mot de passe.
   </p>
+
+  <!-- ⭐ Le bouton de don, posé ICI à la demande de Maxime le 08/08/2026 :
+       « au bouton se déconnecter de Discord ». C'est le seul endroit de
+       l'application où l'on s'adresse à la personne plutôt qu'au compteur.
+
+       ⚠️ Un lien texte, pas l'image `ressources/bouton-don-butin.png` du
+       README : celle-ci n'est pas distribuée avec l'application, l'embarquer
+       demanderait de l'ajouter au paquet figé et à une route du serveur pour
+       15 Ko qu'un contour doré rend aussi bien.
+
+       ⚠️ Contour et pas aplat : la page n'a qu'UN seul aplat coloré, celui de
+       Discord, et c'est ce qui le rend reconnaissable au premier coup d'œil.
+       Un second se disputerait l'attention sans que rien ne dise lequel
+       compte. Même raison que `.bouton-maj`, doré à contour lui aussi. -->
+  <hr class="separateur">
+  <div class="rangee">
+    <a class="lien-don" href="https://paypal.me/maxyull" target="_blank" rel="noopener">
+      ❤ Soutenir Butin
+    </a>
+    <span class="note">Entièrement facultatif.</span>
+  </div>
+  <div class="note note-apres-action">
+    Butin est gratuit et le restera : pas de version payante, pas de publicité,
+    et rien de ce que tu farmes ne quitte ta machine.
+  </div>
 </div>
 
 </div>
@@ -1835,6 +1875,7 @@ const DISCORD_SONDAGE_MS = 120000;
 function afficherLeCompteDiscord(compte) {
   const bouton = $("discord-connexion");
   const etiquette = $("discord-compte");
+  const detacher = $("discord-deconnexion");
   // L'avertissement suit le bouton : il ne sert qu'au moment de decider, et
   // une phrase qui survit a ce qu'elle explique dit quelque chose de faux.
   const avertissement = $("discord-avertissement");
@@ -1853,6 +1894,8 @@ function afficherLeCompteDiscord(compte) {
     if (compte.nom) etiquette.querySelector("b").textContent = compte.nom;
     etiquette.hidden = false;
     bouton.hidden = true;
+    detacher.hidden = false;
+    detacher.disabled = false;
     avertissement.hidden = true;
     discordSondageJusqua = 0;  // Inutile de continuer a sonder.
   } else {
@@ -1860,6 +1903,7 @@ function afficherLeCompteDiscord(compte) {
     bouton.hidden = false;
     bouton.disabled = false;
     bouton.textContent = "Se connecter à Discord";
+    detacher.hidden = true;
     avertissement.hidden = false;
   }
 }
@@ -1890,6 +1934,30 @@ $("discord-connexion").addEventListener("click", async () => {
   } catch (erreur) {
     bouton.disabled = false;
     bouton.textContent = "Le serveur local n'a pas répondu.";
+  }
+});
+
+// ⛔ Le message de déconnexion va dans son PROPRE élément, et il n'est PAS
+// effacé par le rafraîchissement. Il dit deux choses que Butin ne peut pas
+// faire à la place du joueur — le relais garde l'ancien lien, et l'autorisation
+// reste donnée chez Discord — et ce sont précisément celles qu'il faut avoir le
+// temps de lire. Même arbitrage que le message de mise à jour, tranché dans
+// l'autre sens parce que celui-ci n'a pas de cause qui disparaît.
+$("discord-deconnexion").addEventListener("click", async () => {
+  const bouton = $("discord-deconnexion");
+  const etat = $("discord-deconnexion-etat");
+  bouton.disabled = true;
+  etat.hidden = false;
+  etat.textContent = "Détachement…";
+  try {
+    const corps = await (await fetch("/api/discord/deconnexion", { method: "POST" })).json();
+    etat.textContent = corps.message || "Réponse illisible.";
+    // Relu depuis le serveur plutôt que déduit ici : c'est lui qui sait si le
+    // nouvel identifiant a bien remplacé l'ancien sur le disque.
+    await relireLeCompteDiscord();
+  } catch (erreur) {
+    etat.textContent = "Le serveur local n'a pas répondu.";
+    bouton.disabled = false;
   }
 });
 
