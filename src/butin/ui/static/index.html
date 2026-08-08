@@ -480,9 +480,10 @@
     <button class="action-mince" id="bouton-archive">Préparer une archive</button>
   </div>
   <div class="note-avant note-apres-action">
-    <b>Ouvre ton inventaire dans le jeu avant de cliquer.</b> La capture prend
-    l'écran tel qu'il est, elle ne peut pas deviner. Elle reste sur ton disque
-    et part avec l'archive.
+    <b>Clique, puis bascule sur le jeu et ouvre ton inventaire.</b> La capture
+    part <b>6 secondes</b> après le clic, le temps que tu y sois : sinon elle
+    prendrait cette fenêtre-ci, qui est devant le jeu au moment où tu cliques.
+    Elle reste sur ton disque et part avec l'archive.
   </div>
   <div id="inventaire-etat" class="note"></div>
   <div id="archive-etat" class="note"></div>
@@ -1522,17 +1523,36 @@ async function rafraichir() {
 // clavier dans la barre de recherche, pas de clic. Injecter des entrees dans un
 // client de Black Desert est sanctionne par un bannissement, et aucun confort
 // ne vaut le compte de quelqu'un.
+// ⛔ Le compte a rebours est VISIBLE, et ce n'est pas cosmetique. La capture
+// part six secondes apres le clic, le temps de basculer sur le jeu : sans
+// compteur a l'ecran, six secondes de silence ressemblent a un bouton casse, et
+// on reclique.
+const DELAI_CAPTURE_S = 6;
+
 $("bouton-inventaire").addEventListener("click", async () => {
   const bouton = $("bouton-inventaire");
   const etat = $("inventaire-etat");
   bouton.disabled = true;
-  etat.textContent = "Capture…";
+
+  let reste = DELAI_CAPTURE_S;
+  etat.textContent = "Va sur le jeu et ouvre ton inventaire — capture dans " + reste + " s";
+  const compte = setInterval(() => {
+    reste -= 1;
+    if (reste > 0) {
+      etat.textContent = "Va sur le jeu et ouvre ton inventaire — capture dans " + reste + " s";
+    } else {
+      etat.textContent = "Capture…";
+      clearInterval(compte);
+    }
+  }, 1000);
+
   try {
     const corps = await (await fetch("/api/inventaire", { method: "POST" })).json();
     etat.textContent = corps.message || "Réponse illisible.";
   } catch (erreur) {
     etat.textContent = "Le serveur local n'a pas répondu.";
   } finally {
+    clearInterval(compte);
     bouton.disabled = false;
   }
 });

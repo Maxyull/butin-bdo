@@ -44,6 +44,8 @@ que découvert après coup en ouvrant le fichier.
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,19 +82,44 @@ def chemin_pour(session_id: int, racine: Path | None = None) -> Path:
     return dossier_des_rapports(racine) / f"{PREFIXE}-{session_id:04d}.png"
 
 
+DELAI_S = 6.0
+"""Secondes entre le clic et la capture.
+
+⛔ Sans ce délai, la fonctionnalité ne pouvait PAS marcher, et c'est une faute
+de conception que personne n'a vue avant que Maxime n'essaie.
+
+Pour cliquer sur le bouton, la fenêtre de Butin doit être au premier plan — et
+elle recouvre le jeu. La capture prenait donc **Butin devant l'inventaire**.
+Ma propre capture de test du 08/08/2026 le montrait déjà, jeu visible et
+inventaire fermé, et j'en avais tiré « il faudra penser à l'ouvrir » au lieu de
+« le geste demandé est impossible ».
+
+Six secondes : le temps de basculer sur le jeu et d'ouvrir l'inventaire sans se
+presser. Plus court oblige à courir, plus long donne envie de faire autre chose
+en attendant.
+"""
+
+
 def capturer(
     session_id: int,
     *,
     racine: Path | None = None,
     monitor: int = 1,
+    delai_s: float = DELAI_S,
+    dormir: Callable[[float], None] = time.sleep,
 ) -> Capture:
     """Enregistre l'écran entier dans le dossier des rapports. **Ne lève jamais.**
+
+    Attend `delai_s` AVANT de capturer, pour laisser le temps de revenir au jeu
+    et d'ouvrir l'inventaire. Voir `DELAI_S`.
 
     Même garantie que partout ailleurs : c'est un confort de diagnostic, il ne
     doit pas pouvoir interrompre quoi que ce soit. Une machine sans écran, un
     pilote graphique fâché, un disque plein descendent en message affichable.
     """
     destination = chemin_pour(session_id, racine)
+    if delai_s > 0:
+        dormir(delai_s)
     try:
         from PIL import Image
 
