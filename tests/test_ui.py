@@ -1181,3 +1181,57 @@ class TestButin:
         etat = get(base, "/api/etat")
         assert etat["session"] is None
         assert etat["butin"] == []
+
+
+class TestMonEcran:
+    """Le bouton « Mon écran », demandé par Maxime le 08/08/2026.
+
+    Il va par paire avec « Ce qu'il faut voir » : le schéma dit à quoi un bon
+    écran ressemble, celui-ci montre celui qu'on a. La description d'une zone
+    en pixels ne dit rien à l'œil ; un cadre posé sur sa propre capture ne
+    laisse aucun doute.
+    """
+
+    def test_l_apercu_est_rendu_en_data_url(self, app, monkeypatch) -> None:
+        """Une `data:` URL et pas un fichier : l'image ne touche pas le disque
+        et n'a pas de route à elle, donc rien à servir ni à nettoyer."""
+        state, base = app
+        monkeypatch.setattr(state, "_apercu_de_la_zone", lambda: b"\x89PNG\r\n\x1a\n faux")
+
+        corps = post(base, "/api/apercu")
+
+        assert corps["apercu"].startswith("data:image/png;base64,")
+        assert "erreur" not in corps
+
+    def test_sans_calibrage_on_ne_rend_PAS_l_ecran_entier(self, app, monkeypatch) -> None:
+        """⛔ Régression : la tentation est de se rabattre sur l'écran complet.
+
+        `_apercu_de_la_zone` recadre exprès sur la zone calibrée, avec sa
+        raison écrite : un écran entier emporterait le jeu, les autres fenêtres
+        ouvertes et tout ce qui traîne dessus, pour une information qui tient
+        dans la bande que la reconnaissance lit. Rendre l'écran complet « en
+        attendant le calibrage » serait le contraire exact de cette règle, et
+        personne ne le remarquerait puisque l'image s'afficherait très bien.
+
+        On rend donc une phrase qui dit quoi faire, et aucune image.
+        """
+        state, base = app
+        monkeypatch.setattr(state, "_apercu_de_la_zone", lambda: None)
+
+        corps = post(base, "/api/apercu")
+
+        assert "apercu" not in corps
+        assert "Calibrer la zone" in corps["erreur"]
+
+    def test_un_echec_de_capture_reste_un_200(self, app, monkeypatch) -> None:
+        """Comme `/api/rapport` : le serveur local a fait son travail, la cause
+        est ailleurs. Un code d'erreur HTTP ferait afficher « erreur serveur »
+        à la page pour un calibrage qui manque."""
+        state, base = app
+        monkeypatch.setattr(state, "_apercu_de_la_zone", lambda: None)
+
+        with urllib.request.urlopen(  # noqa: S310
+            urllib.request.Request(base + "/api/apercu", data=b"{}", method="POST"),  # noqa: S310
+            timeout=5,
+        ) as reponse:
+            assert reponse.status == 200

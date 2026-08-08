@@ -796,6 +796,39 @@ class AppState:
             ),
         }
 
+    def apercu_de_l_ecran(self) -> dict[str, Any]:
+        """L'écran de l'instant, cadre de la zone calibrée posé dessus.
+
+        Sert le bouton « Mon écran », qui va par paire avec « Ce qu'il faut
+        voir » : le schéma dit à quoi un bon écran ressemble, celui-ci montre
+        celui qu'on a. La comparaison se fait à l'œil, ce qu'aucune description
+        de zone en pixels ne permet.
+
+        ⚠️ **Hors verrou**, comme l'archive : la capture d'écran dure, et tenir
+        le verrou d'`AppState` figerait le rafraîchissement et le bouton
+        d'arrêt de session.
+
+        ⛔ **Sans calibrage, on ne rend rien.** Pas l'écran entier « en
+        attendant » : `_apercu_de_la_zone` recadre justement pour ne pas
+        emporter le jeu, les autres fenêtres et tout ce qui traîne dessus, et
+        se rabattre sur l'écran complet serait le contraire exact de cette
+        règle. Le message dit quoi faire à la place.
+
+        Toujours 200, comme `/api/rapport` : le corps porte `apercu` ou
+        `erreur`, tous deux affichables tels quels.
+        """
+        apercu = self._apercu_de_la_zone()
+        if apercu is None:
+            return {
+                "erreur": (
+                    "Rien à montrer : la zone n'est pas encore calibrée, ou l'écran "
+                    "n'a pas pu être capturé. Clique d'abord sur « Calibrer la zone »."
+                )
+            }
+        import base64
+
+        return {"apercu": "data:image/png;base64," + base64.b64encode(apercu).decode("ascii")}
+
     def _apercu_de_la_zone(self) -> bytes | None:
         """Une image de la zone calibrée, ou `None`. **Ne lève jamais.**
 
@@ -1271,6 +1304,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(self.state.redimensionner_le_panneau(int(hauteur)))
             except (TypeError, ValueError):
                 self._send_json({"erreur": "hauteur invalide"}, status=400)
+        elif self.path == "/api/apercu":
+            # Toujours 200, comme /api/rapport : le corps porte `apercu` ou
+            # `erreur`, et le second est une phrase que la page affiche telle
+            # quelle. Un calibrage absent n'est pas une panne du serveur.
+            self._send_json(self.state.apercu_de_l_ecran())
         elif self.path == "/api/archive":
             # Toujours 200, comme /api/rapport : le corps porte le nom de
             # l'archive, son contenu détaillé et ce qui a manqué.
