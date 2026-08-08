@@ -9,6 +9,22 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.9.1] - 2026-08-08
+
+### Corrigé
+
+- **⛔ « Capturer mon inventaire » capture maintenant ton inventaire.** Dans la
+  0.9.0, il ne pouvait pas : pour cliquer sur le bouton, la fenêtre de Butin
+  doit être devant, et elle recouvre le jeu. La capture prenait donc Butin, pas
+  ton inventaire.
+
+  Elle part désormais **6 secondes après le clic**, avec un compte à rebours
+  affiché : tu cliques, tu bascules sur le jeu, tu ouvres ton inventaire, et
+  l'image se prend toute seule.
+
+  La consigne affichée demandait d'ailleurs l'impossible — « ouvre ton
+  inventaire avant de cliquer » — elle dit maintenant l'ordre réel.
+
 ## [0.9.0] - 2026-08-08
 
 ### Ajouté
