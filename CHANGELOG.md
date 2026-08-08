@@ -25,6 +25,13 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   Rapport. Entièrement facultatif : Butin est gratuit et le restera, sans
   version payante ni publicité.
 
+### Corrigé
+
+- **Les barres de défilement suivent enfin le thème sombre.** Elles restaient
+  blanches, dans la fenêtre principale comme dans le panneau posé sur le jeu —
+  et là, une bande blanche pleine hauteur par-dessus le décor était le contraire
+  de ce que ce panneau doit faire.
+
 ## [0.11.0] - 2026-08-08
 
 ### Ajouté

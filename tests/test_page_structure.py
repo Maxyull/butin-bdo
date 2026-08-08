@@ -186,6 +186,54 @@ class TestCeQuIlFautVoir:
         assert bloc.count("<figure") == 3
 
 
+class TestLesBarresDeDefilementSuiventLeTheme:
+    """⚠️ Elles restaient au thème CLAIR du système sur deux pages sombres.
+
+    Rien dans la palette ne les atteignait : le moteur les dessine lui-même
+    tant qu'on ne lui dit pas que la page est sombre. Signalé par Maxime le
+    08/08/2026.
+    """
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_la_page_se_declare_sombre(self, nom: str) -> None:
+        """`color-scheme: dark` est le vrai correctif : il reteint la barre et
+        tout ce que le système dessine lui-même. À lui seul, il suffirait."""
+        assert "color-scheme: dark" in page(nom)
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_scrollbar_color_n_est_PAS_pose(self, nom: str) -> None:
+        """⛔ Régression mesurée, et parfaitement contre-intuitive.
+
+        `scrollbar-color` est la propriété standard, donc l'ajouter « en plus »
+        pour couvrir plus de moteurs semble prudent. C'est l'inverse : dès
+        qu'elle est posée, Chromium **ignore** toutes les règles
+        `::-webkit-scrollbar`. Mesuré dans un navigateur, la barre du fil
+        restait à 15 px alors que la règle en demandait 10, et la piste du
+        panneau redevenait opaque par-dessus le jeu.
+
+        Ce n'était pas une ceinture avec des bretelles, c'était une ceinture
+        qui coupait les bretelles. Le repli reste sain sans elle :
+        `color-scheme` donne déjà une barre sombre.
+
+        ⚠️ Le test vise `scrollbar-color:` **avec son deux-points**, donc la
+        déclaration et pas la mention. Les deux pages en parlent en commentaire
+        pour expliquer pourquoi elles ne la posent pas, et une règle qui
+        interdirait d'en parler ferait disparaître l'explication en même temps
+        que le piège.
+        """
+        assert "scrollbar-color:" not in page(nom)
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_la_piste_reste_transparente(self, nom: str) -> None:
+        """⛔ Vital sur le panneau, qui est posé PAR-DESSUS le jeu : une piste
+        peinte serait un rectangle opaque de plus, visible en permanence même
+        quand la liste tient entièrement."""
+        source = page(nom)
+        _, marque, apres = source.partition("::-webkit-scrollbar-track")
+        assert marque, f"{nom} : aucune règle de piste, la barre garde celle du système"
+        assert "transparent" in apres.partition("}")[0]
+
+
 def _bloc_du_schema(source: str) -> str:
     """Le contenu de `#schema-zone`, découpé sur ses balises littérales.
 
