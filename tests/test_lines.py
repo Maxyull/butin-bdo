@@ -10,14 +10,18 @@ Le relevé complet est dans `docs/journal-acquisition.md`.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from butin.capture.lines import (
     DEFAULT_FORMAT,
+    PART_AVEC_HEURE_ATTENDUE,
     ChatLineFormat,
     is_stale,
     parse_frame,
     parse_line,
+    part_avec_heure,
     split_line,
     stamp_minutes,
 )
@@ -408,3 +412,75 @@ class TestFormatParDefaut:
         """
         assert DEFAULT_FORMAT.folded_prefixes == ("vous avez obtenu",)
         assert "pieces" in DEFAULT_FORMAT.folded_silver
+
+
+class TestZoneTropEtroite:
+    """⛔ Le seul signe de troncature qui ne demande aucune géométrie.
+
+    Le jeu finit CHAQUE ligne du journal d'acquisition par son heure entre
+    parenthèses, relevé sur de vraies captures dans
+    `docs/journal-acquisition.md`. Si la zone est trop étroite, l'heure est la
+    première chose qui sort du cadre, et le nom de l'objet suit.
+
+    ⭐ Deux populations mesurées sur de vraies sessions du 08/08/2026, et il n'y
+    a rien entre les deux :
+
+    | session | zone | lignes finissant par leur heure |
+    | --- | --- | --- |
+    | 0018 | 662 px | 13 621 sur 13 686, soit **100 %** |
+    | 0017 | **448 px** | **0 sur 18** |
+
+    La 0017 a compté **zéro objet en 462 secondes**, et tous les critères
+    géométriques du calibrage passaient : force 0,41, 25 rangées. Aucun ne
+    regardait le texte.
+    """
+
+    COMPLETES: ClassVar[list[str]] = [
+        "Vous avez obtenu : [Pierre de puissance sous-marine d'arme ancestrale] x3 (17:33)",
+        "Vous avez obtenu : [Poussière d'esprit ancien]. (17:33)",
+        "Vous avez obtenu : [Cristal de magie noire scellé]. (17:34)",
+        "Vous avez obtenu : [Pierre de Caphras] x2 (17:34)",
+    ]
+    #: Coupées exactement comme la session 0017 les a produites.
+    COUPEES: ClassVar[list[str]] = [
+        "Vous avez obtenu:[[Even!] Sceauide I'Age",
+        "Vous avez obtenu :[Ccelacanthe dodu]. (1",
+        "Vous avez obtenu :[[Even.] Sceau de I'Ag",
+        "Vous avez obtenu : [Pierre de puissance sous-mar",
+    ]
+
+    def test_une_zone_correcte_ne_leve_aucun_doute(self) -> None:
+        assert part_avec_heure(self.COMPLETES) == 1.0
+
+    def test_une_zone_qui_coupe_est_vue(self) -> None:
+        """Le cas réel de la session 0017, ses lignes telles quelles."""
+        part = part_avec_heure(self.COUPEES)
+
+        assert part is not None
+        assert part < PART_AVEC_HEURE_ATTENDUE
+
+    def test_deux_lignes_ne_suffisent_pas_a_juger(self) -> None:
+        """⛔ Une ou deux lignes mal lues arrivent tout le temps. Accuser la
+        zone sur si peu ferait recalibrer pour rien, et un avertissement qu'on
+        apprend à ignorer ne protège plus de rien."""
+        assert part_avec_heure(self.COUPEES[:2]) is None
+
+    def test_un_ecran_vide_ne_se_prononce_pas(self) -> None:
+        """Pas de texte n'est pas la même chose qu'un texte coupé : c'est le
+        chat masqué, que la 0.8.1 signale déjà par un autre chemin."""
+        assert part_avec_heure([]) is None
+        assert part_avec_heure(["", "   ", ""]) is None
+
+    def test_le_melange_penche_du_bon_cote(self) -> None:
+        """Quelques lignes abîmées au milieu de lignes saines ne condamnent pas
+        la zone : c'est la reconnaissance qui bruite, pas le cadrage."""
+        part = part_avec_heure([*self.COMPLETES, self.COUPEES[0]])
+
+        assert part is not None
+        assert part >= PART_AVEC_HEURE_ATTENDUE
+
+    def test_la_parenthese_pleine_largeur_compte_quand_meme(self) -> None:
+        """⚠️ 7,6 % des heures étaient perdues sur « （ », mesuré sur 13 646
+        lignes réelles. Une ligne complète ne doit pas passer pour coupée à
+        cause d'un glyphe."""
+        assert part_avec_heure(["Vous avez obtenu : [Pierre noire]. （17:33)"] * 3) == 1.0

@@ -27,6 +27,33 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Corrigé
 
+- **⛔ Butin te dit quand ta zone est trop étroite et coupe les noms d'objets.**
+  C'était une panne muette de plus, et la plus coûteuse : une session réelle a
+  tourné **462 secondes pour zéro objet compté**, avec une zone de 448 px là où
+  la même fenêtre de chat en demandait 662.
+
+  Un nom coupé n'est pas reconnu, donc le drop est perdu **sans que rien ne le
+  dise**. Et sans l'heure en fin de ligne, le refus du vieux journal ne
+  fonctionne plus non plus : une zone trop étroite casse les deux protections
+  d'un coup.
+
+  Le calibrage passait pourtant tous ses contrôles — force 0,41, 25 rangées —
+  parce qu'aucun ne regardait le **texte**. Il vérifie maintenant que les
+  lignes lues se terminent bien par leur heure, comme le jeu les écrit.
+
+- **⛔ Plus de drops inventés au démarrage quand le chat se remplit.** Une
+  session réelle a compté **6 261 unités d'un objet possédé avant de lancer**,
+  soit la moitié de son total.
+
+  Dans les premières secondes, la fenêtre de chat n'est pas encore pleine, donc
+  la mesure de défilement ne veut rien dire. Une prédiction fausse pouvait
+  alors annuler l'état de départ et faire recompter tout ce qui était déjà à
+  l'écran.
+
+  Mesuré sur huit sessions réelles rejouées : **6 302 unités inventées en
+  moins**, et au passage **des lignes perdues en moins** aussi (51 → 4 sur
+  l'une d'elles).
+
 - **Les barres de défilement suivent enfin le thème sombre.** Elles restaient
   blanches, dans la fenêtre principale comme dans le panneau posé sur le jeu —
   et là, une bande blanche pleine hauteur par-dessus le décor était le contraire
