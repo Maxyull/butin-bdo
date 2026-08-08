@@ -9,6 +9,24 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.10.0] - 2026-08-08
+
+### Modifié
+
+- **Ton dossier de sessions s'appelle maintenant `Documents\BDO Butin`.** Il
+  s'appelait `BDO Tracker`, un nom qui ne disait plus celui du logiciel.
+
+  **Le renommage est automatique et ne te fait rien perdre.** Au premier
+  lancement, tout le dossier est renommé : tes sessions, tes réglages, ton
+  calibrage, tes journaux de lecture et tes captures d'inventaire.
+
+  ⚠️ Si le renommage échoue — dossier ouvert dans l'explorateur, antivirus —
+  Butin continue d'utiliser l'ancien nom plutôt que de t'afficher un historique
+  vide. Tes données ne sont jamais perdues, au pire elles ne bougent pas.
+
+  ⚠️ Si tu avais choisi ton propre dossier dans les réglages, rien ne change :
+  ton choix passe avant.
+
 ## [0.9.1] - 2026-08-08
 
 ### Corrigé
