@@ -47,31 +47,71 @@ donc un creux **de chaque côté séparément**, et on retient le plus faible de
 deux. Voir `_carte_des_creux` : additionner les deux désaccords, qui était la
 première idée, laissait passer une image simplement rayée.
 
-Ce que ça donne sur de vraies captures
-----------------------------------------
+⛔⛔ CE DÉTECTEUR NE MARCHE QUE SUR UN INVENTAIRE PRESQUE VIDE
+--------------------------------------------------------------
 
-14 captures d'écran réelles en 2560 × 1440, dont **une seule** contient un
-inventaire ouvert (`inventaire-0016`, 13 emplacements occupés sur 76) :
+**Ne pas le brancher en l'état.** La deuxième capture réelle l'a réfuté, le
+08/08/2026, et le mécanisme de l'échec est limpide une fois vu.
 
-| Capture | Force |
-| --- | --- |
-| **inventaire ouvert** | **2,92** |
-| `inventaire-0014` (menu Échap, pas d'inventaire) | 0,31 |
-| les 12 captures d'échantillon (ville, dialogue) | 0,25 à 0,38 |
+| Capture | Emplacements occupés | Force | Verdict |
+| --- | --- | --- | --- |
+| `inventaire-0016` | **13 sur 76** | **2,92** | trouvé |
+| `inventaire-0018` | **51 sur 192** | **0,24** | **manqué** |
+| `inventaire-0014` (menu Échap) | pas d'inventaire | 0,31 | refusé, juste |
+| 12 captures d'échantillon | pas d'inventaire | 0,25 à 0,38 | refusés, justes |
 
-**14 verdicts justes sur 14.** Deux populations franchement séparées, d'un
-facteur **7,7** entre la vraie détection et le pire des faux. Le seuil est posé
-entre les deux, plus près du bruit que de la détection, pour la même raison que
-`MIN_STRENGTH` du calibrage : se tromper en refusant est réparable, se tromper
-en acceptant ne se voit pas.
+⛔ **0,24 est SOUS le pire des faux positifs.** Aucun seuil ne peut séparer ces
+deux populations : abaisser `MIN_STRENGTH` jusqu'à voir l'inventaire plein
+ferait passer les treize écrans qui n'en contiennent aucun.
 
-Le pas trouvé est de **48 px** sur cet écran, ce que corrobore une mesure
-indépendante des bords de case au gradient (48,7 px sur sept intervalles).
+**Ce que la méthode mesurait vraiment**, et ce n'est pas ce qu'annonçait la
+première version de cet en-tête : la ressemblance d'une case à sa voisine. Sur
+un inventaire presque vide, des dizaines d'emplacements **rigoureusement
+identiques** donnent un creux énorme. Sur un inventaire rempli, chaque case
+porte une icône différente et il ne reste rien à faire ressembler.
 
-⚠️ **Une seule capture positive.** Le refus est mesuré sur treize écrans réels
-et variés, la détection sur un seul. Ce qui est solide ici, c'est que le
-détecteur sait dire non ; qu'il dise oui à tous les inventaires reste à
-vérifier sur une deuxième capture.
+⭐ Et c'est le cas rempli qui compte : on lit un inventaire **après** une
+session de farm, précisément parce qu'il s'est rempli.
+
+⚠️ **La leçon, quatrième occurrence dans ce projet** : une suite verte et une
+mesure juste ne disent rien d'un cas que les données ne contiennent pas. Le
+14 sur 14 était vrai, et sa portée était « treize refus et un accord sur une
+grille vide ». L'en-tête le disait d'ailleurs — « qu'il dise oui à tous les
+inventaires reste à vérifier sur une deuxième capture » — et la réponse est
+non.
+
+Ce qui reste acquis, mesuré sur les deux captures
+---------------------------------------------------
+
+Deux choses tombent juste **même sur l'inventaire plein**, et elles serviront à
+ce qui remplacera la force :
+
+- le **pas** : 48 px dans les deux cas, corroboré par une mesure indépendante
+  des bords de case au gradient (48,7 px sur sept intervalles) ;
+- la **position** : le sommet de la carte tombe dans la grille dans les deux
+  cas, (2336, 756) et (2202, 728).
+
+C'est donc la mesure de **confiance** qui est à refaire, pas la géométrie.
+
+Ce qui a été essayé pour la remplacer, et n'a pas suffi
+--------------------------------------------------------
+
+La piste juste est de mesurer les **séparateurs** plutôt que les cases : la
+gouttière entre deux emplacements est sombre et régulière quoi qu'il y ait
+dedans. Un peigne dans le profil de bords, exigé saillant en pas et accordé
+dans les deux directions, trouve bien 48 px au bon endroit sur les **deux**
+captures. Mais il ne sépare pas :
+
+| Fenêtre | Inventaire plein | Pire faux |
+| --- | --- | --- |
+| 4 cases (200 px) | 1,03 | 0,99 |
+| 8 cases (400 px) | 0,39, et **au mauvais endroit** | 0,52 |
+
+Élargir la fenêtre dilue le signal au lieu de le renforcer. Consigné pour ne
+pas le refaire à l'identique ; il faudra autre chose que ce score-là.
+
+⚠️ Il n'y a que **deux** captures positives. La prochaine idée se mesure contre
+les deux, pas contre celle qui l'arrange.
 
 ⛔ Ce que ce module NE fait pas encore, et pourquoi
 ----------------------------------------------------
@@ -160,9 +200,20 @@ sept. Sur une grille de synthèse, sans plancher, elle atteignait 1,9 × 10⁷.
 MIN_STRENGTH = 1.5
 """Force en dessous de laquelle on déclare qu'il n'y a pas d'inventaire.
 
-⛔ Posé entre deux populations MESURÉES, pas au jugé. Sur 14 captures réelles :
-**2,92** là où un inventaire est ouvert, **0,38 au plus** ailleurs. Le seuil est
-à quatre fois le pire faux et à moitié de la vraie détection.
+Posé entre les deux populations connues au moment où il a été écrit : **2,92**
+sur l'inventaire presque vide, **0,38 au plus** sur les treize captures sans
+inventaire.
+
+⛔ **Et il ne suffit pas.** L'inventaire REMPLI mesure **0,24**, c'est-à-dire
+sous le pire des faux positifs. Voir l'en-tête du module : aucune valeur de ce
+seuil ne peut séparer les deux, et l'abaisser ferait passer les treize écrans
+qui ne contiennent aucun inventaire. Ce n'est pas le seuil qu'il faut régler,
+c'est la mesure qu'il faut remplacer.
+
+⛔ **Ne pas l'abaisser « pour voir ».** C'est exactement le geste que
+`docs/banc-essai.md` interdit : un réglage ne se retient que s'il a un
+mécanisme explicable, et celui-là n'en a aucun — il échangerait un faux négatif
+contre treize faux positifs.
 
 Il penche volontairement du côté du refus. Refuser à tort se voit tout de suite
 — le joueur relance en ayant ouvert son inventaire — alors qu'accepter à tort
