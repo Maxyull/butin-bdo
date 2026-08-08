@@ -35,6 +35,25 @@
     --fond-champ: #0f1116;
   }
   * { box-sizing: border-box; }
+
+  /* ⛔ `hidden` ne cachait RIEN sur deux éléments, et il a fallu que Maxime
+     demande « c'est quoi le truc jaune qui sert à rien » pour le voir.
+
+     `[hidden] { display: none }` vient de la feuille du NAVIGATEUR. N'importe
+     quelle règle d'auteur qui pose un `display` la bat, sans avertissement :
+     `.bouton-maj` était en `inline-block`, donc la pastille dorée du bouton de
+     mise à jour restait affichée **vide** en permanence, y compris sur la
+     dernière version. `.identite-discord`, posée le 08/08/2026, avait le même
+     défaut au même endroit.
+
+     ⚠️ Et mon contrôle au navigateur ne pouvait pas le voir : il lisait
+     `element.hidden`, qui dit que l'ATTRIBUT est posé, pas que l'élément est
+     invisible. Vérifier `getComputedStyle(...).display` est la seule question
+     qui a un sens ici.
+
+     `!important` est délibéré : c'est justement une règle qui doit gagner
+     contre toutes les autres, y compris celles qu'on écrira demain. */
+  [hidden] { display: none !important; }
   body {
     margin: 0; padding: var(--espace-6);
     background: var(--fond); color: var(--texte);
