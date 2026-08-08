@@ -1253,6 +1253,12 @@ class TestBoutonDeDon:
     def test_il_est_a_cote_des_boutons_discord(self, app) -> None:
         """L'endroit fait partie de la demande, pas seulement la présence.
 
+        ⚠️ Le panneau Discord a déménagé de Rapport vers Réglages le
+        08/08/2026, et le bouton de don l'a suivi : la demande était « à côté
+        des boutons Discord », pas « dans l'onglet Rapport ». Ce test suit donc
+        l'ADJACENCE, qui est ce qui a été demandé, et non l'onglet, qui n'en
+        était que la conséquence du moment.
+
         Découpage sur les balises littérales plutôt qu'une expression
         régulière sur du HTML : CodeQL refuse la seconde (`py/bad-tag-filter`),
         et le fichier lu est le nôtre.
@@ -1261,11 +1267,12 @@ class TestBoutonDeDon:
         with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
             corps = reponse.read().decode("utf-8")
 
-        _, marque, apres = corps.partition('id="page-rapport"')
-        assert marque, "l'onglet Rapport a disparu"
-        assert "paypal.me/maxyull" in apres.partition("<script>")[0]
+        _, marque, apres = corps.partition('id="page-reglages"')
+        assert marque, "l'onglet Réglages a disparu"
+        reglages = apres.partition('id="page-rapport"')[0]
+        assert "paypal.me/maxyull" in reglages, "le bouton de don n'est plus dans les Réglages"
         # Dans le même panneau que Discord, donc après le lien du salon.
-        assert apres.index("discord.gg") < apres.index("paypal.me")
+        assert reglages.index("discord.gg") < reglages.index("paypal.me")
 
     def test_il_s_ouvre_dans_le_navigateur_du_systeme(self, app) -> None:
         """⛔ `rel="noopener"`, comme le lien Discord. Sans lui, la page

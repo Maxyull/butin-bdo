@@ -9,6 +9,17 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Modifié
+
+- **Ton pseudonyme Discord s'affiche en haut à droite, sur la ligne du titre.**
+  « Suis-je connecté, et sous quel nom » est une question qu'on se pose en
+  permanence : c'est ce nom qui apparaît dans le salon quand tu signales un
+  bogue. Il reste donc visible.
+
+- **Se connecter à Discord a déménagé dans les Réglages**, avec le lien vers le
+  salon et le bouton de soutien. Se connecter ne se fait qu'une fois : ça n'a
+  rien à faire dans l'onglet qu'on ouvre quand quelque chose ne va pas.
+
 ## [0.12.0] - 2026-08-08
 
 ### Ajouté

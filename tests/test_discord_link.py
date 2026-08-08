@@ -123,12 +123,54 @@ class TestLaPagePrevientAvantDOuvrirLeNavigateur:
         debut = page.index('id="discord-avertissement"')
         assert "hidden" in page[debut : debut + 60]
 
+    def _corps_de_la_fonction(self, page: str, nom: str) -> str:
+        """Le corps de la fonction, borné par son ACCOLADE, pas par un budget.
+
+        ⚠️ La première version prenait « les 1 600 caractères qui suivent ». Elle
+        a échoué le 08/08/2026 sur un ajout parfaitement correct de six lignes
+        dans la fonction : la seconde moitié du test était sortie de la fenêtre,
+        et le test annonçait un câblage manquant qui était là.
+
+        Un test qui casse quand on allonge la fonction qu'il surveille ne
+        surveille pas ce qu'il croit.
+        """
+        debut = page.index(f"function {nom}")
+        fin = page.index("\n}", debut)
+        return page[debut:fin]
+
     def test_le_script_le_masque_quand_le_compte_est_rattache(self) -> None:
         """Régression de câblage : l'élément peut exister et ne jamais bouger."""
-        page = self._page()
-        corps = page[page.index("function afficherLeCompteDiscord") :][:1600]
+        corps = self._corps_de_la_fonction(self._page(), "afficherLeCompteDiscord")
+
         assert "avertissement.hidden = true" in corps
         assert "avertissement.hidden = false" in corps
+
+    def test_l_identite_de_l_en_tete_suit_les_deux_etats(self) -> None:
+        """⭐ Même exigence pour la pastille posée dans l'en-tête le 08/08/2026.
+
+        Elle affiche le pseudonyme Discord à côté du titre. Un élément qui
+        apparaît et ne disparaît jamais annoncerait « connecté » à quelqu'un qui
+        vient de se déconnecter — c'est le même défaut que l'avertissement
+        ci-dessus, à l'autre bout.
+        """
+        page = self._page()
+        corps = self._corps_de_la_fonction(page, "afficherLeCompteDiscord")
+
+        assert 'id="identite-discord"' in page
+        assert "identite.hidden = false" in corps
+        assert "identite.hidden = true" in corps
+
+    def test_le_pseudonyme_de_l_en_tete_n_est_jamais_injecte_en_HTML(self) -> None:
+        """⛔ Il vient du relais, donc de Discord, donc de l'extérieur.
+
+        `textContent` et jamais `innerHTML` : c'est la règle tenue partout
+        ailleurs pour les noms d'objets, et elle vaut d'autant plus ici que
+        celui-ci est choisi par une personne.
+        """
+        corps = self._corps_de_la_fonction(self._page(), "afficherLeCompteDiscord")
+
+        assert '$("identite-discord-nom").textContent' in corps
+        assert 'identite-discord-nom").innerHTML' not in corps
 
 
 class TestLectureDeLaReponse:
