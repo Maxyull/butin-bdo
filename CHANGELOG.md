@@ -9,6 +9,8 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.11.0] - 2026-08-08
+
 ### Ajouté
 
 - **Deux boutons « Ce qu'il faut voir » et « Mon écran », sous le calibrage.**
