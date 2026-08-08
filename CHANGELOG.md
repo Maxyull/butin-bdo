@@ -20,7 +20,17 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   compte : **le compte est bon ?** Si tu réponds non, le rapport part et
   l'archive complète est préparée, prête à déposer.
 
+### Modifié
+
+- **Le bouton « Soutenir Butin » porte enfin sa vraie icône**, le cœur facetté
+  doré du kit, et il a échangé sa place avec ton pseudonyme dans l'en-tête.
+
 ### Retiré
+
+- **Le fil des drops et le tableau du butin de l'onglet Session.** Le panneau
+  posé sur le jeu montre le récap pendant le farm — c'est le seul écran qu'on
+  regarde en farmant — et l'Historique le montre après. Cette fenêtre-ci est
+  derrière le jeu : personne ne l'a jamais lue pendant une session.
 
 - **Le bouton « Calibrer la zone ».** Il se faisait à part, donc il s'oubliait —
   et une zone non calibrée donne un compteur à zéro qui ressemble à un farm
