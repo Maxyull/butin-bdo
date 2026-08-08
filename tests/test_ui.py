@@ -1250,29 +1250,46 @@ class TestBoutonDeDon:
         assert "https://paypal.me/maxyull" in corps
         assert "Soutenir Butin" in corps
 
-    def test_il_est_a_cote_des_boutons_discord(self, app) -> None:
-        """L'endroit fait partie de la demande, pas seulement la présence.
+    def test_il_est_a_cote_de_la_deconnexion_discord(self, app) -> None:
+        """L'endroit fait partie de la demande, et il a bougé deux fois.
 
-        ⚠️ Le panneau Discord a déménagé de Rapport vers Réglages le
-        08/08/2026, et le bouton de don l'a suivi : la demande était « à côté
-        des boutons Discord », pas « dans l'onglet Rapport ». Ce test suit donc
-        l'ADJACENCE, qui est ce qui a été demandé, et non l'onglet, qui n'en
+        08/08/2026, premier jet : « à côté des boutons Discord », qui étaient
+        alors dans l'onglet Rapport. Puis Maxime a demandé l'identité Discord
+        dans l'en-tête, la déconnexion à côté d'elle, et le don à côté de la
+        déconnexion. Le test suit donc l'ADJACENCE au bouton de déconnexion,
+        qui est ce qui a été demandé les deux fois, et non l'onglet, qui n'en
         était que la conséquence du moment.
 
         Découpage sur les balises littérales plutôt qu'une expression
-        régulière sur du HTML : CodeQL refuse la seconde (`py/bad-tag-filter`),
-        et le fichier lu est le nôtre.
+        régulière sur du HTML : CodeQL refuse la seconde (`py/bad-tag-filter`).
         """
         _, base = app
         with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
             corps = reponse.read().decode("utf-8")
 
-        _, marque, apres = corps.partition('id="page-reglages"')
-        assert marque, "l'onglet Réglages a disparu"
-        reglages = apres.partition('id="page-rapport"')[0]
-        assert "paypal.me/maxyull" in reglages, "le bouton de don n'est plus dans les Réglages"
-        # Dans le même panneau que Discord, donc après le lien du salon.
-        assert reglages.index("discord.gg") < reglages.index("paypal.me")
+        entete = corps.partition('<div class="onglets"')[0]
+        assert 'id="identite-discord"' in entete, "l'identité Discord n'est plus dans l'en-tête"
+        assert 'id="discord-deconnexion"' in entete, "la déconnexion n'est plus dans l'en-tête"
+        assert "paypal.me/maxyull" in entete, "le bouton de don n'est plus dans l'en-tête"
+        # Dans cet ordre : le nom, puis ce qui le retire, puis le soutien.
+        assert (
+            entete.index('id="identite-discord"')
+            < entete.index('id="discord-deconnexion"')
+            < entete.index("paypal.me")
+        )
+
+    def test_se_connecter_reste_dans_les_reglages(self, app) -> None:
+        """Se connecter est un geste qu'on fait UNE FOIS : il n'a rien à faire
+        dans un en-tête qu'on relit à chaque lancement. Se déconnecter, si :
+        on le décide en regardant sous quel nom on parle."""
+        _, base = app
+        with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
+            corps = reponse.read().decode("utf-8")
+
+        reglages = corps.partition('id="page-reglages"')[2].partition('id="page-rapport"')[0]
+        assert 'id="discord-connexion"' in reglages
+        assert 'id="discord-avertissement"' in reglages
+        assert "discord.gg" in reglages
 
     def test_il_s_ouvre_dans_le_navigateur_du_systeme(self, app) -> None:
         """⛔ `rel="noopener"`, comme le lien Discord. Sans lui, la page

@@ -30,6 +30,9 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Modifié
 
+- **Tout ce qui te concerne est passé en haut à droite** : ton pseudonyme
+  Discord, le bouton pour t'en détacher, et le soutien. Sur la ligne du titre.
+
 - **Ton pseudonyme Discord s'affiche en haut à droite, sur la ligne du titre.**
   « Suis-je connecté, et sous quel nom » est une question qu'on se pose en
   permanence : c'est ce nom qui apparaît dans le salon quand tu signales un
