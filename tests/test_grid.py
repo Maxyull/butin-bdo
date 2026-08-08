@@ -174,6 +174,47 @@ class TestIlSaitDireNon:
         assert find_lattice(np.full((60, 60), 30, dtype=np.uint8)) is None
 
 
+class TestLaLimiteConnue:
+    """⛔ Le détecteur RATE un inventaire rempli, et ce test l'écrit noir sur blanc.
+
+    Mesuré le 08/08/2026 sur deux captures réelles : **2,92** à 13 emplacements
+    occupés sur 76, **0,24** à 51 sur 192. Le second est sous le pire des faux
+    positifs (0,38), donc aucun seuil ne sépare les deux.
+
+    La méthode mesure la ressemblance d'une case à sa voisine. Un inventaire
+    presque vide en aligne des dizaines de rigoureusement identiques ; un
+    inventaire rempli n'en a aucune. Et c'est le cas rempli qui compte, puisque
+    l'inventaire se lit **après** une session de farm.
+
+    ⚠️ Le cas réel ne peut pas entrer ici : la capture porte le solde en silver
+    et le nom du personnage, et ce dépôt est public. La grille synthétique
+    ci-dessous reproduit le **mécanisme**, pas l'image.
+    """
+
+    def test_une_grille_dont_chaque_case_differe_n_est_PAS_trouvee(self) -> None:
+        """Le mécanisme de l'échec, reproduit : mêmes cases, contenus tous
+        différents. La géométrie est intacte, la ressemblance a disparu."""
+        pas, rangees, colonnes = 48, 8, 8
+        image = grille(pas=pas, rangees=rangees, colonnes=colonnes)
+        hasard = np.random.default_rng(11)
+        for rangee in range(rangees):
+            for colonne in range(colonnes):
+                x = 300 + colonne * pas + 8
+                y = 200 + rangee * pas + 8
+                icone = hasard.integers(40, 230, size=(pas - 16, pas - 16), dtype=np.uint8)
+                image[y : y + pas - 16, x : x + pas - 16] = icone
+
+        assert find_lattice(image) is None, (
+            "le détecteur voit maintenant une grille pleine : la limite documentée "
+            "en tête de grid.py a changé, il faut y remesurer les deux populations"
+        )
+
+    def test_la_grille_vide_reste_trouvee(self) -> None:
+        """L'autre moitié du même constat, sans quoi le test ci-dessus passerait
+        aussi sur un détecteur simplement cassé."""
+        assert find_lattice(grille()) is not None
+
+
 class TestLeBancPeutEchouer:
     """⛔ Le canari. Sans lui, on ne saurait pas si le banc mesure quoi que ce soit.
 
