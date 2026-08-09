@@ -68,7 +68,11 @@ def dotnet(monkeypatch: pytest.MonkeyPatch) -> FauxFormulaire:
     faux_system.Action = lambda fonction: fonction  # type: ignore[attr-defined]
     faux_dessin = types.ModuleType("System.Drawing")
     faux_dessin.Color = types.SimpleNamespace(  # type: ignore[attr-defined]
-        FromArgb=lambda r, v, b: FausseCouleur(r, v, b)
+        FromArgb=lambda r, v, b: FausseCouleur(r, v, b),
+        # ⛔ `Color.Empty` est ce que .NET rend pour « aucune couleur-clé ». Ses
+        # composantes valent zéro, donc il ne peut percer que du noir pur, que
+        # la palette du panneau n'emploie nulle part.
+        Empty=FausseCouleur(0, 0, 0),
     )
     monkeypatch.setitem(sys.modules, "System", faux_system)
     monkeypatch.setitem(sys.modules, "System.Drawing", faux_dessin)
@@ -110,6 +114,60 @@ class TestPoserLaCouleurCle:
         transparence.rendre_le_fond_transparent(FausseFenetre(dotnet))
 
         assert dotnet.invocations == 1
+
+
+class TestTransparentOuCliquable:
+    """⛔ Régression trouvée par Maxime EN FARMANT, case décochée.
+
+    « les boutons en direct ne fonctionnent plus et impossible de bouger la
+    fenêtre ». Mesuré sur son panneau en session : `WS_EX_TRANSPARENT` était
+    bien retiré, et pourtant les quatre points testés rendaient tous
+    `BlackDesertWindowClass`, barre du haut comprise.
+
+    La couleur-clé rend la fenêtre entière intraversable au clic — WebView2
+    dessine dans une fenêtre fille, et la surface en couches que Windows teste
+    ne porte que du magenta d'un bord à l'autre. Aucun réglage de souris ne peut
+    le rattraper : les deux états s'excluent, et c'est la case qui tranche.
+    """
+
+    def test_le_fond_opaque_retire_la_cle(self, dotnet: FauxFormulaire) -> None:
+        fenetre = FausseFenetre(dotnet)
+        transparence.rendre_le_fond_transparent(fenetre)
+
+        assert transparence.rendre_le_fond_opaque(fenetre) is True
+        assert transparence.fond_transparent(fenetre) is False
+
+    def test_le_fond_opaque_REPEINT_au_lieu_de_laisser_le_gris(
+        self, dotnet: FauxFormulaire
+    ) -> None:
+        """⛔ Sans repeindre, on retombe sur le gris clair du formulaire : le
+        « blanc très moche » d'où vient tout ce module. Retirer la clé sans
+        poser de fond échangerait une gêne contre celle d'avant."""
+        transparence.rendre_le_fond_opaque(FausseFenetre(dotnet))
+
+        assert (dotnet.BackColor.R, dotnet.BackColor.G, dotnet.BackColor.B) == (transparence.OPAQUE)
+
+    def test_les_deux_sens_sont_idempotents(self, dotnet: FauxFormulaire) -> None:
+        """Le réglage est réappliqué à chaque enregistrement, y compris quand il
+        n'a pas bougé : reposer la clé fait retravailler le formulaire pour
+        rien, et c'est cet appel-là qui efface le style de souris."""
+        fenetre = FausseFenetre(dotnet)
+
+        transparence.rendre_le_fond_opaque(fenetre)
+        transparence.rendre_le_fond_opaque(fenetre)
+        transparence.rendre_le_fond_transparent(fenetre)
+        transparence.rendre_le_fond_transparent(fenetre)
+
+        assert dotnet.invocations == 2, "un aller-retour, deux écritures, pas quatre"
+
+    def test_l_aller_retour_revient_a_l_etat_de_depart(self, dotnet: FauxFormulaire) -> None:
+        fenetre = FausseFenetre(dotnet)
+
+        transparence.rendre_le_fond_transparent(fenetre)
+        transparence.rendre_le_fond_opaque(fenetre)
+
+        assert transparence.rendre_le_fond_transparent(fenetre) is True
+        assert transparence.fond_transparent(fenetre) is True
 
 
 class TestOnRelitAuLieuDeCroire:

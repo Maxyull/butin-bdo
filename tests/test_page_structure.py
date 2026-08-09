@@ -602,7 +602,9 @@ class TestLaSourisTraverseLePanneau:
         source = page("overlay.html")
 
         assert "sans-clic" in identifiants_declares(source)
-        assert "pilote depuis la fenêtre Butin" in source
+        # ⚠️ La ligne dit où DÉCOCHER, pas seulement que c'est traversant :
+        # Maxime a cherché ses boutons avant de trouver le réglage.
+        assert "décoche dans Réglages" in source
 
 
 class TestLePanneauNeCoupeRienEnSilence:

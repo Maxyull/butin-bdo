@@ -9,6 +9,24 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+## [0.14.1] - 2026-08-09
+
+### Corrigé
+
+- **⛔ Le panneau restait insensible aux clics même la case décochée.** Ses
+  boutons ne répondaient plus et on ne pouvait plus le déplacer, quel que soit
+  le réglage. Régression de la 0.14.0, signalée en pleine session de farm.
+
+  La cause : c'est le **fond transparent lui-même** qui rend la fenêtre
+  insensible, pas le réglage de souris. Windows ne teste que la surface du
+  fond, et le panneau est dessiné par-dessus par le moteur web ; il ne voit donc
+  que des trous, alors que tu vois un panneau normal.
+
+  La case porte donc maintenant les deux états, et l'interface le dit :
+  **coché**, le panneau laisse voir le jeu et n'attrape rien ; **décoché**, fond
+  sombre opaque, boutons et déplacement retrouvés. Les deux ne peuvent pas aller
+  ensemble.
+
 ## [0.14.0] - 2026-08-09
 
 Six correctifs de **fenêtres**, tous trouvés en regardant l'écran plutôt qu'en
