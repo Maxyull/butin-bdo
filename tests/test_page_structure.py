@@ -98,6 +98,90 @@ class TestLeScriptNeDemandeQueCeQuiExiste:
         assert identifiants_demandes(casse) - identifiants_declares(casse) == {"par-heure"}
 
 
+class TestAucunBoutonMort:
+    """⛔ Le trou que ce fichier n'attrapait PAS : un bouton sans gestionnaire.
+
+    Le 09/08/2026, Maxime a demandé « à quoi servent-ils ? » à propos des deux
+    boutons posés sous le calibrage. Réponse mesurée dans un navigateur :
+    **rien**. Ni l'un ni l'autre n'avait de gestionnaire de clic.
+
+    - « Mon écran » : clic, zéro requête, aucun aperçu. Livré mort en 0.11.0 ;
+    - « Ce qu'il faut voir » : les trois schémas ne se dépliaient jamais. C'est
+      le seul endroit qui explique la panne la plus coûteuse du logiciel — 560
+      objets perdus derrière un menu — et il était **inatteignable**. Le
+      parcours guidé essayait lui-même de l'ouvrir, sans rien pour écouter.
+
+    ⭐ Et voilà pourquoi rien ne l'a vu : `TestLeScriptNeDemandeQueCeQuiExiste`
+    cherche des `$()` sur des éléments **disparus**, donc des liens ROMPUS. Un
+    bouton qu'aucune ligne n'écoute est un lien **absent**, et un lien absent ne
+    casse rien : la page reste parfaitement présentable. C'est exactement la
+    forme de défaut que ce projet trouve à l'usage et jamais en relisant.
+    """
+
+    #: Les boutons branchés autrement qu'en écoutant leur identifiant en clair.
+    #:
+    #: ⚠️ La valeur n'est pas un commentaire : c'est le fragment de script qui
+    #: DOIT exister pour que l'exemption tienne. Une liste d'exemptions qu'on ne
+    #: vérifie pas devient une liste de boutons morts autorisés — exactement le
+    #: défaut qu'on est en train de corriger, avec la bénédiction du test.
+    BRANCHES_AUTREMENT: ClassVar[dict[str, str]] = {
+        "onglet-session": '$("onglet-" + nom).addEventListener',
+        "onglet-historique": '$("onglet-" + nom).addEventListener',
+        "onglet-reglages": '$("onglet-" + nom).addEventListener',
+        "onglet-rapport": '$("onglet-" + nom).addEventListener',
+        "bouton-rapport": "rapportBouton.addEventListener",
+        "bouton-inventaire-avant": '"bouton-inventaire-avant", "avant"',
+        "bouton-inventaire-apres": '"bouton-inventaire-apres", "apres"',
+    }
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_chaque_exemption_dit_vrai(self, nom: str) -> None:
+        """Le mécanisme nommé par l'exemption existe bien dans la page."""
+        source = page(nom)
+        declares = identifiants_declares(source)
+
+        for identifiant, mecanisme in self.BRANCHES_AUTREMENT.items():
+            if identifiant not in declares:
+                continue
+            assert mecanisme in source, (
+                f"{nom} : {identifiant} est exempté au nom de « {mecanisme} », "
+                "qui n'existe plus. L'exemption couvre donc un bouton mort."
+            )
+
+    @pytest.mark.parametrize("nom", PAGES)
+    def test_chaque_bouton_identifie_a_un_gestionnaire(self, nom: str) -> None:
+        source = page(nom)
+        # Découpage littéral plutôt qu'une expression régulière sur du HTML :
+        # CodeQL refuse la seconde (`py/bad-tag-filter`).
+        morts = []
+        for morceau in source.split("<button")[1:]:
+            ouvrant = morceau.partition(">")[0]
+            trouve = re.search(r'id="([A-Za-z0-9_-]+)"', ouvrant)
+            if trouve is None:
+                continue
+            identifiant = trouve.group(1)
+            if identifiant in self.BRANCHES_AUTREMENT:
+                continue
+            if f'$("{identifiant}").addEventListener' not in source:
+                morts.append(identifiant)
+
+        assert morts == [], (
+            f"{nom} : {morts} n'écoute(nt) aucun clic. Un bouton qui ne répond pas "
+            "se lit comme un logiciel cassé, et rien d'autre ici ne le voit."
+        )
+
+    def test_le_detecteur_voit_le_cas_qu_il_garde(self) -> None:
+        """⛔ Un garde-fou qui ne peut pas échouer ne garde rien.
+
+        Le cas exact : le bouton est là, son identifiant est même cité ailleurs
+        dans le script — c'était vrai de « Ce qu'il faut voir », que le parcours
+        guidé essayait de cliquer — mais personne n'écoute.
+        """
+        mort = '<button id="bouton-mort">Rien</button>\n$("bouton-mort").click();'
+
+        assert '$("bouton-mort").addEventListener' not in mort
+
+
 class TestLesQuatreOngletsExistent:
     """⚠️ Le mécanisme était codé en dur pour DEUX onglets.
 
@@ -154,13 +238,40 @@ class TestLEnTeteEstAllege:
 
 
 class TestCeQuIlFautVoir:
-    """Les deux boutons demandés le 08/08/2026, et ce qu'ils montrent."""
+    """Le bouton demandé le 08/08/2026, et ce qu'il montre."""
 
-    def test_les_deux_boutons_sont_la(self) -> None:
-        declares = identifiants_declares(page("index.html"))
+    def test_le_bouton_des_schemas_est_la(self) -> None:
+        assert "bouton-schema" in identifiants_declares(page("index.html"))
 
-        assert "bouton-schema" in declares
-        assert "bouton-mon-ecran" in declares
+    def test_le_bouton_MORT_a_disparu(self) -> None:
+        """⛔ « Mon écran » n'avait AUCUN gestionnaire de clic.
+
+        Vérifié dans un navigateur le 09/08/2026 : clic, zéro requête, aucun
+        aperçu, aucun message. Livré ainsi en 0.11.0, et personne ne l'a vu
+        avant que Maxime demande « à quoi servent-ils ? ».
+
+        ⚠️ La leçon vaut plus que le retrait : `test_page_structure.py` attrape
+        un `$()` sur un élément **disparu**, pas un élément **sans code**. Un
+        bouton qu'aucune ligne ne référence est invisible pour lui, et l'était
+        aussi pour la relecture — les deux cherchent des liens rompus, pas des
+        liens absents.
+        """
+        source = page("index.html")
+
+        assert "bouton-mon-ecran" not in identifiants_declares(source)
+        assert "mon-ecran-apercu" not in identifiants_declares(source)
+        assert "mon-ecran-apercu" not in identifiants_demandes(source)
+
+    def test_un_SEUL_apercu_de_l_ecran(self) -> None:
+        """⛔ « pourquoi dans session il y a 2 fois le même screen », 09/08/2026.
+
+        Deux balises d'image, l'une remplie par le calibrage et l'autre par
+        l'étape de vérification. Le parcours guidé enchaînant les deux, la même
+        capture s'affichait deux fois, l'une sous l'autre.
+        """
+        source = page("index.html")
+
+        assert source.count('class="apercu"') == 1
 
     def test_le_schema_est_DESSINE_jamais_une_capture(self) -> None:
         """⛔ Décision explicite, et elle tient à la vie privée de tiers.
@@ -537,12 +648,12 @@ def _bloc_du_schema(source: str) -> str:
     """
     _, marque, reste = source.partition('id="schema-zone"')
     assert marque, "le bloc du schéma a disparu de la page"
-    # Jusqu'à la ligne d'état de « Mon écran », qui suit immédiatement le bloc.
-    # ⚠️ Un premier découpage allait jusqu'à `extrait-calibrage`, plus bas : il
-    # emportait l'aperçu de « Mon écran », qui est une vraie balise `img`, et
-    # faisait échouer le test sur une image parfaitement légitime. Un délimiteur
-    # trop large ne mesure plus ce qu'il annonce.
-    bloc, fin, _ = reste.partition('<div id="mon-ecran-etat"')
+    # Jusqu'à l'extrait du calibrage, qui suit immédiatement le bloc.
+    # ⚠️ Le délimiteur a été « `mon-ecran-etat` » jusqu'au 09/08/2026, et cet
+    # élément a disparu avec le bouton mort. Il doit rester COLLÉ à la fin du
+    # bloc : trop large, il emporterait l'aperçu de l'écran — une vraie balise
+    # `img` — et le test échouerait sur une image parfaitement légitime.
+    bloc, fin, _ = reste.partition('<pre id="extrait-calibrage"')
     assert fin, "impossible de délimiter le bloc du schéma"
     return bloc
 
