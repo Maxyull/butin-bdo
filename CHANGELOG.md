@@ -26,6 +26,18 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Corrigé
 
+- **⭐ Le panneau est enfin VRAIMENT transparent.** Il se déclarait transparent
+  depuis le début, et ça n'a jamais marché sous Windows : sous la boîte du
+  récap, un aplat gris clair recouvrait le jeu. C'était le « blanc très moche ».
+  Le fond perce maintenant jusqu'au décor — mesuré, l'écran est identique avec
+  et sans le panneau à cet endroit.
+
+- **Le panneau ne coupe plus sa liste en silence.** Il s'arrêtait au douzième
+  objet, sans rien dire. Il en montre vingt, et annonce ce qui dépasse avec le
+  nombre d'objets ET d'unités. Ça compte d'autant plus que la souris traverse le
+  panneau : on ne peut plus y défiler, donc ce qui est à l'écran est tout ce
+  qu'on verra.
+
 - **Arrêter depuis le panneau ne saute plus la photo d'inventaire d'arrivée.**
   Le panneau posé sur le jeu a son propre bouton « Arrêter », et c'est
   évidemment celui-là qu'on clique : c'est le seul écran qu'on regarde en
