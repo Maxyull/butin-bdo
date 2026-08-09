@@ -1077,6 +1077,10 @@ function afficher(etat) {
   // bas, pour les avertissements.
   const stats = etat.stats;
 
+  // ⭐ Avant tout affichage : c'est ici, et nulle part ailleurs, que la fenêtre
+  // principale voit qu'une session s'est terminée sans passer par son bouton.
+  surveillerLaFinDeSession(etat);
+
   const enCours = Boolean(etat.session && etat.session.en_cours);
   const enPause = Boolean(etat.session && etat.session.en_pause);
   $("bouton-session").textContent = enCours ? "Arrêter la session" : "Démarrer une session";
@@ -1183,11 +1187,46 @@ $("bouton-pause").addEventListener("click", async () => {
 $("bouton-session").addEventListener("click", async () => {
   const etat = await (await fetch("/api/etat")).json();
   if (etat.session && etat.session.en_cours) {
-    await parcoursInventaire("apres");
+    await parcoursInventaire("apres", etat.session.id, false);
   } else {
     await parcoursCalibrer();
   }
 });
+
+// ⛔ LE PANNEAU COURT-CIRCUITAIT LE PARCOURS, et c'était un angle mort complet.
+// Trouvé par Maxime à l'usage le 09/08/2026 : le panneau posé sur le jeu a son
+// PROPRE bouton « Arrêter », qui appelle /api/session/arreter en direct. Et
+// c'est évidemment celui-là qu'on clique, puisque c'est le seul écran qu'on
+// regarde en farmant. Le parcours ne couvrait que le bouton de la fenêtre
+// principale, donc la photo d'inventaire d'ARRIVÉE n'était jamais demandée.
+//
+// ⛔ Ce que ça coûte : sans les deux bouts, une session ne peut plus être
+// comparée qu'à elle-même. L'inventaire est la SEULE vérité de ce logiciel qui
+// ne passe par aucune reconnaissance d'écran, et c'est elle qui a donné le seul
+// chiffre de justesse honnête du projet (+1,3 % sur la session 0020).
+//
+// ⭐ Le correctif ne touche NI au panneau — la fenêtre la plus délicate du
+// produit — NI au serveur : la fenêtre principale s'aperçoit toute seule qu'une
+// session vient de finir sans photo d'arrivée, et pose l'étape manquante. La
+// photo reste valable après l'arrêt tant que l'inventaire n'a pas bougé.
+let sessionVueEnCours = null;
+let arriveeDemandee = null;
+
+function surveillerLaFinDeSession(etat) {
+  const session = etat.session;
+  if (session && session.en_cours) {
+    sessionVueEnCours = session.id;
+    return;
+  }
+  const finie = sessionVueEnCours;
+  sessionVueEnCours = null;
+  // ⚠️ `finie === arriveeDemandee` est ce qui empêche de reposer l'étape quand
+  // c'est le parcours LUI-MÊME qui vient d'arrêter la session : il a déjà
+  // demandé la photo, et la reposer relancerait la question du compte
+  // par-dessus sa propre réponse.
+  if (finie === null || finie === arriveeDemandee) return;
+  parcoursInventaire("apres", finie, true);
+}
 
 // -- Le parcours guidé -------------------------------------------------------
 //
@@ -1337,11 +1376,26 @@ async function parcoursDemarrer() {
 // ⭐ La photo de l'inventaire est la SEULE vérité de ce logiciel qui ne passe
 // par aucune lecture d'écran. Sans les deux bouts, on ne peut que comparer le
 // compteur à lui-même.
-function parcoursInventaire(moment) {
+//
+// ⚠️ `session` est l'identifiant concerné et `arretee` dit que le panneau l'a
+// DÉJÀ fermée. Les deux existent parce que la réponse de /api/session/arreter
+// est l'état d'APRÈS : elle rend `session: null` et ne peut donc pas dire de
+// quelle session on vient de parler.
+function parcoursInventaire(moment, session, arretee) {
   const depart = moment === "avant";
+  // Une seule fois par session : c'est ce qui empêche la surveillance de
+  // reposer l'étape que le parcours vient de poser lui-même.
+  if (!depart) arriveeDemandee = session !== undefined ? session : sessionVueEnCours;
   etape(
     depart ? "3 / 4 — Inventaire de départ" : "Inventaire d'arrivée",
-    "Bascule dans le jeu et <b>ouvre ton inventaire</b>.<br>" +
+    (arretee
+      ? "Tu viens d'arrêter depuis le panneau. Il manque la <b>photo " +
+        "d'arrivée</b>, sans laquelle cette session ne pourra être comparée " +
+        "qu'à elle-même.<br><br>Elle reste valable <b>tant que ton inventaire " +
+        "n'a pas bougé</b> : ne vends rien, n'améliore rien avant de la " +
+        "prendre.<br><br>"
+      : "") +
+      "Bascule dans le jeu et <b>ouvre ton inventaire</b>.<br>" +
       (depart
         ? "C'est la photo de ce que tu as <b>avant</b> de farmer."
         : "C'est la photo de ce que tu as <b>après</b>. La différence entre les " +
@@ -1353,14 +1407,22 @@ function parcoursInventaire(moment) {
     [
       {
         libelle: "C'est ouvert, prends la photo",
-        action: () => photographier(moment),
+        action: () => photographier(moment, session, arretee),
         principal: true,
       },
-    ],
+      // ⚠️ Seulement quand la session est déjà close : une photo prise après
+      // avoir vendu ou amélioré serait FAUSSE, et une mesure fausse est pire
+      // qu'une mesure absente. Le parcours passe alors directement à la
+      // question qui ferme la boucle.
+    ].concat(
+      arretee
+        ? [{libelle: "Passer la photo", action: () => parcoursLeCompteEstBon(session)}]
+        : [],
+    ),
   );
 }
 
-async function photographier(moment) {
+async function photographier(moment, session, arretee) {
   const depart = moment === "avant";
   await compteARebours(
     depart ? "3 / 4 — Inventaire de départ" : "Inventaire d'arrivée",
@@ -1380,8 +1442,14 @@ async function photographier(moment) {
   }
   if (depart) {
     await parcoursVerifier();
+  } else if (arretee) {
+    // ⛔ Ne PAS rearrêter : le panneau l'a déjà fait. Repasser par
+    // /api/session/arreter ne fermerait rien (le serveur sort tout de suite si
+    // aucune session n'est ouverte) et donnerait l'illusion que le parcours
+    // maîtrise l'arrêt alors qu'il ne fait que le rattraper.
+    parcoursLeCompteEstBon(session);
   } else {
-    await parcoursArreter();
+    await parcoursArreter(session);
   }
 }
 
@@ -1435,7 +1503,7 @@ async function parcoursVerifier() {
   );
 }
 
-async function parcoursArreter() {
+async function parcoursArreter(session) {
   etape("Arrêt", "Fermeture de la session…", []);
   const corps = await (
     await fetch("/api/session/arreter", {
@@ -1444,10 +1512,19 @@ async function parcoursArreter() {
       body: "{}",
     })
   ).json();
-  const session = corps.session ? corps.session.id : null;
   afficher(corps);
-  // ⛔ La question qui ferme la boucle. Sans elle, un compte faux repart avec le
-  // joueur et personne ne le saura jamais.
+  // ⚠️ L'identifiant vient de l'APPELANT, jamais de cette réponse : elle est
+  // l'état d'après l'arrêt, donc son `session` vaut null. Le lire ici rendait
+  // toujours null, et « Oui, c'est juste » ne rouvrait donc jamais la session
+  // dans l'Historique — la promesse était à l'écran, le geste manquait.
+  parcoursLeCompteEstBon(session);
+}
+
+// ⛔ La question qui ferme la boucle. Sans elle, un compte faux repart avec le
+// joueur et personne ne le saura jamais. Séparée de l'arrêt le 09/08/2026 :
+// c'est le même écran qu'on doit poser après un arrêt fait depuis le panneau,
+// où il n'y a plus rien à arrêter.
+function parcoursLeCompteEstBon(session) {
   etape(
     "Le compte est bon ?",
     "Compare ce que Butin a compté avec ce que ton inventaire a réellement " +
@@ -2082,6 +2159,9 @@ function brancherLaCapture(id, moment, invite) {
         body: JSON.stringify({ moment: moment }),
       });
       etat.textContent = (await reponse.json()).message || "Réponse illisible.";
+      // Une photo d'arrivée prise à la main compte : sans ça, la surveillance
+      // reposerait l'étape au premier arrêt, pour un geste déjà fait.
+      if (moment === "apres") arriveeDemandee = sessionVueEnCours;
     } catch (erreur) {
       etat.textContent = "Le serveur local n'a pas répondu.";
     } finally {

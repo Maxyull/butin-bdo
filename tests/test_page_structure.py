@@ -349,6 +349,107 @@ class TestLeParcoursGuide:
         assert "n'est envoyée à personne" in corps
 
 
+class TestLePanneauNeCourtCircuitePlusLeParcours:
+    """⛔ Le bouton « Arrêter » du panneau sautait la photo d'arrivée.
+
+    Trouvé par Maxime **à l'usage** le 09/08/2026, et c'était un angle mort
+    complet : le panneau posé sur le jeu a son propre bouton « Arrêter », qui
+    appelle `/api/session/arreter` en direct. Le parcours guidé ne couvrait que
+    le bouton de la fenêtre principale, donc la photo d'inventaire d'ARRIVÉE
+    n'était jamais demandée — et c'est évidemment le bouton du panneau qu'on
+    clique, puisque c'est le seul écran qu'on regarde en farmant.
+
+    ⛔ Ce que ça coûte : sans les deux bouts, une session ne peut plus être
+    comparée qu'à elle-même. L'inventaire est la seule vérité de ce logiciel qui
+    ne passe par aucune reconnaissance d'écran.
+
+    ⭐ Le correctif ne touche NI au panneau NI au serveur : la fenêtre
+    principale s'aperçoit toute seule qu'une session vient de finir sans photo
+    d'arrivée. Ces tests figent les trois pièces qui le rendent possible.
+    """
+
+    def test_le_panneau_arrete_toujours_en_direct(self) -> None:
+        """⚠️ Le cas gardé, et il n'est pas hypothétique : c'est le comportement
+        du panneau, laissé tel quel EXPRÈS.
+
+        Le panneau est la fenêtre la plus délicate du produit — elle est posée
+        par-dessus le jeu — et le correctif a été choisi pour ne pas y toucher.
+        Si ce test tombe un jour parce que le panneau est passé par le parcours,
+        la surveillance de la fenêtre principale devient inutile : c'est le
+        moment de la retirer, pas de la garder par précaution.
+        """
+        assert "/api/session/arreter" in page("overlay.html")
+
+    def test_la_fenetre_principale_surveille_la_fin_de_session(self) -> None:
+        source = page("index.html")
+
+        assert "function surveillerLaFinDeSession(" in source
+        # Appelée depuis `afficher`, donc à chaque rafraîchissement d'une
+        # seconde : c'est le seul endroit qui voit passer l'état du serveur.
+        corps = source[source.index("function afficher(etat)") :]
+        corps = corps[: corps.index("\n}\n")]
+        assert "surveillerLaFinDeSession(etat)" in corps
+
+    def test_la_surveillance_pose_l_etape_manquante(self) -> None:
+        """Une session vue en cours, puis plus de session : la photo d'arrivée
+        est demandée pour celle qui vient de finir."""
+        source = page("index.html")
+        corps = source[source.index("function surveillerLaFinDeSession(") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert 'parcoursInventaire("apres", finie, true)' in corps
+
+    def test_la_surveillance_ne_repose_pas_une_etape_deja_posee(self) -> None:
+        """⛔ Sans ce garde, le parcours se déclencherait sur son PROPRE arrêt.
+
+        Le bouton de la fenêtre principale demande la photo, prend la photo,
+        puis arrête la session — et cet arrêt-là est exactement ce que la
+        surveillance guette. Elle reposerait la question du compte par-dessus sa
+        propre réponse.
+        """
+        source = page("index.html")
+        corps = source[source.index("function surveillerLaFinDeSession(") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert "finie === arriveeDemandee" in corps
+
+    def test_une_session_deja_arretee_n_est_pas_rearretee(self) -> None:
+        """⛔ Repasser par `/api/session/arreter` ne fermerait rien — le serveur
+        sort tout de suite s'il n'y a pas de session — mais donnerait
+        l'illusion que le parcours maîtrise l'arrêt alors qu'il le rattrape."""
+        source = page("index.html")
+        corps = source[source.index("async function photographier(") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert "} else if (arretee) {" in corps
+        assert "parcoursLeCompteEstBon(session)" in corps
+        # L'arrêt reste le chemin normal quand la session tourne encore.
+        assert "parcoursArreter(session)" in corps
+
+    def test_la_question_du_compte_est_separee_de_l_arret(self) -> None:
+        """C'est ce qui rend le rattrapage possible : le même écran doit être
+        posé après un arrêt venu du panneau, où il n'y a plus rien à arrêter."""
+        source = page("index.html")
+
+        assert "function parcoursLeCompteEstBon(session)" in source
+        assert "Le compte est bon ?" in source
+
+    def test_l_identifiant_de_session_ne_vient_PAS_de_la_reponse_d_arret(self) -> None:
+        """⛔ Défaut réel, présent depuis #112 et invisible à l'écran.
+
+        `/api/session/arreter` rend l'état d'APRÈS l'arrêt, donc `session` y
+        vaut `null`. `corps.session ? corps.session.id : null` rendait donc
+        toujours `null`, et « Oui, c'est juste » ne rouvrait jamais la session
+        dans l'Historique. La promesse était affichée, le geste manquait.
+        """
+        source = page("index.html")
+        corps = source[source.index("async function parcoursArreter(") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert "corps.session" not in corps
+        assert "parcoursLeCompteEstBon(session)" in corps
+
+
 def _bloc_du_schema(source: str) -> str:
     """Le contenu de `#schema-zone`, découpé sur ses balises littérales.
 
