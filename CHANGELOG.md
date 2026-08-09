@@ -9,6 +9,25 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Corrigé
+
+- **Arrêter depuis le panneau ne saute plus la photo d'inventaire d'arrivée.**
+  Le panneau posé sur le jeu a son propre bouton « Arrêter », et c'est
+  évidemment celui-là qu'on clique : c'est le seul écran qu'on regarde en
+  farmant. Le parcours guidé ne couvrait que le bouton de la fenêtre
+  principale, donc la photo d'arrivée n'était jamais demandée — et sans les deux
+  bouts, une session ne peut être comparée qu'à elle-même.
+
+  La fenêtre principale s'en aperçoit maintenant toute seule et pose l'étape
+  manquante. La photo reste valable tant que l'inventaire n'a pas bougé, ce
+  qu'elle dit ; si tu as déjà vendu ou amélioré quelque chose, « Passer la
+  photo » évite d'enregistrer une mesure fausse.
+
+- **« Oui, c'est juste » rouvre enfin la session dans l'Historique.** Elle
+  était annoncée à l'écran et ne se produisait jamais : l'identifiant était lu
+  dans la réponse à l'arrêt, qui décrit l'état d'après et ne contient donc plus
+  de session.
+
 ## [0.13.0] - 2026-08-08
 
 ### Ajouté
