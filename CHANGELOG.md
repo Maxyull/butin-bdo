@@ -9,6 +9,25 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Corrigé (en premier, parce que c'était visible)
+
+- **⛔ Les deux boutons sous le calibrage ne faisaient RIEN.** Ni l'un ni
+  l'autre n'écoutait le moindre clic.
+
+  « Ce qu'il faut voir » ne dépliait donc jamais ses trois schémas — le seul
+  endroit qui explique la panne la plus coûteuse de Butin, une fenêtre du jeu
+  posée devant le chat, 560 objets perdus sans un mot à l'écran. Ils étaient
+  inatteignables depuis l'application. Le bouton marche, et il se replie.
+
+  « Mon écran » est **retiré** : il était mort depuis la 0.11.0. L'aperçu de
+  ton écran, lui, reste — le parcours guidé le prend au moment de la
+  vérification.
+
+- **L'onglet Session ne montre plus deux fois la même capture.** Il y avait
+  deux emplacements d'aperçu, l'un rempli par le calibrage et l'autre par la
+  vérification : le parcours guidé enchaînant les deux, la même image
+  s'affichait deux fois l'une sous l'autre.
+
 ### Ajouté
 
 - **⭐ Le panneau laisse passer la souris.** Black Desert cache le curseur

@@ -591,22 +591,28 @@
   <div id="etat-capture" class="note note-large"></div>
   <div id="etat-calibrage" class="note note-large"></div>
 
-  <!-- ⭐ Les deux boutons demandés par Maxime le 08/08/2026, posés juste sous
-       le calibrage parce que c'est là qu'on se pose la question : « est-ce que
-       la zone est la bonne ? ».
+  <!-- ⭐ « Ce qu'il faut voir » : trois SCHÉMAS DESSINÉS, pas des captures.
+       Décision explicite et elle ne bouge pas : toutes les captures
+       disponibles contiennent le chat de guilde, donc les pseudonymes
+       d'autres joueurs, et ce dépôt est public. Les schémas sont dessinés
+       d'après cinq vrais écrans de Maxime, qui ont servi de modèle sans
+       jamais entrer ici.
 
-       « Ce qu'il faut voir » est un SCHÉMA DESSINÉ, pas une capture d'écran.
-       Décision explicite : toutes les captures disponibles contiennent le chat
-       de guilde, donc les pseudonymes d'autres joueurs, et ce dépôt est
-       public. Un schéma dit la même chose sans exposer personne.
+       ⛔ Il y avait un second bouton, « Mon écran », et il ne faisait RIEN :
+       aucun gestionnaire de clic ne lui était branché. Vérifié dans un
+       navigateur le 09/08/2026 — zéro requête, aucun aperçu, aucun message.
+       Il a été livré mort en 0.11.0, et il aura fallu que Maxime demande « à
+       quoi servent-ils » pour qu'on s'en aperçoive. `test_page_structure.py`
+       ne garde que ce qu'il PEUT voir : un `$()` sur un élément disparu. Un
+       bouton sans gestionnaire lui est invisible, et l'était aussi pour la
+       relecture.
 
-       « Mon écran » va chercher l'écran réel avec le cadre de la zone posé
-       dessus. Les deux se lisent côte à côte : le schéma dit ce qu'il faut,
-       l'aperçu dit ce qu'on a. -->
+       L'aperçu du vrai écran, lui, reste : il est pris par le parcours guidé
+       au moment de la vérification, juste sous ces schémas. Le schéma dit ce
+       qu'il faut, l'aperçu dit ce qu'on a. -->
   <div class="rangee note-apres-action">
     <button class="action-mince" id="bouton-schema" aria-expanded="false"
             aria-controls="schema-zone">Ce qu'il faut voir</button>
-    <button class="action-mince" id="bouton-mon-ecran">Mon écran</button>
   </div>
   <!-- ⛔ Le troisième schéma n'est PAS décoratif. Le 07/08/2026, la session
        0014 a laissé le menu Échap par-dessus le chat pendant 247 secondes
@@ -699,15 +705,19 @@
       et ne recouvre rien.
     </p>
   </div>
-  <div id="mon-ecran-etat" class="note"></div>
-  <img id="mon-ecran-apercu" class="apercu" alt="Ton écran, cadre orangé sur la zone lue" hidden>
-
   <pre id="extrait-calibrage" class="extrait" hidden></pre>
   <!-- Ce qui cloche dans le calibrage qu'on vient d'accepter. Masqué quand il
        n'y a rien à dire : un avertissement qui s'affiche aussi sur les bons
        calibrages est un avertissement qu'on apprend à ignorer. -->
   <div id="calibrage-doutes" class="doutes" hidden></div>
-  <img id="apercu-calibrage" class="apercu" alt="Zone calibrée, cadre en surbrillance" hidden>
+  <!-- ⛔ UN SEUL aperçu, et c'est le correctif demandé par Maxime le
+       09/08/2026 : « pourquoi dans session il y a 2 fois le même screen ».
+       Il y avait deux balises d'image, `#apercu-calibrage` remplie par le
+       calibrage et `#mon-ecran-apercu` remplie par l'étape de vérification.
+       Le parcours guidé enchaînant les deux, la MÊME capture s'affichait deux
+       fois, l'une sous l'autre. Celle-ci sert aux deux moments. -->
+  <img id="apercu-calibrage" class="apercu"
+       alt="Ton écran, cadre orangé sur la zone lue" hidden>
 </div>
 
 <!-- ⛔ Le fil des drops et le tableau du butin ont été RETIRÉS de cet onglet le
@@ -1536,9 +1546,11 @@ async function parcoursVerifier() {
   } catch (erreur) {
     corps = {};
   }
+  // Le MÊME emplacement que le calibrage : deux images l'une sous l'autre
+  // montraient la même capture, ce que Maxime a fini par demander.
   if (corps.apercu) {
-    $("mon-ecran-apercu").src = corps.apercu;
-    $("mon-ecran-apercu").hidden = false;
+    $("apercu-calibrage").src = corps.apercu;
+    $("apercu-calibrage").hidden = false;
   }
   etape(
     "4 / 4 — Vérification",
@@ -1552,7 +1564,7 @@ async function parcoursVerifier() {
         principal: true,
         action: () => {
           fermerLeParcours();
-          $("mon-ecran-apercu").hidden = true;
+          $("apercu-calibrage").hidden = true;
         },
       },
       {
@@ -1712,6 +1724,23 @@ function afficherLeCalibrage(corps) {
 
 brancherBascule("langue", "langue");
 brancherBascule("region", "region");
+
+// ⛔ CE GESTIONNAIRE N'EXISTAIT PAS, et le bouton était donc mort depuis #97.
+// Les trois schémas — le seul endroit qui explique la panne la plus coûteuse du
+// logiciel, 560 objets perdus derrière un menu — étaient INATTEIGNABLES depuis
+// l'application. Le parcours guidé essayait lui-même de les déplier
+// (`$("bouton-schema").click()`), sans rien derrière pour écouter.
+//
+// ⚠️ Ni les tests ni la relecture ne pouvaient le voir : ils cherchent des
+// `$()` sur des éléments DISPARUS, c'est-à-dire des liens rompus, pas des liens
+// absents. Il a fallu que Maxime demande « à quoi servent-ils ? ».
+$("bouton-schema").addEventListener("click", () => {
+  const bloc = $("schema-zone");
+  const deplie = bloc.hidden;
+  bloc.hidden = !deplie;
+  $("bouton-schema").setAttribute("aria-expanded", String(deplie));
+  $("bouton-schema").textContent = deplie ? "Masquer les schémas" : "Ce qu'il faut voir";
+});
 
 // -- profil de taxe ---------------------------------------------------------
 //
