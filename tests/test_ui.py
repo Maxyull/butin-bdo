@@ -1305,6 +1305,12 @@ class TestBoutonDeDon:
 
     Il a fallu le lui demander : le bouton était réclamé depuis la 0.4.0 sans
     que l'endroit soit dit, et le poser au jugé aurait été le poser deux fois.
+
+    ⚠️ Et il a rebougé le 09/08/2026 : le don est maintenant ENCADRÉ par
+    « Rejoindre le Discord » à gauche et « Se connecter » à droite. Trois
+    placements en deux jours, et c'est normal — l'endroit d'un bouton se juge
+    à l'usage, pas sur un plan. Ce qui compte est qu'un seul endroit décide,
+    et que le test dise lequel.
     """
 
     def test_le_lien_de_don_est_dans_la_page(self, app) -> None:
@@ -1315,15 +1321,17 @@ class TestBoutonDeDon:
         assert "https://paypal.me/maxyull" in corps
         assert "Soutenir Butin" in corps
 
-    def test_il_est_a_cote_de_la_deconnexion_discord(self, app) -> None:
-        """L'endroit fait partie de la demande, et il a bougé deux fois.
+    def test_le_don_est_encadre_par_les_deux_boutons_discord(self, app) -> None:
+        """L'endroit fait partie de la demande, et il a bougé trois fois.
 
-        08/08/2026, premier jet : « à côté des boutons Discord », qui étaient
-        alors dans l'onglet Rapport. Puis Maxime a demandé l'identité Discord
-        dans l'en-tête, la déconnexion à côté d'elle, et le don à côté de la
-        déconnexion. Le test suit donc l'ADJACENCE au bouton de déconnexion,
-        qui est ce qui a été demandé les deux fois, et non l'onglet, qui n'en
-        était que la conséquence du moment.
+        08/08/2026 : « à côté des boutons Discord », puis l'identité dans
+        l'en-tête avec la déconnexion à côté d'elle. 09/08/2026, dans ses
+        mots : « si pas connecté met bouton se connecter pour discord a droite
+        de soutenir, puis rejoindre le discord a gauche de soutenir butin ».
+
+        ⚠️ Ce test suit donc l'ORDRE, qui est ce qui a été demandé cette fois,
+        et il a été réécrit plutôt qu'étendu : figer les deux placements
+        successifs aurait fait passer une contrainte périmée pour une règle.
 
         Découpage sur les balises littérales plutôt qu'une expression
         régulière sur du HTML : CodeQL refuse la seconde (`py/bad-tag-filter`).
@@ -1333,31 +1341,39 @@ class TestBoutonDeDon:
             corps = reponse.read().decode("utf-8")
 
         entete = corps.partition('<div class="onglets"')[0]
-        assert 'id="identite-discord"' in entete, "l'identité Discord n'est plus dans l'en-tête"
-        assert 'id="discord-deconnexion"' in entete, "la déconnexion n'est plus dans l'en-tête"
+        assert "discord.gg" in entete, "le lien vers le salon n'est pas dans l'en-tête"
+        assert "github.com/Maxyull/butin-bdo" in entete, "le lien du dépôt n'est pas dans l'en-tête"
         assert "paypal.me/maxyull" in entete, "le bouton de don n'est plus dans l'en-tête"
-        # ⚠️ L'ordre a changé le 08/08/2026 : Maxime a demandé d'ÉCHANGER le
-        # soutien et le pseudonyme. La déconnexion reste entre les deux, donc
-        # toujours adjacente au nom qu'elle retire — c'est ce qui comptait dans
-        # la demande précédente, et c'est ce que ce test garde.
+        assert 'id="discord-connexion"' in entete, "« se connecter » n'est pas dans l'en-tête"
+        # Les deux icônes, puis le don, puis le rattachement : « juste l'icône
+        # de Discord […] puis à côté l'icône de GitHub » (09/08/2026).
         assert (
-            entete.index("paypal.me")
-            < entete.index('id="discord-deconnexion"')
-            < entete.index('id="identite-discord"')
+            entete.index("discord.gg")
+            < entete.index("github.com/Maxyull/butin-bdo")
+            < entete.index("paypal.me")
+            < entete.index('id="discord-connexion"')
         )
 
-    def test_se_connecter_reste_dans_les_reglages(self, app) -> None:
-        """Se connecter est un geste qu'on fait UNE FOIS : il n'a rien à faire
-        dans un en-tête qu'on relit à chaque lancement. Se déconnecter, si :
-        on le décide en regardant sous quel nom on parle."""
+    def test_le_compte_et_sa_deconnexion_vivent_dans_les_reglages(self, app) -> None:
+        """« laisser les infos discord, déconnexion etc. dans réglages », le
+        09/08/2026.
+
+        ⛔ Les deux restent COLLÉS l'un à l'autre : un bouton « se déconnecter »
+        loin du compte qu'il détache ne dit pas de quoi il parle. C'est la seule
+        chose qui n'a pas bougé à travers les trois placements.
+        """
         _, base = app
         with urllib.request.urlopen(base + "/", timeout=5) as reponse:  # noqa: S310
             corps = reponse.read().decode("utf-8")
 
         reglages = corps.partition('id="page-reglages"')[2].partition('id="page-rapport"')[0]
-        assert 'id="discord-connexion"' in reglages
+        entete = corps.partition('<div class="onglets"')[0]
+
+        assert 'id="identite-discord"' in reglages
+        assert 'id="discord-deconnexion"' in reglages
         assert 'id="discord-avertissement"' in reglages
-        assert "discord.gg" in reglages
+        assert 'id="identite-discord"' not in entete, "le pseudonyme est redescendu des Réglages"
+        assert 'id="discord-deconnexion"' not in entete
 
     def test_il_s_ouvre_dans_le_navigateur_du_systeme(self, app) -> None:
         """⛔ `rel="noopener"`, comme le lien Discord. Sans lui, la page

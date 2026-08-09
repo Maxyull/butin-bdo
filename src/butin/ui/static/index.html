@@ -305,11 +305,44 @@
      clique pas, elle informe. Contour et non aplat de marque — l'aplat bleu
      appartient au lien vers le salon, dans les Réglages, et deux aplats
      identiques à deux endroits diraient que ce sont deux fois la même chose. */
-  /* Le groupe de droite de l'en-tete : qui je suis sur Discord, comment m'en
-     detacher, et le soutien. Il passe a la ligne sur une fenetre etroite
-     plutot que de pousser le titre hors de l'ecran. */
+  /* Le groupe de droite de l'en-tete : rejoindre le salon, soutenir, et se
+     connecter quand ce n'est pas fait. Il passe a la ligne sur une fenetre
+     etroite plutot que de pousser le titre hors de l'ecran. */
   .groupe-entete { display: flex; align-items: center; gap: var(--espace-3);
                    flex-wrap: wrap; }
+  /* ⚠️ Trois pastilles sur une seule ligne : a la taille des Reglages, elles
+     poussaient le titre a la ligne des la fenetre minimale (860 px). Elles sont
+     donc un cran plus petites ICI seulement — le meme bouton garde sa taille
+     pleine dans les Reglages, ou il est seul. */
+  /* ⚠️ `nowrap` mesuré dans un navigateur à 880 px, la largeur minimale de la
+     fenêtre : sans lui, « Soutenir Butin » passait sur deux lignes et sa
+     pastille faisait 54 px de haut à côté de deux icônes de 34, ce qui déforme
+     toute la ligne du titre. Les libellés de l'en-tête sont courts et connus :
+     ils ne se coupent pas, le groupe passe à la ligne entier s'il le faut. */
+  .groupe-entete .lien-discord,
+  .groupe-entete .lien-don,
+  .groupe-entete .bouton-discord-compte { padding: 6px 12px; font-size: 13px;
+                                          white-space: nowrap; }
+
+  /* ⭐ Icône SEULE, demandé par Maxime le 09/08/2026 : « met juste l'icône de
+     Discord et un lien vers le Discord, puis à côté l'icône de GitHub qui
+     amène vers le dépôt ». Deux marques que tout le monde reconnaît, et
+     l'en-tête garde la place pour ce qui a besoin de mots.
+
+     ⛔ Un lien sans texte n'a plus de nom pour un lecteur d'écran ni de
+     survol pour qui hésite : `title` ET `aria-label` sont donc obligatoires
+     sur ces deux-là, et un test le vérifie. Une icône « évidente » ne l'est
+     que pour celui qui la connaît déjà. */
+  .groupe-entete .icone-seule { padding: 7px; gap: 0; }
+  .icone-seule svg { width: 18px; height: 18px; flex: 0 0 18px; fill: currentColor; }
+
+  /* Le dépôt : contour neutre, jamais un aplat. Voir le commentaire sur le
+     lien lui-même — la page n'a qu'un seul aplat coloré, et c'est Discord. */
+  .lien-depot { display: inline-flex; align-items: center;
+                border: 1px solid var(--bord); border-radius: var(--rayon-pilule);
+                background: var(--fond-champ); color: var(--doux);
+                text-decoration: none; transition: color .12s, border-color .12s; }
+  .lien-depot:hover { color: var(--texte); border-color: var(--or); }
 
   .identite-discord { display: inline-flex; align-items: center; gap: 8px;
                       padding: 5px 12px; border: 1px solid #5865f2;
@@ -462,21 +495,42 @@
   <h1><img class="marque" src="/butin.png" alt="">Butin <span id="version"></span><button class="bouton-maj" id="bouton-maj" hidden
      type="button"></button>
      <span id="maj-etat" class="etat-en-ligne"></span></h1>
-  <!-- ⭐ L'identité Discord, sur la MÊME ligne que le titre, à droite. Demandé
-       par Maxime le 08/08/2026, et c'est le bon endroit : « suis-je connecté,
-       et sous quel nom » est une question qu'on se pose en permanence — c'est
-       ce nom qui apparaîtra dans le salon quand on signale un bogue — alors
-       que « me connecter » ne se fait qu'une fois. Le premier est un état, il
-       reste visible ; le second est un geste, il vit dans les Réglages.
-
-       ⛔ Masqué tant qu'aucun compte n'est rattaché, et pas remplacé par une
-       invite à se connecter : un en-tête qui réclame quelque chose à chaque
-       lancement est un en-tête qu'on apprend à ne plus lire. -->
+  <!-- Les trois raccourcis de l'en-tête, sur la MÊME ligne que le titre : le
+       salon, le don, et le rattachement du compte quand il manque. -->
   <div class="groupe-entete">
-  <!-- ⚠️ « Soutenir Butin » et le pseudonyme ont ÉCHANGÉ leur place le
-       08/08/2026, à la demande de Maxime. La déconnexion reste entre les deux,
-       donc toujours adjacente au nom qu'elle retire — c'est ce qui comptait
-       dans la demande précédente. -->
+  <!-- ⭐ L'ordre demandé par Maxime le 09/08/2026 : rejoindre le salon à GAUCHE
+       de « Soutenir Butin », « se connecter » à DROITE. Les deux encadrent donc
+       le don.
+
+       ⚠️ Le LIBELLÉ reste « Discord », pas « Rejoindre le Discord ». Il nommait
+       le bouton par ce qu'il fait, mais il avait explicitement refusé ce
+       libellé-là le 06/08 (« le logo dit déjà où ça mène, le reste sonne comme
+       un encart publicitaire »), et `test_marque.py` le fige. Entre une demande
+       de PLACEMENT et une décision de LIBELLÉ, les deux tiennent ensemble : on
+       déplace sans réécrire.
+
+       ⚠️ Le pseudonyme et la déconnexion sont redescendus dans les Réglages le
+       même jour. Ils y étaient montés le 08/08 (« suis-je connecté, et sous
+       quel nom » se demande en permanence), mais l'en-tête ne peut pas tout
+       porter : ce qui y reste est ce qu'on veut atteindre depuis n'importe quel
+       onglet, pas ce qu'on vient consulter. -->
+  <a class="lien-discord icone-seule" href="https://discord.gg/qCuvN2Zna7"
+     target="_blank" rel="noopener" title="Le Discord de Butin" aria-label="Le Discord de Butin">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
+  </a>
+  <!-- ⭐ Le dépôt, demandé par Maxime le 09/08/2026 en même temps que l'icône
+       Discord seule. Butin est sous licence MIT et son code est public : le
+       lien n'est pas de la coquetterie, c'est ce qui permet à un joueur de
+       vérifier ce qu'un logiciel qui lit son écran fait de ce qu'il lit.
+
+       ⚠️ Contour neutre et pas d'aplat : la page n'a qu'UN seul aplat coloré,
+       celui de Discord, et c'est ce qui le rend reconnaissable. Deux aplats
+       côte à côte se disputeraient l'attention. -->
+  <a class="lien-depot icone-seule" href="https://github.com/Maxyull/butin-bdo"
+     target="_blank" rel="noopener" title="Le code de Butin sur GitHub"
+     aria-label="Le code de Butin sur GitHub">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8Z"/></svg>
+  </a>
   <!-- ⭐ La vraie icône du kit, demandée par Maxime : `don-butin-256.png`, un
        cœur facetté doré en 256x256. Elle remplace le caractère ❤, qui était un
        pis-aller parce que la seule image disponible était une bannière de
@@ -487,21 +541,11 @@
   <a class="lien-don" href="https://paypal.me/maxyull" target="_blank" rel="noopener">
     <img src="/don.png" alt="">Soutenir Butin
   </a>
-  <!-- ⛔ La deconnexion vit a cote du nom qu'elle retire, pas dans un autre
-       onglet. Demande par Maxime le 08/08/2026 : « l'icone connexion discord en
-       haut a droite avec l'image et le pseudo puis deconnecter a cote ». Se
-       connecter reste dans les Reglages — c'est un geste qu'on fait une fois ;
-       se deconnecter se decide en regardant sous quel nom on parle. -->
-  <button class="bouton-discord-compte" id="discord-deconnexion" hidden>Se déconnecter</button>
-  <!-- ⚠️ Le don garde la pastille doree qu'on a faite, PAS l'image du README :
-       `ressources/bouton-don-butin.png` fait 560x120, c'est une banniere, pas
-       une icone. A la taille d'un en-tete elle serait illisible, et l'embarquer
-       demanderait de l'ajouter au paquet fige et a une route du serveur pour
-       15 Ko qu'un contour dore rend mieux. -->
-  <div class="identite-discord" id="identite-discord" hidden>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
-    <span id="identite-discord-nom"></span>
-  </div>
+  <!-- ⛔ Masqué tant qu'un compte est rattaché, et masqué aussi tant que l'état
+       est INCONNU : proposer « se connecter » à quelqu'un qui l'est déjà lui
+       ferait refaire une autorisation pour rien, et une coupure réseau ne doit
+       rien changer à l'écran. -->
+  <button class="bouton-discord-compte" id="discord-connexion" hidden>Se connecter</button>
   </div>
 </div>
 
@@ -804,16 +848,27 @@
        vers le salon et le bouton de connexion se retrouvaient séparés de
        84 px, comme s'ils n'avaient rien à voir. Mesuré dans un navigateur le
        07/08/2026, invisible pour la suite de tests. -->
+  <!-- ⭐ Le compte, et rien que le compte. Le lien vers le salon et le bouton de
+       connexion sont montés dans l'en-tête le 09/08/2026, à la demande de
+       Maxime : ce sont les deux gestes qu'on fait depuis n'importe quel onglet.
+       Ce qui reste ici est ce qu'on vient consulter — sous quel nom je parle,
+       et comment m'en détacher. -->
   <div class="groupe-discord">
-    <a class="lien-discord" href="https://discord.gg/qCuvN2Zna7" target="_blank" rel="noopener">
+    <div class="identite-discord" id="identite-discord" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
-      Discord
-    </a>
-    <!-- Masqué tant que l'état n'est pas connu, pour ne pas proposer « se
-         connecter » à quelqu'un qui l'est déjà. -->
-    <button class="bouton-discord-compte" id="discord-connexion" hidden>Se connecter à Discord</button>
+      <span id="identite-discord-nom"></span>
+    </div>
+    <!-- ⛔ La déconnexion reste COLLÉE au nom qu'elle retire. C'était déjà la
+         règle quand les deux vivaient dans l'en-tête, et elle ne change pas en
+         descendant ici : un bouton « se déconnecter » loin du compte qu'il
+         détache ne dit pas de quoi il parle. -->
+    <button class="bouton-discord-compte" id="discord-deconnexion" hidden>Se déconnecter</button>
   </div>
   <div id="discord-deconnexion-etat" class="note note-large" hidden></div>
+  <div class="note" id="discord-pas-connecte" hidden>
+    Aucun compte rattaché. Le bouton <b>Se connecter</b> est en haut à droite,
+    à côté de « Soutenir Butin ».
+  </div>
   <!-- ⛔ Dit AVANT d'ouvrir le navigateur, pas après. Discord affichera
        « Rubin » parce que les deux logiciels partagent le même serveur, et
        c'est lui qui y est enregistré. Un joueur à qui l'on demande d'autoriser
@@ -2254,27 +2309,35 @@ function afficherLeCompteDiscord(compte) {
   // lui ferait refaire une autorisation pour rien.
   if (compte.inconnu) return;
 
+  // ⭐ Depuis le 09/08/2026, les deux etats ne vivent plus au meme endroit : le
+  // bouton « Se connecter » est dans l'EN-TETE, le compte et sa deconnexion
+  // dans les REGLAGES. Un seul endroit decide lequel se montre, ici, sinon
+  // deux ecrans finiraient par se contredire.
+  const sansCompte = $("discord-pas-connecte");
+
   if (compte.rattache) {
-    // ⚠️ L'etiquette « Connecte en tant que … » des Reglages a ete RETIREE le
-    // 08/08/2026 : la pastille de l'en-tete dit deja la meme chose, et deux
-    // endroits qui affichent le meme fait finissent par se contredire.
     bouton.hidden = true;
     detacher.hidden = false;
     detacher.disabled = false;
     avertissement.hidden = true;
-    // L'identite dans l'en-tete : le nom quand on l'a, sinon le fait d'etre
-    // connecte. ⛔ textContent et jamais innerHTML — ce pseudonyme vient du
-    // relais, donc de Discord, donc de l'exterieur.
+    sansCompte.hidden = true;
+    // Le nom quand on l'a, sinon le fait d'etre connecte. ⛔ textContent et
+    // jamais innerHTML — ce pseudonyme vient du relais, donc de Discord, donc
+    // de l'exterieur.
     $("identite-discord-nom").textContent = compte.nom || "Compte Discord connecté";
     identite.hidden = false;
     discordSondageJusqua = 0;  // Inutile de continuer a sonder.
   } else {
     bouton.hidden = false;
     bouton.disabled = false;
-    bouton.textContent = "Se connecter à Discord";
+    bouton.textContent = "Se connecter";
     detacher.hidden = true;
     avertissement.hidden = false;
     identite.hidden = true;
+    // ⚠️ Les Reglages disent OU est le bouton. Sans cette phrase, l'onglet qui
+    // s'appelle « Discord » n'offrirait plus rien a quelqu'un qui n'est pas
+    // connecte, et il chercherait la ou ca ne se trouve plus.
+    sansCompte.hidden = false;
   }
 }
 
@@ -2299,7 +2362,7 @@ $("discord-connexion").addEventListener("click", async () => {
       discordSondageJusqua = Date.now() + DISCORD_SONDAGE_MS;
     } else {
       bouton.disabled = false;
-      bouton.textContent = corps.message || "Se connecter à Discord";
+      bouton.textContent = corps.message || "Se connecter";
     }
   } catch (erreur) {
     bouton.disabled = false;
