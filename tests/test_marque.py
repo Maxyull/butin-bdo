@@ -152,15 +152,88 @@ class TestBoutonDiscord:
         texte = INDEX.read_text(encoding="utf-8")
         assert "background: #5865f2" in texte
 
-    def test_le_libelle_n_invite_pas_a_rejoindre(self) -> None:
-        """« Discord » suffit, et c'est ce que Maxime a demandé.
+    def test_le_lien_du_salon_est_une_ICONE_seule(self) -> None:
+        """Trois décisions successives de Maxime, et la dernière tranche.
 
-        Le logo dit déjà où ça mène ; ajouter « Rejoindre le Discord » répète
-        l'icône en mots et donne au bouton un ton d'encart publicitaire.
+        06/08/2026 : « Discord » suffit comme libellé, une invitation en toutes
+        lettres sonne comme un encart publicitaire. 09/08/2026 : « met juste
+        l'icône de Discord et un lien vers le Discord ». Le mot disparaît donc
+        à son tour — c'est la même idée poussée d'un cran, le logo dit déjà où
+        ça mène.
+        """
+        libelle = _contenu_du_lien(INDEX.read_text(encoding="utf-8"), "lien-discord")
+        mot = libelle.rpartition("</svg>")[2].strip()
+
+        assert mot == "", f"le lien du salon porte encore du texte : {mot!r}"
+
+    def test_une_icone_seule_garde_un_NOM_pour_qui_ne_la_reconnait_pas(self) -> None:
+        """⛔ Un lien sans texte n'a plus de nom.
+
+        Sans `aria-label`, un lecteur d'écran lit l'adresse ou rien ; sans
+        `title`, personne ne peut vérifier au survol où mène un pictogramme.
+        Une icône « évidente » ne l'est que pour qui la connaît déjà, et c'est
+        exactement la personne qui n'avait pas besoin du lien.
         """
         texte = INDEX.read_text(encoding="utf-8")
-        assert "Rejoindre" not in texte
-        assert "rejoindre le Discord" not in texte
+
+        for classe in ("lien-discord", "lien-depot"):
+            ouvrant = texte.partition(f'class="{classe} icone-seule"')[2].partition(">")[0]
+            assert "aria-label=" in ouvrant, f"{classe} n'a pas de nom accessible"
+            assert "title=" in ouvrant, f"{classe} n'a pas d'infobulle"
+
+    def test_le_garde_fou_voit_le_cas_qu_il_garde(self) -> None:
+        """⛔ Un garde-fou qui ne peut pas échouer ne garde rien.
+
+        Le test du libellé regardait le FICHIER entier, commentaires compris,
+        et il a échoué sur le commentaire qui expliquait justement pourquoi le
+        libellé ne changeait pas — un garde-fou qui interdit d'écrire sa propre
+        raison. Resserré sur le contenu du lien, il fallait vérifier qu'il mord
+        encore.
+        """
+        invitant = '<a class="lien-discord" href="#"><svg></svg>\n  Rejoindre le Discord\n</a>'
+
+        assert _contenu_du_lien(invitant, "lien-discord").rpartition("</svg>")[2].strip() != ""
+
+
+class TestLienVersLeDepot:
+    """⭐ Demandé par Maxime le 09/08/2026, à côté de l'icône Discord.
+
+    Butin est sous licence MIT et son code est public. Le lien n'est pas de la
+    coquetterie : c'est ce qui permet à un joueur de vérifier ce qu'un logiciel
+    qui lit son écran fait de ce qu'il y lit.
+    """
+
+    def test_il_mene_au_depot_de_butin(self) -> None:
+        texte = INDEX.read_text(encoding="utf-8")
+
+        assert "https://github.com/Maxyull/butin-bdo" in texte
+
+    def test_il_s_ouvre_dans_le_navigateur_du_systeme_sans_donner_la_main(self) -> None:
+        """⛔ `rel="noopener"`, comme les autres liens sortants : sans lui, la
+        page ouverte garde une poignée sur celle-ci."""
+        ouvrant = INDEX.read_text(encoding="utf-8").partition('class="lien-depot')[2]
+        ouvrant = ouvrant.partition(">")[0]
+
+        assert 'target="_blank"' in ouvrant
+        assert 'rel="noopener"' in ouvrant
+
+    def test_il_ne_porte_PAS_un_aplat_de_couleur(self) -> None:
+        """La page n'a qu'un seul aplat coloré, celui de Discord, et c'est ce
+        qui le rend reconnaissable. Deux aplats côte à côte se disputeraient
+        l'attention sans que rien ne dise lequel compte."""
+        texte = INDEX.read_text(encoding="utf-8")
+        regle = texte.partition("  .lien-depot {")[2].partition("}")[0]
+
+        assert "var(--fond-champ)" in regle, "le lien du dépôt doit rester en contour neutre"
+
+
+def _contenu_du_lien(source: str, classe: str) -> str:
+    """Ce qu'il y a entre les balises du lien portant cette classe.
+
+    Découpage littéral, pas d'expression régulière sur du HTML : CodeQL refuse
+    la seconde (`py/bad-tag-filter`).
+    """
+    return source.partition(f'class="{classe}')[2].partition(">")[2].partition("</a>")[0]
 
 
 class TestServeur:
