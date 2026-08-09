@@ -384,12 +384,16 @@ class TestPanneauEnSurimpression:
     class _Overlay:
         def __init__(self) -> None:
             self.trace: list[str] = []
+            self.souris: list[bool] = []
 
         def open(self) -> None:
             self.trace.append("ouvert")
 
         def close(self) -> None:
             self.trace.append("ferme")
+
+        def souris_traversante(self, actif: bool) -> None:
+            self.souris.append(actif)
 
     def test_il_s_ouvre_avec_la_session_et_se_ferme_avec_elle(self, store: SessionStore) -> None:
         panneau = self._Overlay()
@@ -437,6 +441,67 @@ class TestPanneauEnSurimpression:
         etat.stop()
 
         assert etat.session_id is None
+
+
+class TestSourisTraversante:
+    """Le panneau capte-t-il encore la souris du joueur ?
+
+    Signalé par Maxime le 09/08/2026 : Black Desert cache le curseur pendant
+    qu'on joue, et le panneau posé par-dessus le récupérait au premier survol.
+    Ce qui est vérifié ici, c'est le CÂBLAGE — que le réglage atteigne la
+    fenêtre. Que Windows obéisse est mesuré ailleurs (voir `test_souris.py`).
+    """
+
+    def test_le_reglage_est_dans_l_etat(self, app) -> None:
+        state, _ = app
+
+        assert state.snapshot()["reglages"]["souris_traversante"] is True
+
+    def test_le_panneau_le_recoit_a_son_OUVERTURE(self, store: SessionStore) -> None:
+        """⛔ Régression : le réglage est retenu d'un lancement à l'autre.
+
+        Sans cet appel-ci, un panneau rouvert au démarrage de la session
+        suivante capterait la souris de quelqu'un qui avait demandé le
+        contraire — la veille, et sans rien pour le lui rappeler.
+        """
+        panneau = TestPanneauEnSurimpression._Overlay()
+        etat = AppState(store, PriceBook(), None, None, panneau)
+
+        etat.start("Sycraia")
+
+        assert panneau.souris == [True]
+
+    def test_decocher_la_case_rend_le_panneau_cliquable(self, store: SessionStore) -> None:
+        panneau = TestPanneauEnSurimpression._Overlay()
+        etat = AppState(store, PriceBook(), None, None, panneau)
+        etat.start("Sycraia")
+
+        etat.set_settings({"souris_traversante": False})
+
+        assert panneau.souris == [True, False]
+
+    def test_il_est_reapplique_meme_quand_il_n_a_pas_bouge(self, store: SessionStore) -> None:
+        """⚠️ Deux appels système idempotents contre une case qui mentirait.
+
+        Le faire dépendre d'une comparaison rouvrirait la porte au défaut que
+        ce projet trouve partout : un réglage affiché d'un côté, une fenêtre
+        qui fait autre chose de l'autre, et rien pour les départager.
+        """
+        panneau = TestPanneauEnSurimpression._Overlay()
+        etat = AppState(store, PriceBook(), None, None, panneau)
+        etat.start("Sycraia")
+
+        etat.set_settings({"taxe": {"abonnement": True}})
+
+        assert panneau.souris == [True, True]
+
+    def test_sans_panneau_ouvert_le_reglage_s_enregistre_quand_meme(self, app) -> None:
+        """La case se coche avant la première session, et doit tenir."""
+        _, base = app
+
+        post(base, "/api/reglages", {"souris_traversante": False})
+
+        assert get(base, "/api/etat")["reglages"]["souris_traversante"] is False
 
 
 class TestDossierDesSessions:

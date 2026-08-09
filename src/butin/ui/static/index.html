@@ -756,6 +756,24 @@
     <div id="etat-taxe" class="note"></div>
   </div>
 
+  <!-- ⭐ Le panneau posé sur le jeu captait le survol de la souris, donc Windows
+       réaffichait le curseur en plein combat. Demandé par Maxime le 09/08/2026.
+       ⛔ Le prix est écrit noir sur blanc sous la case, parce qu'un bouton qui
+       ne répond plus se lit comme un logiciel cassé, pas comme un réglage. -->
+  <div class="panneau">
+    <div class="etiquette">Panneau posé sur le jeu</div>
+    <label class="case">
+      <input id="souris-traversante" type="checkbox">
+      La souris passe à travers le panneau
+    </label>
+    <div class="note">
+      Coché, le panneau n'attrape plus ni le curseur ni les clics : tu joues
+      comme s'il n'était pas là. En échange il ne <b>répond plus à rien</b> —
+      ses boutons Recalibrer, Pause et Arrêter deviennent inertes et on ne peut
+      plus le déplacer. Tout se pilote alors depuis cette fenêtre-ci.
+    </div>
+  </div>
+
   <div class="panneau">
     <div class="etiquette">Langue et région</div>
     <div class="sliders">
@@ -1655,6 +1673,7 @@ function afficherLaTaxe(reglages) {
   // toute seule.
   $("abonnement").checked = taxe.abonnement;
   $("anneau-marchand").checked = taxe.anneau_marchand;
+  $("souris-traversante").checked = Boolean(reglages.souris_traversante);
   // Le champ de saisie, lui, est protégé : le rafraîchissement d'une seconde
   // replacerait le curseur au début à chaque chiffre tapé.
   if (document.activeElement !== $("renommee")) $("renommee").value = taxe.renommee;
@@ -1682,6 +1701,14 @@ async function envoyerLaTaxe() {
 
 $("abonnement").addEventListener("change", envoyerLaTaxe);
 $("anneau-marchand").addEventListener("change", envoyerLaTaxe);
+
+// ⭐ Le panneau et la souris. Même règle que les cases de taxe : ce qui
+// s'affiche est ce que le serveur confirme, jamais ce qu'on vient de cliquer.
+$("souris-traversante").addEventListener("change", async () => {
+  afficher(await poster("/api/reglages", {
+    souris_traversante: $("souris-traversante").checked,
+  }));
+});
 // « change » et non « input » : sur un champ numérique, « input » enverrait une
 // requête par chiffre tapé, et « 11 » partirait avant « 11952 ».
 $("renommee").addEventListener("change", envoyerLaTaxe);

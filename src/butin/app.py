@@ -38,10 +38,11 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
-from . import paths
+from . import paths, souris
 from .capture.worker import CaptureWorker
 from .catalog import ItemCatalog, ItemMatcher
 from .fenetres import Position, position_a_restaurer
@@ -53,6 +54,10 @@ from .ui.server import AppState, build_server
 _log = logging.getLogger(__name__)
 
 TITLE = "Butin — suivi de butin, Black Desert Online"
+OVERLAY_TITLE = "Butin — en direct"
+"""Le titre du panneau, et pas seulement une décoration : c'est par lui que
+`souris.fenetre_par_titre` retrouve la fenêtre pour poser son style. Le changer
+sans changer l'autre laisserait le réglage sans effet, en silence."""
 WIDTH = 1100
 HEIGHT = 820
 OVERLAY_WIDTH = 430
@@ -79,6 +84,15 @@ plus la même lecture d'un coup d'œil."""
 
 FENETRE_PRINCIPALE = "principale"
 FENETRE_PANNEAU = "panneau"
+
+SOURIS_ESSAIS = 25
+SOURIS_DELAI_S = 0.2
+"""Cinq secondes en tout, par pas de 200 ms, pour attendre que la couche
+graphique ait créé la fenêtre du panneau.
+
+⚠️ Généreux exprès : rater le réglage à l'ouverture, c'est farmer toute une
+session avec la souris captée. Le coût d'attendre est nul, ces essais tournent
+dans un fil démon qui ne retient personne."""
 
 SUIVI_POSITION_S = 3.0
 """Intervalle entre deux relevés de la position d'une fenêtre.
@@ -152,7 +166,7 @@ class Overlay:
         # corvée en deux gestes.
         depart = position_a_restaurer(FENETRE_PANNEAU)
         self._window = webview.create_window(
-            "Butin — en direct",
+            OVERLAY_TITLE,
             self._url,
             width=OVERLAY_WIDTH,
             height=OVERLAY_HEIGHT,
@@ -164,6 +178,41 @@ class Overlay:
             easy_drag=True,
         )
         self._arret_suivi = _suivre_la_position(self._window, FENETRE_PANNEAU)
+
+    def souris_traversante(self, actif: bool) -> None:
+        """Laisse (ou non) la souris passer à travers le panneau. **Ne lève jamais.**
+
+        ⚠️ Le travail part dans un fil, pour deux raisons qui vont ensemble : la
+        fenêtre n'existe pas encore à l'instant où pywebview rend la main (elle
+        est créée par la couche graphique, plus tard), et l'appelant est une
+        requête HTTP qu'on ne fait pas attendre pour un confort.
+
+        Voir `butin.souris` pour ce que ça change, ce que ça coûte, et la mesure
+        qui l'a établi.
+        """
+        if self._window is None:
+            return
+        threading.Thread(
+            target=self._poser_la_souris, args=(actif,), daemon=True, name="butin-souris"
+        ).start()
+
+    def _poser_la_souris(self, actif: bool) -> None:
+        """Réessaie tant que la fenêtre n'est pas là. **Ne lève jamais.**
+
+        ⛔ Sans cette attente, le réglage serait perdu **précisément au moment
+        qui compte** : à l'ouverture du panneau, quand la session démarre. Un
+        seul essai tombe systématiquement avant que la couche graphique ait créé
+        la fenêtre, et le joueur retrouverait la souris captée en farmant sans
+        rien comprendre.
+        """
+        for _ in range(SOURIS_ESSAIS):
+            if self._window is None:
+                return
+            fenetre = souris.fenetre_par_titre(OVERLAY_TITLE)
+            if fenetre is not None and souris.laisser_passer_la_souris(fenetre, actif):
+                return
+            time.sleep(SOURIS_DELAI_S)
+        _log.debug("souris traversante non appliquée au panneau (fenêtre introuvable)")
 
     def resize(self, hauteur: int) -> None:
         """Ajuste la hauteur du panneau à son contenu. **Ne lève jamais.**
