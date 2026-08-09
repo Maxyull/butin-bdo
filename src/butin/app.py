@@ -217,14 +217,23 @@ class Overlay:
         la fenêtre, et le joueur retrouverait la souris captée en farmant sans
         rien comprendre.
 
-        ⛔ **L'ordre des deux poses est contraint, et c'est mesuré** : poser la
-        couleur-clé du fond efface `WS_EX_TRANSPARENT`, donc la transparence
-        passe TOUJOURS avant la souris. Dans l'autre sens, le panneau
-        redeviendrait capteur de souris pendant que la case afficherait encore
-        « coché ». Détail et chiffres dans `butin.transparence`.
+        ⛔⛔ **La case commande DEUX choses, et c'est une contrainte, pas un
+        choix** : la couleur-clé qui rend le fond transparent rend la fenêtre
+        entière intraversable au clic, quel que soit le style de souris. Un
+        panneau transparent ne peut donc pas avoir de boutons.
 
-        ⚠️ La transparence n'est pas une condition de la souris : si elle échoue
-        — pas de .NET, formulaire inattendu — on pose quand même la souris. Un
+            cochée   : fond qui perce jusqu'au jeu, aucun clic reçu
+            décochée : fond opaque sombre, boutons et déplacement retrouvés
+
+        Trouvé par Maxime en farmant, case DÉCOCHÉE : « les boutons en direct ne
+        fonctionnent plus et impossible de bouger la fenêtre ». Détail et mesure
+        dans `butin.transparence`.
+
+        ⛔ **L'ordre reste contraint** : poser la couleur-clé efface
+        `WS_EX_TRANSPARENT`, donc le fond passe TOUJOURS avant la souris.
+
+        ⚠️ Le fond n'est pas une condition de la souris : s'il échoue — pas de
+        .NET, formulaire inattendu — on pose quand même le style de souris. Un
         panneau opaque qui laisse jouer vaut mieux qu'un panneau qui ne fait ni
         l'un ni l'autre.
         """
@@ -234,8 +243,11 @@ class Overlay:
                 return
             fenetre = souris.fenetre_par_titre(OVERLAY_TITLE)
             if fenetre is not None:
-                # ⛔ Dans cet ordre, jamais dans l'autre. Voir la docstring.
-                transparence.rendre_le_fond_transparent(fenetre_pywebview)
+                # ⛔ Le fond d'abord, la souris ensuite. Voir la docstring.
+                if actif:
+                    transparence.rendre_le_fond_transparent(fenetre_pywebview)
+                else:
+                    transparence.rendre_le_fond_opaque(fenetre_pywebview)
                 souris.laisser_passer_la_souris(fenetre, actif)
                 return
             time.sleep(SOURIS_DELAI_S)
