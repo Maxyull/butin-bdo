@@ -95,6 +95,14 @@ class OverlayWindow(Protocol):
         moins d'objets à la fois. Les tests s'en servent tels quels.
         """
 
+    def souris_traversante(self, actif: bool) -> None:
+        """Laisse (ou non) la souris passer à travers le panneau.
+
+        Défaut vide, pour la même raison que `resize` : c'est un confort propre
+        à Windows, et un panneau qui ne sait pas le faire reste utilisable. Voir
+        `butin.souris` pour ce que ça change et ce que ça coûte.
+        """
+
 
 class AppState:
     """État partagé entre les requêtes.
@@ -165,6 +173,7 @@ class AppState:
             "langue": self.settings.language,
             "region": self.settings.region.value,
             "taux_marche": self.settings.market_rate,
+            "souris_traversante": self.settings.overlay_click_through,
             "taxe": {
                 "abonnement": taxe.value_pack,
                 "anneau_marchand": taxe.merchant_ring,
@@ -459,11 +468,21 @@ class AppState:
             self.settings = self.settings.updated(
                 language=data.get("langue"),
                 region=data.get("region"),
+                overlay_click_through=data.get("souris_traversante"),
                 value_pack=taxe.get("abonnement"),
                 merchant_ring=taxe.get("anneau_marchand"),
                 family_fame=taxe.get("renommee"),
             )
             a_ecrire = self.settings
+
+        # ⚠️ **Hors du verrou**, comme l'ouverture du panneau : poser un style de
+        # fenêtre passe par la couche graphique. Et appliqué à CHAQUE
+        # enregistrement, même quand ce réglage-là n'a pas bougé : c'est une
+        # écriture idempotente de deux appels système, et la faire dépendre d'une
+        # comparaison rouvrirait la porte à une case qui dit une chose pendant
+        # que la fenêtre en fait une autre.
+        if self.overlay is not None:
+            self.overlay.souris_traversante(a_ecrire.overlay_click_through)
         try:
             a_ecrire.save()
         except OSError as exc:
@@ -596,12 +615,18 @@ class AppState:
                     self.store.end_session(session.id, ended_at=maintenant)
                     raise
             self.session_id = session.id
+            traversante = self.settings.overlay_click_through
 
         # Hors du verrou : ouvrir une fenêtre passe par la couche graphique,
         # qui peut prendre son temps. Le garder verrouillé bloquerait toutes les
         # autres requêtes, dont celles qui rafraîchissent l'écran.
         if self.overlay is not None:
             self.overlay.open()
+            # ⭐ Tout de suite après l'ouverture, et pas seulement quand la case
+            # change : le réglage est retenu d'un lancement à l'autre, donc un
+            # panneau ouvert sans lui capterait la souris de quelqu'un qui avait
+            # justement demandé le contraire — hier.
+            self.overlay.souris_traversante(traversante)
         return session.id
 
     def stop(self, *, now: float | None = None) -> None:

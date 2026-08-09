@@ -67,6 +67,19 @@ class Settings:
     region: Region = Region.EU
     tax: TaxProfile = field(default_factory=TaxProfile)
 
+    overlay_click_through: bool = True
+    """Le panneau posé sur le jeu laisse-t-il passer la souris ?
+
+    ⭐ Vrai par défaut, tranché par Maxime le 09/08/2026 : le panneau captait le
+    survol, donc Windows réaffichait le curseur en plein jeu. Le défaut protège
+    ce qui compte le plus — jouer — et le coût est réversible d'une case à
+    cocher : le panneau ne reçoit plus de clic tant que c'est actif.
+
+    ⚠️ Le seul réglage de ce fichier qui agisse sur une fenêtre plutôt que sur
+    un calcul. Il est donc appliqué à l'ouverture du panneau ET à chaque
+    changement, sinon la case dirait une chose et la fenêtre en ferait une
+    autre."""
+
     @property
     def market_rate(self) -> float:
         """Part du prix affiché réellement reçue à l'hôtel des ventes."""
@@ -80,6 +93,7 @@ class Settings:
         value_pack: object = None,
         merchant_ring: object = None,
         family_fame: object = None,
+        overlay_click_through: object = None,
     ) -> Settings:
         """Applique ce qui est valide, ignore le reste, et rend un nouveau réglage.
 
@@ -99,6 +113,14 @@ class Settings:
                 change["region"] = Region(region)
             except ValueError:
                 _log.warning("région inconnue ignorée : %r", region)
+
+        if overlay_click_through is not None:
+            if isinstance(overlay_click_through, bool):
+                change["overlay_click_through"] = overlay_click_through
+            else:
+                _log.warning(
+                    "souris traversante attendue booléenne, reçue %r", overlay_click_through
+                )
 
         taxe: dict[str, Any] = {}
         for nom, valeur in (("value_pack", value_pack), ("merchant_ring", merchant_ring)):
@@ -130,6 +152,7 @@ class Settings:
         return {
             "language": self.language,
             "region": self.region.value,
+            "overlay_click_through": self.overlay_click_through,
             "tax": {
                 "value_pack": self.tax.value_pack,
                 "merchant_ring": self.tax.merchant_ring,
@@ -148,6 +171,7 @@ class Settings:
         return cls().updated(
             language=data.get("language"),
             region=data.get("region"),
+            overlay_click_through=data.get("overlay_click_through"),
             value_pack=taxe.get("value_pack"),
             merchant_ring=taxe.get("merchant_ring"),
             family_fame=taxe.get("family_fame"),

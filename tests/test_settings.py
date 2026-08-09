@@ -102,6 +102,36 @@ class TestDisque:
         assert Settings.load(cible) == Settings()
 
 
+class TestSourisTraversante:
+    """Le seul réglage de ce fichier qui agisse sur une FENÊTRE.
+
+    Demandé par Maxime le 09/08/2026 : le panneau posé sur le jeu captait le
+    survol, donc Windows réaffichait le curseur en plein combat.
+    """
+
+    def test_le_defaut_protege_le_jeu(self) -> None:
+        """⭐ Vrai par défaut, tranché par Maxime. Le défaut protège ce qui
+        compte le plus — jouer — et son coût se défait d'une case à cocher."""
+        assert Settings().overlay_click_through is True
+
+    def test_le_choix_survit_au_relancement(self, tmp_path: Path) -> None:
+        """Sinon le panneau redeviendrait capteur de souris à chaque lancement,
+        et il faudrait y repenser avant chaque session de farm."""
+        cible = tmp_path / "reglages.json"
+        Settings(overlay_click_through=False).save(cible)
+
+        assert Settings.load(cible).overlay_click_through is False
+
+    def test_une_valeur_qui_n_est_pas_un_booleen_est_refusee(self) -> None:
+        assert Settings().updated(overlay_click_through="oui").overlay_click_through is True
+
+    def test_changer_ce_reglage_garde_le_reste(self) -> None:
+        reglages = Settings(tax=PROFIL_REEL).updated(overlay_click_through=False)
+
+        assert reglages.overlay_click_through is False
+        assert reglages.tax == PROFIL_REEL
+
+
 class TestValidation:
     def test_une_langue_inconnue_ne_change_rien(self) -> None:
         assert Settings().updated(language="klingon").language == "fr"

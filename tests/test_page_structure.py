@@ -450,6 +450,50 @@ class TestLePanneauNeCourtCircuitePlusLeParcours:
         assert "parcoursLeCompteEstBon(session)" in corps
 
 
+class TestLaSourisTraverseLePanneau:
+    """⭐ Demandé par Maxime le 09/08/2026 : « je passe dessus et ça affiche la
+    souris, c'est chiant ».
+
+    Le panneau laisse maintenant passer la souris. ⛔ Le prix est qu'il ne
+    reçoit plus AUCUN clic, et c'est ce que ces tests gardent : la case existe
+    du côté où elle reste cliquable, et le panneau ne montre pas des boutons
+    qui ne peuvent plus rien faire.
+    """
+
+    def test_la_case_est_dans_les_reglages_et_pas_dans_le_panneau(self) -> None:
+        """⛔ Elle ne peut pas vivre dans le panneau : quand elle est cochée,
+        le panneau ne reçoit plus de clic, donc plus moyen de la décocher.
+        Le réglage qui rend une fenêtre inerte ne peut pas habiter dedans."""
+        assert "souris-traversante" in identifiants_declares(page("index.html"))
+        assert "souris-traversante" not in identifiants_declares(page("overlay.html"))
+
+    def test_la_case_dit_ce_qu_elle_coute(self) -> None:
+        """Un bouton qui ne répond plus se lit comme un logiciel cassé. La page
+        doit donc annoncer la contrepartie avant qu'on la découvre."""
+        source = page("index.html")
+        bloc = source[source.index('id="souris-traversante"') :][:700]
+
+        assert "répond plus à rien" in bloc
+        assert "Recalibrer" in bloc
+
+    def test_le_panneau_retire_ses_boutons_quand_la_souris_le_traverse(self) -> None:
+        source = page("overlay.html")
+        corps = source[source.index("function afficher(etat)") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert "reglages.souris_traversante" in corps
+        for bouton in ("recalibrer", "pause", "fermer"):
+            assert bouton in corps
+
+    def test_le_panneau_dit_pourquoi_ses_boutons_ont_disparu(self) -> None:
+        """Trois boutons qui disparaissent sans un mot, c'est une panne ; avec
+        un mot, c'est un réglage."""
+        source = page("overlay.html")
+
+        assert "sans-clic" in identifiants_declares(source)
+        assert "pilote depuis la fenêtre Butin" in source
+
+
 def _bloc_du_schema(source: str) -> str:
     """Le contenu de `#schema-zone`, découpé sur ses balises littérales.
 

@@ -9,6 +9,21 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
+### Ajouté
+
+- **⭐ Le panneau laisse passer la souris.** Black Desert cache le curseur
+  pendant qu'on joue, et le panneau posé par-dessus le récupérait au premier
+  survol : la flèche réapparaissait en plein combat. Il devient transparent au
+  pointeur, aux clics et au survol — tout va au jeu.
+
+  ⛔ Le prix, et il est dit à l'écran : le panneau ne reçoit alors plus **aucun**
+  clic. Ses boutons Recalibrer, Pause et Arrêter disparaissent plutôt que de
+  faire semblant, et il ne se déplace plus à la souris. Tout se pilote depuis la
+  fenêtre principale.
+
+  La case « la souris passe à travers le panneau » est dans Réglages, cochée par
+  défaut, et le panneau redevient cliquable dès qu'on la décoche.
+
 ### Corrigé
 
 - **Arrêter depuis le panneau ne saute plus la photo d'inventaire d'arrivée.**
