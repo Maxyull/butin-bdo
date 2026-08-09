@@ -42,7 +42,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import paths, souris
+from . import paths, souris, transparence
 from .capture.worker import CaptureWorker
 from .catalog import ItemCatalog, ItemMatcher
 from .fenetres import Position, position_a_restaurer
@@ -180,23 +180,23 @@ class Overlay:
         self._arret_suivi = _suivre_la_position(self._window, FENETRE_PANNEAU)
 
     def souris_traversante(self, actif: bool) -> None:
-        """Laisse (ou non) la souris passer à travers le panneau. **Ne lève jamais.**
+        """Prépare le panneau : fond transparent, puis souris. **Ne lève jamais.**
 
         ⚠️ Le travail part dans un fil, pour deux raisons qui vont ensemble : la
         fenêtre n'existe pas encore à l'instant où pywebview rend la main (elle
         est créée par la couche graphique, plus tard), et l'appelant est une
         requête HTTP qu'on ne fait pas attendre pour un confort.
 
-        Voir `butin.souris` pour ce que ça change, ce que ça coûte, et la mesure
-        qui l'a établi.
+        Voir `butin.souris` et `butin.transparence` pour ce que chacun change,
+        ce que ça coûte, et les mesures qui les ont établis.
         """
         if self._window is None:
             return
         threading.Thread(
-            target=self._poser_la_souris, args=(actif,), daemon=True, name="butin-souris"
+            target=self._preparer_la_fenetre, args=(actif,), daemon=True, name="butin-panneau"
         ).start()
 
-    def _poser_la_souris(self, actif: bool) -> None:
+    def _preparer_la_fenetre(self, actif: bool) -> None:
         """Réessaie tant que la fenêtre n'est pas là. **Ne lève jamais.**
 
         ⛔ Sans cette attente, le réglage serait perdu **précisément au moment
@@ -204,15 +204,30 @@ class Overlay:
         seul essai tombe systématiquement avant que la couche graphique ait créé
         la fenêtre, et le joueur retrouverait la souris captée en farmant sans
         rien comprendre.
+
+        ⛔ **L'ordre des deux poses est contraint, et c'est mesuré** : poser la
+        couleur-clé du fond efface `WS_EX_TRANSPARENT`, donc la transparence
+        passe TOUJOURS avant la souris. Dans l'autre sens, le panneau
+        redeviendrait capteur de souris pendant que la case afficherait encore
+        « coché ». Détail et chiffres dans `butin.transparence`.
+
+        ⚠️ La transparence n'est pas une condition de la souris : si elle échoue
+        — pas de .NET, formulaire inattendu — on pose quand même la souris. Un
+        panneau opaque qui laisse jouer vaut mieux qu'un panneau qui ne fait ni
+        l'un ni l'autre.
         """
         for _ in range(SOURIS_ESSAIS):
-            if self._window is None:
+            fenetre_pywebview = self._window
+            if fenetre_pywebview is None:
                 return
             fenetre = souris.fenetre_par_titre(OVERLAY_TITLE)
-            if fenetre is not None and souris.laisser_passer_la_souris(fenetre, actif):
+            if fenetre is not None:
+                # ⛔ Dans cet ordre, jamais dans l'autre. Voir la docstring.
+                transparence.rendre_le_fond_transparent(fenetre_pywebview)
+                souris.laisser_passer_la_souris(fenetre, actif)
                 return
             time.sleep(SOURIS_DELAI_S)
-        _log.debug("souris traversante non appliquée au panneau (fenêtre introuvable)")
+        _log.debug("panneau non préparé (fenêtre introuvable)")
 
     def resize(self, hauteur: int) -> None:
         """Ajuste la hauteur du panneau à son contenu. **Ne lève jamais.**

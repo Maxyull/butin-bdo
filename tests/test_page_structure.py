@@ -494,6 +494,39 @@ class TestLaSourisTraverseLePanneau:
         assert "pilote depuis la fenêtre Butin" in source
 
 
+class TestLePanneauNeCoupeRienEnSilence:
+    """⛔ Le panneau s'arrêtait à douze objets, sans un mot.
+
+    Signalé par Maxime le 09/08/2026 : « lorsque trop d'objets c'est coupé ».
+    Au-delà du douzième, les suivants n'étaient ni affichés ni signalés —
+    exactement comme s'ils n'existaient pas. Une session de Sycraia en aligne
+    facilement le double.
+
+    ⚠️ Et depuis que la souris traverse le panneau, on ne peut plus y défiler :
+    ce qui est à l'écran est tout ce qu'on verra. Une troncature muette y est
+    devenue une perte sèche.
+    """
+
+    def test_la_limite_est_nommee_et_pas_ecrite_dans_la_boucle(self) -> None:
+        """Un nombre nu au milieu d'une boucle ne se relie à rien : ni à la
+        hauteur du panneau, ni à sa borne, ni à ce qu'on annonce en dessous."""
+        source = page("overlay.html")
+
+        assert "const LIGNES_MAX = 20;" in source
+        assert "butin.slice(0, LIGNES_MAX)" in source
+
+    def test_ce_qui_depasse_est_ANNONCE(self) -> None:
+        source = page("overlay.html")
+        corps = source[source.index("function afficher(etat)") :]
+        corps = corps[: corps.index("\n}\n")]
+
+        assert "butin.length - LIGNES_MAX" in corps
+        assert "autre" in corps
+        # Le nombre d'unités aussi : « + 4 autres objets » sans quantité laisse
+        # croire à quatre bricoles, alors que ça peut peser plus que le reste.
+        assert "unité" in corps
+
+
 def _bloc_du_schema(source: str) -> str:
     """Le contenu de `#schema-zone`, découpé sur ses balises littérales.
 

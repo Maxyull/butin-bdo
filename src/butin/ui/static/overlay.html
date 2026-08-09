@@ -5,7 +5,18 @@
   /* ⚠️ Fond entièrement transparent. C'est la seule raison d'être de cette
      page : elle se pose PAR-DESSUS le jeu, et tout pixel opaque qu'elle
      ajoute est un pixel de jeu que le joueur ne voit plus. Seules les
-     pastilles de texte ont un fond, et il est translucide. */
+     pastilles de texte ont un fond, et il est translucide.
+
+     ⛔ Et ça n'a PAS marché pendant des semaines, sans que rien ne le dise.
+     Ce commentaire décrivait une intention : sous Windows, pywebview rendait
+     bien la vue web transparente, mais sur le fond gris clair du formulaire
+     qui la porte. Photographié par-dessus le vrai jeu le 09/08/2026 : un aplat
+     clair, le « blanc très moche » signalé par Maxime. Corrigé par une
+     couleur-clé posée sur le formulaire, voir `butin/transparence.py`.
+
+     ⛔ CONSÉQUENCE POUR CETTE PAGE : le magenta pur (#ff00ff) est désormais la
+     couleur qui perce. Tout pixel qui la porte exactement devient un trou vers
+     le jeu. Ne jamais l'utiliser ici, ni dans une image servie ici. */
   /* ⛔ Meme garde que dans `index.html`, et pour la meme raison : la regle
      `[hidden] { display: none }` vient de la feuille du NAVIGATEUR, et toute
      regle d'auteur qui pose un `display` la bat en silence. Deux elements de la
@@ -130,6 +141,9 @@
   .rarete-5 { color: #ff8b3d; }
 
   #vide { color: #97a0b5; font-size: 13px; padding: 4px 0; }
+  /* Ce qui dépasse de la liste. Discret mais lisible : ce n'est pas un drop,
+     c'est ce qu'on ne montre pas — et le taire serait mentir par omission. */
+  .reste { color: #97a0b5; font-size: 12px; padding: 3px 0 1px; font-style: italic; }
   #panne { color: #ff8b3d; font-size: 13px; padding: 4px 0; display: none; }
 
   /* ⛔ « Je ne vois plus le chat ». Plus voyant que la panne, parce que c'est
@@ -180,6 +194,11 @@ function chrono(secondes) {
   const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
   return h + ":" + m + ":" + String(s % 60).padStart(2, "0");
 }
+
+// ⚠️ Vingt lignes, et non douze. Le panneau grandit avec sa liste jusqu'à sa
+// borne (voir `OVERLAY_HEIGHT_MAX`), et vingt lignes y tiennent. Ce qui dépasse
+// est annoncé sur une ligne de plus, jamais avalé.
+const LIGNES_MAX = 20;
 
 // Quantité déjà affichée par objet, pour repérer celles qui viennent de monter.
 // Une Map et non un Set : c'est la VARIATION qui signale un drop, pas la
@@ -244,7 +263,7 @@ function afficher(etat) {
 
   const vues = new Map();
   zone.innerHTML = "";
-  for (const ligne of butin.slice(0, 12)) {
+  for (const ligne of butin.slice(0, LIGNES_MAX)) {
     vues.set(ligne.item_id, ligne.quantite);
     // Une ligne s'anime quand sa quantité AUGMENTE. C'est ce qui remplace
     // l'arrivée d'une ligne neuve : sans ça, un récap cumulé ne dirait plus
@@ -276,6 +295,25 @@ function afficher(etat) {
 
     rangee.append(icone, nom, qte, valeur);
     zone.appendChild(rangee);
+  }
+
+  // ⛔ Ce qui dépasse est ANNONCÉ, jamais coupé en silence. Le panneau montrait
+  // douze objets et s'arrêtait là : au-delà, les suivants n'étaient ni affichés
+  // ni signalés, exactement comme s'ils n'existaient pas — et une session de
+  // Sycraia en aligne facilement le double.
+  //
+  // ⚠️ Et depuis que la souris traverse le panneau, on ne peut PLUS y défiler :
+  // ce qui est à l'écran est tout ce qu'on verra. Une troncature muette y est
+  // donc devenue une perte sèche d'information.
+  const reste = butin.length - LIGNES_MAX;
+  if (reste > 0) {
+    const ligne = document.createElement("div");
+    ligne.className = "reste";
+    const unites = butin.slice(LIGNES_MAX).reduce((somme, l) => somme + (l.quantite || 0), 0);
+    ligne.textContent =
+      "+ " + reste + " autre" + (reste > 1 ? "s" : "") + " objet" + (reste > 1 ? "s" : "") +
+      " (" + nombre(unites) + " unité" + (unites > 1 ? "s" : "") + ") — voir l'Historique";
+    zone.appendChild(ligne);
   }
   dejaVus = vues;
 }
