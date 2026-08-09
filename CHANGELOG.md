@@ -26,6 +26,10 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ### Corrigé
 
+- **La barre de titre de la fenêtre passe en sombre.** Elle restait claire
+  au-dessus d'une page entièrement sombre : c'est Windows qui la dessine, et
+  aucune règle de la page ne l'atteint.
+
 - **⭐ Le panneau est enfin VRAIMENT transparent.** Il se déclarait transparent
   depuis le début, et ça n'a jamais marché sous Windows : sous la boîte du
   récap, un aplat gris clair recouvrait le jeu. C'était le « blanc très moche ».

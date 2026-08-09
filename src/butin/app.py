@@ -42,7 +42,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import paths, souris, transparence
+from . import barre_de_titre, paths, souris, transparence
 from .capture.worker import CaptureWorker
 from .catalog import ItemCatalog, ItemMatcher
 from .fenetres import Position, position_a_restaurer
@@ -93,6 +93,18 @@ graphique ait créé la fenêtre du panneau.
 ⚠️ Généreux exprès : rater le réglage à l'ouverture, c'est farmer toute une
 session avec la souris captée. Le coût d'attendre est nul, ces essais tournent
 dans un fil démon qui ne retient personne."""
+
+BARRE_DUREE_S = 10.0
+BARRE_INTERVALLE_S = 0.4
+"""Combien de temps on tient la barre de titre en sombre après l'ouverture.
+
+⛔ Ce n'est pas de la prudence en l'air : mesuré sur la vraie fenêtre, une pose
+unique est **effacée** par la suite de l'ouverture (luminance 4 à t=1 s, 243 à
+t=2,5 s). Dix secondes couvrent largement le démarrage de la vue web sur cette
+machine ; au-delà, plus rien ne touche au cadre.
+
+⚠️ Le coût est nul : un appel système qui ne change rien quand c'est déjà posé,
+toutes les 400 ms, dans un fil démon qui meurt tout seul."""
 
 SUIVI_POSITION_S = 3.0
 """Intervalle entre deux relevés de la position d'une fenêtre.
@@ -447,10 +459,51 @@ def _open_window(url: str) -> None:
         y=depart.y if depart else None,
     )
     arret = _suivre_la_position(fenetre, FENETRE_PRINCIPALE)
+    _assombrir_la_barre_de_titre(TITLE)
     try:
         webview.start()
     finally:
         arret.set()
+
+
+def _assombrir_la_barre_de_titre(titre: str) -> None:
+    """Tient la barre de titre en sombre pendant toute l'ouverture.
+
+    ⚠️ Dans un fil : la fenêtre n'existe pas encore quand `create_window` rend
+    la main, elle est créée par la couche graphique pendant `webview.start()`.
+
+    ⛔ **Et une seule pose ne suffit pas, c'est mesuré.** La barre devient bien
+    sombre à la première seconde, puis **redevient claire** : pywebview touche
+    au cadre après coup (`ExtendFrameIntoClientArea`, politique de rendu non
+    client) et efface le réglage. Luminance de la bande de titre, sur la vraie
+    fenêtre : **4 à t=1 s, 243 à t=2,5 s**, sans que rien d'autre ne change.
+
+    On repose donc pendant `BARRE_DUREE_S`, le temps que l'ouverture se
+    stabilise. C'est une poignée d'appels système sans effet de bord, et le fil
+    démon meurt tout seul.
+
+    ⭐ Le piège de la MESURE, à ne pas refaire : les deux premières lectures
+    ont photographié la zone de l'écran sans vérifier ce qu'il y avait dessus.
+    L'une a rendu 248 (une autre fenêtre couvrait la barre) et a fait accuser
+    le correctif ; l'autre 36 (le jeu par-dessus) et l'a fait déclarer bon. Une
+    mesure doit dire **ce qu'elle regarde**, sinon elle raconte n'importe quoi
+    dans les deux sens.
+
+    Ne lève jamais et ne retient personne : une barre claire n'empêche rien.
+    """
+
+    def poser() -> None:
+        fin = time.monotonic() + BARRE_DUREE_S
+        pose_au_moins_une_fois = False
+        while time.monotonic() < fin:
+            fenetre = souris.fenetre_par_titre(titre)
+            if fenetre is not None and barre_de_titre.rendre_sombre(fenetre):
+                pose_au_moins_une_fois = True
+            time.sleep(BARRE_INTERVALLE_S)
+        if not pose_au_moins_une_fois:
+            _log.debug("barre de titre laissée telle quelle (fenêtre introuvable)")
+
+    threading.Thread(target=poser, daemon=True, name="butin-barre-titre").start()
 
 
 def main() -> int:
