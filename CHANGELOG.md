@@ -9,7 +9,12 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
 
 ## [Non publié]
 
-### Corrigé (en premier, parce que c'était visible)
+## [0.14.0] - 2026-08-09
+
+Six correctifs de **fenêtres**, tous trouvés en regardant l'écran plutôt qu'en
+relisant du code. Rien ici ne touche au comptage.
+
+### Corrigé
 
 - **⛔ Les deux boutons sous le calibrage ne faisaient RIEN.** Ni l'un ni
   l'autre n'écoutait le moindre clic.
@@ -43,7 +48,11 @@ version, ce qu'elle promet et ce qu'elle ne promet pas, est expliquée dans
   La case « la souris passe à travers le panneau » est dans Réglages, cochée par
   défaut, et le panneau redevient cliquable dès qu'on la décoche.
 
-### Corrigé
+- **Le lien vers le dépôt, en haut à droite.** Butin est sous licence MIT et son
+  code est public : c'est ce qui te permet de vérifier ce qu'un logiciel qui lit
+  ton écran fait de ce qu'il y lit.
+
+### Corrigé (suite)
 
 - **La barre de titre de la fenêtre passe en sombre.** Elle restait claire
   au-dessus d'une page entièrement sombre : c'est Windows qui la dessine, et
